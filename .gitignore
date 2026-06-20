@@ -1,0 +1,41 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings
+TestResults/
+coverage/
+
+# NuGet
+*.nupkg
+packages/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Frontend / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local dev secrets — never commit
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
