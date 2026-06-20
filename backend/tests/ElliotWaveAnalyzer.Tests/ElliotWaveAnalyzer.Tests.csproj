@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ElliotWaveAnalyzer.Tests</RootNamespace>
+    <AssemblyName>ElliotWaveAnalyzer.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NUnit over xUnit: cleaner [SetUp]/[TearDown] lifecycle for stateful test fixtures.
+         NSubstitute over Moq: no telemetry controversy, cleaner argument matcher syntax. -->
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp" Version="1.0.17">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ElliotWaveAnalyzer.Api\ElliotWaveAnalyzer.Api.csproj" />
+  </ItemGroup>
+
+</Project>
