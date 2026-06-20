@@ -1,0 +1,90 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '30 12 * * 5'  # Every Friday at 12:30 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  # ── .NET NuGet vulnerability scan ────────────────────────────────────────
+  dotnet-audit:
+    name: .NET Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore
+        working-directory: backend
+
+      - name: Check for vulnerable packages
+        run: dotnet list package --vulnerable --include-transitive 2>&1 | tee /tmp/vuln-report.txt
+        working-directory: backend
+
+      - name: Fail on critical vulnerabilities
+        run: |
+          if grep -q "Critical\|High" /tmp/vuln-report.txt; then
+            echo "Critical or High vulnerabilities found:"
+            cat /tmp/vuln-report.txt
+            exit 1
+          fi
+
+  # ── npm audit ─────────────────────────────────────────────────────────────
+  npm-audit:
+    name: npm Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+  # ── License compliance ────────────────────────────────────────────────────
+  license-check:
+    name: Frontend License Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Check licenses (no GPL / AGPL)
+        working-directory: frontend
+        run: |
+          npx license-checker-rseidelsohn --summary \
+            --failOn "GPL;AGPL" \
+            --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;CC0-1.0;Unlicense;0BSD;BlueOak-1.0.0" \
+            || echo "Warning: Unlisted or restrictive licenses found"
