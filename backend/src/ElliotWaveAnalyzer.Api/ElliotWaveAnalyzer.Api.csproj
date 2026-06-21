@@ -28,7 +28,7 @@
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
          Replaces Swagger UI (Swashbuckle dependency). -->
-    <PackageReference Include="Scalar.AspNetCore" Version="2.5.13" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.6.0" />
 
     <!-- Gemini is called via the REST API directly (HttpClient).
          No SDK dependency — avoids SDK type-surface changes between versions.
