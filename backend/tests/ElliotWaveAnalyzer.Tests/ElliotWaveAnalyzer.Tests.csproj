@@ -23,6 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- ImplicitUsings is enabled but NUnit does not ship implicit global usings.
+         Expose the test attributes ([TestFixture], [Test], [SetUp], …) project-wide. -->
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\ElliotWaveAnalyzer.Api\ElliotWaveAnalyzer.Api.csproj" />
   </ItemGroup>
 
