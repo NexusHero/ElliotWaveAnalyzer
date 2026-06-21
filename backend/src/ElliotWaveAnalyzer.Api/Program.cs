@@ -4,6 +4,7 @@ using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
 using ElliotWaveAnalyzer.Api.Infrastructure;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
@@ -162,6 +163,27 @@ try
 
     // ── Wave analysis orchestration ───────────────────────────────────────────
     builder.Services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();
+
+    // ── Daily report (opt-in via DailyReport:Enabled) ─────────────────────────
+    // Renders a chart per symbol and delivers it through every enabled channel.
+    // Adding a channel = new IReportDeliveryChannel + one line here (OCP).
+    builder.Services.Configure<DailyReportOptions>(
+        builder.Configuration.GetSection(DailyReportOptions.SectionName));
+    builder.Services.AddSingleton<IChartRenderer, SkiaSharpChartRenderer>();
+
+    builder.Services.AddHttpClient<TelegramDeliveryChannel>(client =>
+        client.BaseAddress = new Uri("https://api.telegram.org/"))
+        .AddStandardResilienceHandler();
+    builder.Services.AddTransient<IReportDeliveryChannel>(sp =>
+        sp.GetRequiredService<TelegramDeliveryChannel>());
+    builder.Services.AddTransient<IReportDeliveryChannel, EmailDeliveryChannel>();
+
+    builder.Services.AddTransient<IDailyReportService, DailyReportService>();
+
+    if (builder.Configuration.GetValue<bool>($"{DailyReportOptions.SectionName}:Enabled"))
+    {
+        builder.Services.AddHostedService<DailyReportBackgroundService>();
+    }
 
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();
