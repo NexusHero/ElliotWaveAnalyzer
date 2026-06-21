@@ -1,3 +1,11 @@
+/*
+ * Design tokens live here so the whole app is themeable from one place.
+ * Colours are referenced everywhere via CSS custom properties (var(--color-*)),
+ * never hard-coded in components — swapping or adding a theme means editing only
+ * this file. The dark theme is the default (:root); the light theme overrides the
+ * same tokens under [data-theme="light"], which useTheme sets on <html>.
+ */
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -7,11 +15,35 @@
 :root {
   --color-bg: #0d1117;
   --color-surface: #161b22;
+  --color-surface-2: #1c222b;
   --color-border: #30363d;
   --color-text: #c9d1d9;
+  --color-text-muted: #8b949e;
   --color-accent: #58a6ff;
+  --color-on-accent: #ffffff;
   --color-up: #3fb950;
   --color-down: #f85149;
+  --color-warning: #d29922;
+
+  --radius: 6px;
+  --space: 8px;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --color-bg: #ffffff;
+  --color-surface: #f6f8fa;
+  --color-surface-2: #eaeef2;
+  --color-border: #d0d7de;
+  --color-text: #1f2328;
+  --color-text-muted: #57606a;
+  --color-accent: #0969da;
+  --color-on-accent: #ffffff;
+  --color-up: #1a7f37;
+  --color-down: #cf222e;
+  --color-warning: #9a6700;
+
+  color-scheme: light;
 }
 
 html, body, #root {
@@ -20,4 +52,14 @@ html, body, #root {
   color: var(--color-text);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   font-size: 14px;
+}
+
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Shared form-control baseline so inputs/buttons follow the theme. */
+input, select, button {
+  font: inherit;
+  color: var(--color-text);
 }

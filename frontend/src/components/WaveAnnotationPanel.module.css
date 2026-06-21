@@ -1,0 +1,129 @@
+.panel {
+  width: 320px;
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.heading {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.subHeading {
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.picker {
+  margin-bottom: 12px;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.labelButton {
+  min-width: 28px;
+  padding: 4px 6px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.labelButton:hover {
+  border-color: var(--color-accent);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.listItemLabel {
+  flex: 1;
+}
+
+.select,
+.removeButton {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.submit {
+  margin-top: 12px;
+  padding: 8px 12px;
+  width: 100%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: var(--color-down);
+  margin-top: 8px;
+}
+
+.result {
+  margin-top: 12px;
+}
+
+.statusValid {
+  font-weight: 600;
+  color: var(--color-up);
+}
+
+.statusInvalid {
+  font-weight: 600;
+  color: var(--color-down);
+}
+
+.violation {
+  color: var(--color-down);
+}
+
+.warning {
+  color: var(--color-warning);
+}
+
+.usage {
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+
+.analysis {
+  margin-top: 8px;
+}

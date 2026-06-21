@@ -1,99 +1,80 @@
-import { useCallback, useMemo, useState } from 'react'
-import PriceChart, { type ChartMarker } from './components/PriceChart'
-import WaveAnnotationPanel from './components/WaveAnnotationPanel'
-import { DUMMY_CANDLES } from './api/dummyData'
-import { validateWaveCount } from './api/client'
-import type { LlmValidation, WaveAnnotation } from './api/types'
-
-const SYMBOL = 'BTC'
+import { useCallback, useEffect, useState } from 'react'
+import LoginForm, { type AuthMode } from './components/LoginForm'
+import ThemeToggle from './components/ThemeToggle'
+import WaveWorkspace from './components/WaveWorkspace'
+import { useTheme } from './hooks/useTheme'
+import { getCurrentUser, login, logout, register, type CurrentUser } from './api/client'
+import styles from './App.module.css'
 
 /**
- * Root component. Wires the price chart to the Elliott Wave annotation workflow:
- * click the chart to place labels, then validate the wave count via the backend.
- * Candle data is still dummy until the market-data API is wired into the UI.
+ * Root component. Gates the app behind authentication, hosts the dark/light theme
+ * switch, and renders the wave workspace once the user is logged in.
  */
 export default function App() {
-  const [annotations, setAnnotations] = useState<WaveAnnotation[]>([])
-  const [pending, setPending] = useState<{ time: string; price: number } | null>(null)
-  const [result, setResult] = useState<LlmValidation | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { theme, toggleTheme } = useTheme()
+  const [user, setUser] = useState<CurrentUser | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(false)
 
-  const handlePointClick = useCallback((time: string, price: number) => {
-    setPending({ time, price })
+  // Probe the session once on load.
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setAuthChecked(true))
   }, [])
 
-  const handleAddLabel = useCallback((label: string) => {
-    setPending(current => {
-      if (current) {
-        const annotation: WaveAnnotation = {
-          date: `${current.time}T00:00:00Z`,
-          price: current.price,
-          label,
-        }
-        setAnnotations(prev =>
-          [...prev, annotation].sort((a, b) => a.date.localeCompare(b.date)),
-        )
-      }
-      return null
-    })
-    setResult(null)
-  }, [])
-
-  const handleRelabel = useCallback((index: number, label: string) => {
-    setAnnotations(prev => prev.map((a, i) => (i === index ? { ...a, label } : a)))
-  }, [])
-
-  const handleRemove = useCallback((index: number) => {
-    setAnnotations(prev => prev.filter((_, i) => i !== index))
-  }, [])
-
-  const handleSubmit = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
+  const handleAuth = useCallback(async (mode: AuthMode, email: string, password: string) => {
+    setAuthLoading(true)
+    setAuthError(null)
     try {
-      const validation = await validateWaveCount({ symbol: SYMBOL, annotations })
-      setResult(validation)
+      if (mode === 'register') {
+        await register(email, password)
+      }
+      await login(email, password)
+      setUser(await getCurrentUser())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Validation failed')
+      setAuthError(e instanceof Error ? e.message : 'Authentication failed')
     } finally {
-      setLoading(false)
+      setAuthLoading(false)
     }
-  }, [annotations])
+  }, [])
 
-  const markers = useMemo<ChartMarker[]>(
-    () => annotations.map(a => ({ time: a.date.split('T')[0] ?? a.date, label: a.label })),
-    [annotations],
-  )
+  const handleLogout = useCallback(async () => {
+    await logout()
+    setUser(null)
+  }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <header style={{ padding: '12px 16px' }}>
-        <h1 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-accent)' }}>
-          Elliott Wave Analyzer
-        </h1>
-        <p style={{ fontSize: '12px', color: '#8b949e', marginTop: '2px' }}>
-          {SYMBOL}/USD · dummy candles · click the chart to annotate waves
-        </p>
+    <div className={styles.app}>
+      <header className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Elliott Wave Analyzer</h1>
+          <p className={styles.subtitle}>BTC/USD · dummy candles · click the chart to annotate waves</p>
+        </div>
+        <div className={styles.actions}>
+          {user && <span className={styles.user}>{user.email}</span>}
+          {user && (
+            <button type="button" className={styles.logout} onClick={handleLogout}>
+              Log out
+            </button>
+          )}
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
       </header>
 
-      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <main style={{ flex: 1, minHeight: 0, padding: '8px 16px' }}>
-          <PriceChart candles={DUMMY_CANDLES} annotations={markers} onPointClick={handlePointClick} />
-        </main>
-        <WaveAnnotationPanel
-          annotations={annotations}
-          pending={pending}
-          result={result}
-          error={error}
-          loading={loading}
-          onAddLabel={handleAddLabel}
-          onRelabel={handleRelabel}
-          onRemove={handleRemove}
-          onSubmit={handleSubmit}
-        />
-      </div>
+      {!authChecked ? (
+        <div className={styles.center}>
+          <p>Loading…</p>
+        </div>
+      ) : user ? (
+        <WaveWorkspace theme={theme} />
+      ) : (
+        <div className={styles.center}>
+          <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} />
+        </div>
+      )}
     </div>
   )
 }

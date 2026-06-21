@@ -11,6 +11,7 @@ import {
   CrosshairMode,
 } from 'lightweight-charts'
 import type { MarketCandle } from '../api/types'
+import type { Theme } from '../hooks/useTheme'
 
 /** A wave label pinned to a chart date. */
 export interface ChartMarker {
@@ -24,16 +25,16 @@ interface PriceChartProps {
   annotations?: ChartMarker[]
   /** Called when the user clicks a point on the chart (date + price at the click). */
   onPointClick?: (time: string, price: number) => void
+  /** Current theme — drives the chart colours, which are read from the CSS variables. */
+  theme?: Theme
 }
 
 /**
  * Candlestick chart using TradingView Lightweight Charts, with an Elliott Wave
- * annotation layer: wave labels are drawn as series markers, and clicking the chart
- * reports the date + price so the parent can place a new label.
- *
- * Lightweight Charts is a pure rendering library — RSI/MACD are computed server-side.
+ * annotation layer. Colours are read from the app's CSS custom properties so the chart
+ * follows the active theme; on a theme switch the options are re-applied.
  */
-export default function PriceChart({ candles, annotations = [], onPointClick }: PriceChartProps) {
+export default function PriceChart({ candles, annotations = [], onPointClick, theme = 'dark' }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -46,34 +47,24 @@ export default function PriceChart({ candles, annotations = [], onPointClick }: 
     const container = containerRef.current
     if (!container) return
 
+    const colors = readChartColors()
     const chart = createChart(container, {
       layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#8b949e',
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.text,
       },
       grid: {
-        vertLines: { color: '#21262d' },
-        horzLines: { color: '#21262d' },
+        vertLines: { color: colors.grid },
+        horzLines: { color: colors.grid },
       },
       crosshair: { mode: CrosshairMode.Normal },
-      timeScale: {
-        borderColor: '#30363d',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      rightPriceScale: { borderColor: '#30363d' },
+      timeScale: { borderColor: colors.border, timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: colors.border },
       width: container.clientWidth,
       height: container.clientHeight,
     })
 
-    const series = chart.addCandlestickSeries({
-      upColor: '#3fb950',
-      downColor: '#f85149',
-      borderUpColor: '#3fb950',
-      borderDownColor: '#f85149',
-      wickUpColor: '#3fb950',
-      wickDownColor: '#f85149',
-    } satisfies Partial<CandlestickSeriesOptions>)
+    const series = chart.addCandlestickSeries(candleColors(colors) satisfies Partial<CandlestickSeriesOptions>)
 
     chartRef.current = chart
     seriesRef.current = series
@@ -87,7 +78,6 @@ export default function PriceChart({ candles, annotations = [], onPointClick }: 
     }
     chart.subscribeClick(handleClick)
 
-    // Resize observer keeps the chart responsive
     const observer = new ResizeObserver(entries => {
       const entry = entries[0]
       if (entry) {
@@ -122,35 +112,81 @@ export default function PriceChart({ candles, annotations = [], onPointClick }: 
     chartRef.current?.timeScale().fitContent()
   }, [candles])
 
-  // ── Draw wave-label markers when annotations change ───────────────────────
+  // ── Re-apply colours when the theme changes ───────────────────────────────
+  useEffect(() => {
+    const chart = chartRef.current
+    const series = seriesRef.current
+    if (!chart || !series) return
+
+    const colors = readChartColors()
+    chart.applyOptions({
+      layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
+      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
+      timeScale: { borderColor: colors.border },
+      rightPriceScale: { borderColor: colors.border },
+    })
+    series.applyOptions(candleColors(colors))
+  }, [theme])
+
+  // ── Draw wave-label markers when annotations (or theme) change ─────────────
   useEffect(() => {
     const series = seriesRef.current
     if (!series) return
 
+    const color = readChartColors().marker
     const markers: SeriesMarker<Time>[] = annotations.map(a => ({
       time: a.time as Time,
       position: 'aboveBar',
-      color: '#58a6ff',
+      color,
       shape: 'circle',
       text: a.label,
     }))
     series.setMarkers(markers)
-  }, [annotations])
+  }, [annotations, theme])
 
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100%' }}
-      data-testid="price-chart"
-    />
-  )
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="price-chart" />
+}
+
+interface ChartColors {
+  background: string
+  text: string
+  border: string
+  grid: string
+  up: string
+  down: string
+  marker: string
+}
+
+/** Reads the chart palette from the app's CSS custom properties (theme-aware). */
+function readChartColors(): ChartColors {
+  const css = getComputedStyle(document.documentElement)
+  const read = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
+  return {
+    background: read('--color-bg', '#0d1117'),
+    text: read('--color-text-muted', '#8b949e'),
+    border: read('--color-border', '#30363d'),
+    grid: read('--color-border', '#21262d'),
+    up: read('--color-up', '#3fb950'),
+    down: read('--color-down', '#f85149'),
+    marker: read('--color-accent', '#58a6ff'),
+  }
+}
+
+function candleColors(colors: ChartColors): Partial<CandlestickSeriesOptions> {
+  return {
+    upColor: colors.up,
+    downColor: colors.down,
+    borderUpColor: colors.up,
+    borderDownColor: colors.down,
+    wickUpColor: colors.up,
+    wickDownColor: colors.down,
+  }
 }
 
 /** Normalizes a Lightweight Charts time value to a YYYY-MM-DD string. */
 function timeToIsoDate(time: Time): string {
   if (typeof time === 'string') return time
   if (typeof time === 'number') return new Date(time * 1000).toISOString().split('T')[0] as string
-  // BusinessDay { year, month, day }
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${time.year}-${pad(time.month)}-${pad(time.day)}`
 }
