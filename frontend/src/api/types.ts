@@ -31,3 +31,43 @@ export interface TechnicalAnalysisResult {
   macd: MacdResult[]
   rsi: RsiResult[]
 }
+
+/** The valid Elliott Wave labels accepted by the backend. */
+export const WAVE_LABELS = ['1', '2', '3', '4', '5', 'A', 'B', 'C', 'W', 'X', 'Y'] as const
+export type WaveLabel = (typeof WAVE_LABELS)[number]
+
+/** A single user-placed wave label. Mirrors the backend `WaveAnnotation` record. */
+export interface WaveAnnotation {
+  date: string // ISO 8601 UTC
+  price: number
+  label: string
+}
+
+/** Mirrors the backend `WaveValidationResult` record (pure assessment). */
+export interface WaveValidationResult {
+  isValid: boolean
+  violations: string[]
+  warnings: string[]
+  analysis: string
+  confidence: string
+}
+
+/** Mirrors the backend `TokenUsage` record. */
+export interface TokenUsage {
+  provider: string
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+/** Response of `POST /api/wave-analysis` — mirrors the backend `LlmValidation` record. */
+export interface LlmValidation {
+  result: WaveValidationResult
+  usage: TokenUsage
+}
+
+/** Request body for `POST /api/wave-analysis`. */
+export interface WaveValidationRequest {
+  symbol: string
+  annotations: WaveAnnotation[]
+}

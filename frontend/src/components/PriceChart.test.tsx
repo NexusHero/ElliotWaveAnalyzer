@@ -10,8 +10,12 @@ vi.mock('lightweight-charts', () => ({
   createChart: vi.fn(() => ({
     addCandlestickSeries: vi.fn(() => ({
       setData: vi.fn(),
+      setMarkers: vi.fn(),
+      coordinateToPrice: vi.fn(() => 100),
     })),
     timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
+    subscribeClick: vi.fn(),
+    unsubscribeClick: vi.fn(),
     resize: vi.fn(),
     remove: vi.fn(),
   })),
