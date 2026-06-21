@@ -16,10 +16,15 @@ namespace ElliotWaveAnalyzer.Api.Domain;
 /// (e.g. "Wave 5 falls significantly short of Wave 3 — possible truncation").
 /// </param>
 /// <param name="Analysis">Brief narrative of the overall wave structure.</param>
-/// <param name="Confidence">Gemini's self-assessed confidence: "high", "medium", or "low".</param>
+/// <param name="Confidence">LLM self-assessed confidence: "high", "medium", or "low".</param>
+/// <param name="TokenUsage">
+/// Token consumption for this call. Null only in tests where the LLM is mocked.
+/// Included so clients can display cost information without a separate API call.
+/// </param>
 public sealed record WaveValidationResult(
     bool IsValid,
     IReadOnlyList<string> Violations,
     IReadOnlyList<string> Warnings,
     string Analysis,
-    string Confidence);
+    string Confidence,
+    TokenUsage? TokenUsage = null);

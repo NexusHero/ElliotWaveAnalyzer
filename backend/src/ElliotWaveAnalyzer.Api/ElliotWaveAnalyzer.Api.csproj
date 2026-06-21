@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ElliotWaveAnalyzer.Api</RootNamespace>
@@ -17,18 +17,23 @@
 
     <!-- Structured logging. Serilog over Microsoft.Extensions.Logging abstraction
          so we can swap sinks (Console → File → Seq) without code changes. -->
-    <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
 
-    <!-- OpenAPI / Swagger -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+    <!-- Built-in ASP.NET Core 10 OpenAPI support.
+         Replaces Swashbuckle (not .NET 10 compatible).
+         Serves OpenAPI JSON at /openapi/v1.json. -->
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
 
-    <!-- Official Google Gen AI SDK (Gemini).
-         Source: https://github.com/googleapis/dotnet-genai (prefix reserved on NuGet).
-         Model name is configurable in appsettings.json → Gemini:Model so no code
-         change is needed when Google deprecates a model version. -->
-    <PackageReference Include="Google.GenAI" Version="1.10.0" />
+    <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
+         Accessible at /scalar/v1 in Development.
+         Replaces Swagger UI (Swashbuckle dependency). -->
+    <PackageReference Include="Scalar.AspNetCore" Version="2.5.13" />
+
+    <!-- Gemini is called via the REST API directly (HttpClient).
+         No SDK dependency — avoids SDK type-surface changes between versions.
+         Base URL: https://generativelanguage.googleapis.com/
+         Registered in Program.cs via AddHttpClient<GeminiWaveAnalyzer>. -->
   </ItemGroup>
 
 </Project>

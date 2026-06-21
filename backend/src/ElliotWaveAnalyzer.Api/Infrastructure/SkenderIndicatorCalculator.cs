@@ -2,10 +2,9 @@ using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Skender.Stock.Indicators;
 
-// Alias to resolve the name conflict between our domain MacdResult
-// and Skender.Stock.Indicators.MacdResult within this file.
-using SkenderMacd = Skender.Stock.Indicators.MacdResult;
-using SkenderRsi = Skender.Stock.Indicators.RsiResult;
+// No name conflict here: Skender types (MacdResult, RsiResult) are only accessed via
+// their properties (r.Macd, r.Rsi, etc.), never by type name. Domain types are
+// referenced with the Domain. prefix. No aliases needed.
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure;
 

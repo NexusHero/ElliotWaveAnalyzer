@@ -31,7 +31,7 @@ ElliotWaveAnalyzer/
 
 ## Voraussetzungen
 
-- .NET 9 SDK
+- .NET 10 SDK
 - Node.js 20+
 - (Optional) Docker für containerisiertes Deployment
 

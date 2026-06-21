@@ -1,24 +1,28 @@
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
 /// <summary>
 /// Orchestrates Elliott Wave validation:
-/// 1. Validates the annotation list (fast, no I/O)
-/// 2. Fetches candles for the annotated period from the appropriate provider
-/// 3. Delegates to <see cref="IGeminiWaveAnalyzer"/> for the actual assessment
-///
-/// Candle fetching provides Gemini with price context beyond just the annotation points,
-/// improving the quality of its analysis (trend direction, overall price range).
+/// 1. Validates input annotations (no I/O — fast, no cost)
+/// 2. Checks token budget (if exceeded, aborts before any LLM call)
+/// 3. Fetches candle context for the annotated period
+/// 4. Selects the active LLM provider via <see cref="LlmProviderOptions.Active"/>
+/// 5. Delegates to the provider, records token usage, returns the result
 /// </summary>
 public sealed class WaveAnalysisService(
-    IEnumerable<IMarketDataProvider> providers,
-    IGeminiWaveAnalyzer geminiAnalyzer,
+    IEnumerable<IMarketDataProvider> marketDataProviders,
+    IEnumerable<ILlmWaveAnalyzer> llmProviders,
+    ITokenTracker tokenTracker,
+    IOptions<LlmProviderOptions> llmOptions,
     ILogger<WaveAnalysisService>? logger = null) : IWaveAnalysisService
 {
-    private readonly IReadOnlyList<IMarketDataProvider> _providers = providers.ToList();
+    private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = marketDataProviders.ToList();
+    private readonly IReadOnlyList<ILlmWaveAnalyzer> _llmProviders = llmProviders.ToList();
 
     /// <inheritdoc/>
     public async Task<WaveValidationResult> ValidateAsync(
@@ -28,36 +32,65 @@ public sealed class WaveAnalysisService(
     {
         ValidateAnnotations(annotations);
 
-        var provider = _providers.FirstOrDefault(p => p.Supports(symbol))
+        // Check budget BEFORE fetching candles — avoid unnecessary API calls
+        if (tokenTracker.IsBudgetExceeded())
+        {
+            var report = tokenTracker.GetReport();
+            throw new InvalidOperationException(
+                $"Session token budget of {report.Budget:N0} tokens has been exceeded " +
+                $"(used: {report.SessionTotalTokens:N0}). Restart the server to reset, " +
+                "or increase LlmProvider:TokenBudget in appsettings.json.");
+        }
+
+        // Select the active LLM provider by name
+        var activeProvider = llmOptions.Value.Active;
+        var llm = _llmProviders.FirstOrDefault(p =>
+            p.ProviderName.Equals(activeProvider, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException(
+                $"LLM provider '{activeProvider}' is not registered. " +
+                $"Available: {string.Join(", ", _llmProviders.Select(p => p.ProviderName))}. " +
+                "Update LlmProvider:Active in appsettings.json.");
+
+        // Select market data provider by symbol
+        var marketProvider = _marketDataProviders.FirstOrDefault(p => p.Supports(symbol))
             ?? throw new ArgumentException(
                 $"No market data provider supports symbol '{symbol}'.", nameof(symbol));
 
-        // Fetch enough days to cover the annotated period plus some context before it.
         var firstAnnotation = annotations.Min(a => a.Date);
         var lastAnnotation = annotations.Max(a => a.Date);
         var annotatedDays = (int)(lastAnnotation - firstAnnotation).TotalDays;
-        var daysToFetch = Math.Max(annotatedDays + 14, 90); // at least 90 days for context
+        var daysToFetch = Math.Max(annotatedDays + 14, 90);
 
         logger?.LogInformation(
-            "Fetching {Days} days of candles for {Symbol} to provide Gemini context",
-            daysToFetch, symbol);
+            "Validating {Symbol} wave count via {Provider} ({Days} days of candle context)",
+            symbol, llm.ProviderName, daysToFetch);
 
-        var candles = await provider.GetCandlesAsync(symbol, daysToFetch, cancellationToken);
+        var candles = await marketProvider.GetCandlesAsync(symbol, daysToFetch, cancellationToken);
 
-        return await geminiAnalyzer.ValidateAsync(symbol, candles, annotations, cancellationToken);
+        var result = await llm.ValidateAsync(symbol, candles, annotations, cancellationToken);
+
+        // Record token usage for session tracking
+        if (result.TokenUsage is { } usage)
+        {
+            tokenTracker.Record(usage);
+            logger?.LogInformation(
+                "Token usage — provider: {Provider}, prompt: {P}, completion: {C}, total: {T}",
+                usage.Provider, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
+        }
+
+        return result;
     }
 
-    // ─── Input validation (pure, no I/O) ─────────────────────────────────────
+    // ─── Input validation (pure, no I/O, no cost) ─────────────────────────────
 
     private static void ValidateAnnotations(IReadOnlyList<WaveAnnotation> annotations)
     {
         if (annotations.Count < 2)
             throw new ArgumentException(
-                "At least 2 annotations are required for Elliott Wave validation. " +
+                $"At least 2 annotations are required for Elliott Wave validation. " +
                 $"Received: {annotations.Count}.",
                 nameof(annotations));
 
-        // Validate labels
         var invalidLabels = annotations
             .Where(a => !WaveAnnotation.IsValidLabel(a.Label))
             .Select(a => a.Label)
@@ -69,7 +102,6 @@ public sealed class WaveAnalysisService(
                 "Valid labels: 1 2 3 4 5 A B C W X Y",
                 nameof(annotations));
 
-        // Validate chronological order
         for (var i = 1; i < annotations.Count; i++)
         {
             if (annotations[i].Date <= annotations[i - 1].Date)

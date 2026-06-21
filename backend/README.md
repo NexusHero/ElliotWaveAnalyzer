@@ -1,6 +1,6 @@
 # Elliott Wave Analyzer — Backend
 
-ASP.NET Core Minimal API (.NET 9) für Marktdaten, technische Indikatoren und Elliott-Wellen-Analyse.
+ASP.NET Core Minimal API (.NET 10) für Marktdaten, technische Indikatoren und Elliott-Wellen-Analyse.
 
 ## Projektstruktur
 
@@ -43,7 +43,7 @@ dotnet restore
 dotnet build
 dotnet test --logger "console;verbosity=detailed"
 
-# API starten (Swagger UI: https://localhost:5001/swagger)
+# API starten (Scalar API UI: https://localhost:5001/scalar/v1 · OpenAPI JSON: https://localhost:5001/openapi/v1.json)
 dotnet run --project src/ElliotWaveAnalyzer.Api
 ```
 
@@ -54,7 +54,7 @@ dotnet run --project src/ElliotWaveAnalyzer.Api
 | GET    | `/api/market-data/{symbol}` | OHLCV + MACD + RSI für BTC oder ETH |
 |        | `?days=90`                  | Zeitraum in Tagen (default: 90)     |
 
-Swagger UI zeigt alle Endpunkte mit Beispiel-Responses.
+Scalar UI zeigt alle Endpunkte mit Beispiel-Responses (ersetzt Swagger in .NET 10).
 
 ## SOLID-Architektur
 

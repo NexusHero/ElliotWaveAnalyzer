@@ -21,7 +21,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -31,14 +31,34 @@ jobs:
         run: dotnet build --no-restore --configuration Release
         working-directory: backend
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: >
           dotnet test
           --no-build
           --configuration Release
           --logger "console;verbosity=detailed"
           --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
         working-directory: backend
+
+      - name: Generate coverage report
+        run: >
+          dotnet tool install --global dotnet-reportgenerator-globaltool --ignore-failed-sources || true &&
+          reportgenerator
+          -reports:"backend/TestResults/**/coverage.cobertura.xml"
+          -targetdir:"backend/TestResults/CoverageReport"
+          -reporttypes:"Html;Cobertura;MarkdownSummaryGithub"
+        continue-on-error: true
+
+      - name: Post coverage summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: backend/TestResults/**/coverage.cobertura.xml
+          badge: true
+          format: markdown
+          output: both
+          thresholds: '60 80'
+        continue-on-error: true
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4

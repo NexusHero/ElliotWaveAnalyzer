@@ -25,7 +25,7 @@ The system replaces an n8n workflow that delivered daily technical analysis repo
 [CoinGecko / Yahoo Finance (planned)]
          │
          ▼
-  ASP.NET Core .NET 9 — Minimal API
+  ASP.NET Core .NET 10 — Minimal API
   ├─ IMarketDataProvider → CoinGeckoMarketDataProvider
   ├─ IIndicatorCalculator → SkenderIndicatorCalculator (RSI, MACD)
   ├─ ITechnicalAnalysisService → TechnicalAnalysisService
@@ -40,7 +40,7 @@ The system replaces an n8n workflow that delivered daily technical analysis repo
 
 | Component | Tech |
 |-----------|------|
-| Backend | .NET 9, ASP.NET Core Minimal API, Skender.Stock.Indicators, Serilog, Google.GenAI |
+| Backend | .NET 10, ASP.NET Core Minimal API, Skender.Stock.Indicators, Serilog, Google.GenAI |
 | Frontend | React 18, TypeScript strict, Vite, TradingView Lightweight Charts |
 | Tests (backend) | NUnit 4, NSubstitute 5 |
 | Tests (frontend) | Vitest, React Testing Library |
@@ -193,7 +193,7 @@ Assert.That((double)result.Last(r => r.Value.HasValue).Value!.Value, Is.GreaterT
 Branch from `main`, open a PR, and the PR may only merge once **all** Quality Gates are green.
 
 Required CI checks for merge:
-- `Backend — .NET 9` (`ci.yml`) — dotnet build + NUnit tests
+- `Backend — .NET 10` (`ci.yml`) — dotnet build + NUnit tests
 - `Frontend — React/TypeScript` (`ci.yml`) — tsc + vitest + vite build
 - `Security Scan` (`security.yml`) — dotnet vuln scan + npm audit + license check
 - `CodeQL` (`codeql.yml`) — static analysis: C# + TypeScript
@@ -202,15 +202,51 @@ Do not consider a task finished until the PR exists and all checks are green.
 
 ---
 
+## Build and Test After Every Change — Mandatory
+
+**Every code change must be followed by a build and test run before committing.**
+This is not optional. A change that has not been verified to build and pass tests is not done.
+
+```bash
+# Run after every backend change — both must be green
+cd backend
+dotnet build --configuration Release        # must succeed with zero errors
+dotnet test  --configuration Release        # must pass with zero failures and zero skips
+
+# Run after every frontend change — all three must be green
+cd frontend
+npx tsc --noEmit                            # zero TypeScript errors
+npm test                                    # zero failing Vitest tests
+npm run build                               # production build must succeed
+```
+
+`.editorconfig` is at the repo root and enforces all formatting and naming rules automatically in Rider / VS Code / Visual Studio. Do not manually format code — let the IDE apply the config. Key rules:
+- `csharp_style_namespace_declarations = file_scoped` — always use file-scoped namespaces
+- `csharp_prefer_braces = true` — always use curly braces
+- `csharp_preferred_modifier_order` — public/private before static/readonly/etc.
+- Private/internal fields must be `_camelCase`; interfaces must start with `I`
+- `dotnet_sort_system_directives_first = true` — System.* usings come first
+
+Known build pitfalls in this codebase (especially after .NET version upgrades):
+- `TreatWarningsAsErrors = true` in the backend — CS8019 (unused using/alias) is an error, not a warning. Remove unused `using` aliases immediately.
+- `GeminiPromptBuilder` is `public static` — it must stay public so the test assembly can access it.
+- `GeminiWaveAnalyzer` uses `HttpClient` (REST, not SDK) — do not add `Google.GenAI` types; the Gemini integration is deliberately SDK-free.
+- **No `WithOpenApi()`** — deprecated and removed in `Microsoft.AspNetCore.OpenApi` 10.0.0. Use `WithTags()`, `WithName()`, `WithSummary()`, `WithDescription()`, `Produces<T>()`, `ProducesProblem()` only.
+- **No `Swashbuckle`** — not compatible with .NET 10. Use `builder.Services.AddOpenApi()` + `app.MapOpenApi()` + `app.MapScalarApiReference()` instead.
+- **No `Produces<ProblemDetails>()`** — use `ProducesProblem(statusCode)` instead (no `using Microsoft.AspNetCore.Mvc` needed).
+- **Scalar UI** is available at `/scalar/v1` (Development only). OpenAPI JSON at `/openapi/v1.json`.
+- `SkenderIndicatorCalculator` — Skender types must never appear in method signatures. Use `Domain.` prefix for `RsiResult`/`MacdResult` to avoid ambiguity.
+
 ## Quality Gates
 
 A change is done — and its PR mergeable — only when **all** hold:
 
-- `dotnet test` passes in `backend/` (all NUnit tests, no skips)
+- `dotnet build` exits 0 (zero errors, zero warnings-as-errors)
+- `dotnet test` passes (all NUnit tests green, none skipped)
 - `tsc --noEmit` reports no errors in `frontend/`
 - `npm test` passes in `frontend/` (all Vitest tests)
 - `npm run build` succeeds in `frontend/`
-- No new Skender or Google.GenAI types imported outside their isolation boundaries
+- No Skender types outside `SkenderIndicatorCalculator.cs`
 - No API key strings hardcoded in source
 - New application/infrastructure logic covered by at least one test
 - `git status` is clean — no needed source file left untracked

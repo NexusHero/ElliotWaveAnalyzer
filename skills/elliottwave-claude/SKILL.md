@@ -63,6 +63,12 @@ throw new ArgumentException($"Invalid label: '{label}'", nameof(label));
 
 ---
 
+## Build and Test After Every Change
+
+After every backend edit: `cd backend && dotnet build && dotnet test` — both must be green before committing.
+After every frontend edit: `npx tsc --noEmit && npm test && npm run build` — all three must pass.
+`TreatWarningsAsErrors = true` — unused `using` aliases are build errors. Remove them immediately.
+
 ## Pull Requests
 
 Every change ships through a PR — see `elliottwave-agents` → **Pull Request Workflow**.

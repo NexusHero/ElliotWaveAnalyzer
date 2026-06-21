@@ -15,7 +15,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
 /// This class is intentionally pure (static, no I/O, no dependencies) so it can be
 /// tested exhaustively without mocks. The prompt is logic — it deserves unit tests.
 /// </summary>
-internal static class GeminiPromptBuilder
+public static class GeminiPromptBuilder
 {
     private static readonly string[] ElliottWaveRules =
     [

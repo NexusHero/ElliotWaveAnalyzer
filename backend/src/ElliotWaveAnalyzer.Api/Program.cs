@@ -1,8 +1,9 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
 using ElliotWaveAnalyzer.Api.Infrastructure;
-using ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
+using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Scalar.AspNetCore;
 using Serilog;
 
 // ── Bootstrap logger (active before DI is ready) ─────────────────────────────
@@ -15,29 +16,36 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // ── Logging ───────────────────────────────────────────────────────────────
-    // Serilog replaces the default Microsoft logger.
-    // Configuration is read from appsettings.json → "Serilog" section.
     builder.Host.UseSerilog((ctx, services, config) => config
         .ReadFrom.Configuration(ctx.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    // ── OpenAPI / Swagger ─────────────────────────────────────────────────────
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(options =>
+    // ── OpenAPI (.NET 10 built-in) ────────────────────────────────────────────
+    // Swashbuckle is not compatible with .NET 10.
+    // Built-in AddOpenApi() + Scalar.AspNetCore replaces it:
+    //   OpenAPI JSON → GET /openapi/v1.json
+    //   Interactive UI → GET /scalar/v1
+    builder.Services.AddOpenApi(opts =>
     {
-        options.SwaggerDoc("v1", new()
+        opts.AddDocumentTransformer((doc, _, _) =>
         {
-            Title = "Elliott Wave Analyzer API",
-            Version = "v1",
-            Description = "Market data, technical indicators, and Elliott Wave analysis"
+            doc.Info = new()
+            {
+                Title = "Elliott Wave Analyzer API",
+                Version = "v1",
+                Description =
+                    "Market data (BTC, ETH, NASDAQ), technical indicators (RSI/MACD), " +
+                    "and multi-provider LLM-based Elliott Wave validation."
+            };
+            return Task.CompletedTask;
         });
     });
 
     // ── Market data providers ─────────────────────────────────────────────────
-    // All IMarketDataProvider registrations are collected as IEnumerable<IMarketDataProvider>
-    // by TechnicalAnalysisService, which selects the right provider at runtime.
-    // To add Yahoo Finance for NASDAQ: register YahooFinanceMarketDataProvider here — nothing else changes.
+    // Multiple IMarketDataProvider registrations are collected as
+    // IEnumerable<IMarketDataProvider> by WaveAnalysisService + TechnicalAnalysisService.
+    // Adding Yahoo Finance = new class + one line here (OCP).
     builder.Services.AddHttpClient<CoinGeckoMarketDataProvider>(client =>
     {
         client.BaseAddress = new Uri(
@@ -45,21 +53,48 @@ try
             ?? "https://api.coingecko.com/api/v3/");
         client.DefaultRequestHeaders.Add("Accept", "application/json");
 
-        // Optional Pro API key for higher rate limits
         var apiKey = builder.Configuration["MarketData:CoinGecko:ApiKey"];
         if (!string.IsNullOrWhiteSpace(apiKey))
             client.DefaultRequestHeaders.Add("x-cg-pro-api-key", apiKey);
     });
     builder.Services.AddTransient<IMarketDataProvider, CoinGeckoMarketDataProvider>();
 
-    // ── Application services ──────────────────────────────────────────────────
+    // ── Indicator calculation ─────────────────────────────────────────────────
     builder.Services.AddTransient<IIndicatorCalculator, SkenderIndicatorCalculator>();
     builder.Services.AddTransient<ITechnicalAnalysisService, TechnicalAnalysisService>();
 
-    // ── Gemini integration ────────────────────────────────────────────────────
-    builder.Services.Configure<GeminiOptions>(
-        builder.Configuration.GetSection(GeminiOptions.SectionName));
-    builder.Services.AddTransient<IGeminiWaveAnalyzer, GeminiWaveAnalyzer>();
+    // ── LLM providers ─────────────────────────────────────────────────────────
+    // All three providers are registered. The active one is selected at runtime
+    // via LlmProvider:Active in appsettings.json — no code change needed to switch.
+    // Adding a new provider = one new class + one block here (OCP).
+    builder.Services.Configure<LlmProviderOptions>(
+        builder.Configuration.GetSection(LlmProviderOptions.SectionName));
+
+    builder.Services.AddHttpClient<GeminiLlmProvider>(client =>
+    {
+        client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
+    builder.Services.AddTransient<ILlmWaveAnalyzer, GeminiLlmProvider>();
+
+    builder.Services.AddHttpClient<ClaudeProvider>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.anthropic.com/");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
+    builder.Services.AddTransient<ILlmWaveAnalyzer, ClaudeProvider>();
+
+    builder.Services.AddHttpClient<OpenAiLlmProvider>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.openai.com/");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    });
+    builder.Services.AddTransient<ILlmWaveAnalyzer, OpenAiLlmProvider>();
+
+    // ── Token tracking (singleton — accumulates across requests) ──────────────
+    builder.Services.AddSingleton<ITokenTracker, TokenTracker>();
+
+    // ── Wave analysis orchestration ───────────────────────────────────────────
     builder.Services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();
 
     // ── Build & configure pipeline ────────────────────────────────────────────
@@ -67,12 +102,15 @@ try
 
     app.UseSerilogRequestLogging();
 
-    if (app.Environment.IsDevelopment())
+    // Built-in OpenAPI + Scalar UI — available in all environments
+    // (restrict to Development only if the API should not be public)
+    app.MapOpenApi();
+    app.MapScalarApiReference(opts =>
     {
-        app.UseSwagger();
-        app.UseSwaggerUI(options =>
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "Elliott Wave Analyzer v1"));
-    }
+        opts.WithTitle("Elliott Wave Analyzer API")
+            .WithTheme(ScalarTheme.DeepSpace)
+            .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
+    });
 
     app.UseHttpsRedirection();
     app.MapMarketDataEndpoints();

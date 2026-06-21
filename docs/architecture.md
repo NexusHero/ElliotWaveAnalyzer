@@ -66,7 +66,7 @@ numbersections: true
 
 | Constraint | Background |
 |-----------|------------|
-| Backend must be .NET 9 | Developer background is C#/.NET; no Node.js or Python backend |
+| Backend must be .NET 10 | Developer background is C#/.NET; no Node.js or Python backend |
 | Indicator calculations must use Skender.Stock.Indicators | Avoids subtle implementation errors in RSI (Wilder's Smoothing), MACD (EMA seeding); library is open-source and well-tested |
 | Gemini model name must be configurable | Google regularly deprecates Gemini model versions; changing the model must require only an appsettings update |
 | CoinGecko free-tier OHLC endpoint does not provide volume | Volume is set to 0 in returned candles; acceptable because RSI and MACD use Close price only |
@@ -106,7 +106,7 @@ C4Context
     Person(trader, "Trader", "Analyzes financial markets using Elliott Wave Theory")
 
     System_Boundary(ewa, "Elliott Wave Analyzer") {
-        System(backend, "Backend API", "ASP.NET Core .NET 9")
+        System(backend, "Backend API", "ASP.NET Core .NET 10")
         System(frontend, "Frontend SPA", "React + TypeScript")
     }
 
@@ -165,7 +165,7 @@ C4Context
 ```mermaid
 graph TD
     FE["Frontend\n(React + TypeScript)\nVite · Lightweight Charts"]
-    BE["Backend\n(ASP.NET Core .NET 9)\nMinimal API"]
+    BE["Backend\n(ASP.NET Core .NET 10)\nMinimal API"]
     CG["CoinGecko API"]
     GEM["Google Gemini API"]
     DB["SQLite\n(wave counts, zones,\nanalysis history)"]
@@ -349,7 +349,7 @@ sequenceDiagram
 ```mermaid
 graph TD
     subgraph "Developer Machine / Home Server"
-        BE["Backend\nbinaries/ElliotWaveAnalyzer.Api\n(.NET 9 self-contained)"]
+        BE["Backend\nbinaries/ElliotWaveAnalyzer.Api\n(.NET 10 self-contained)"]
         FE["Frontend\ndist/index.html + assets\n(served as static files by backend)"]
         DB["SQLite\nelliot.db"]
         BE --- DB

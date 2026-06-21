@@ -6,7 +6,7 @@ namespace ElliotWaveAnalyzer.Api.Endpoints;
 /// <summary>
 /// Minimal API endpoint group for market data.
 /// Endpoints are registered via <see cref="MapMarketDataEndpoints"/> to keep
-/// <c>Program.cs</c> free of endpoint logic (SRP).
+/// Program.cs free of endpoint logic (SRP).
 /// </summary>
 public static class MarketDataEndpoints
 {
@@ -14,8 +14,7 @@ public static class MarketDataEndpoints
     {
         var group = app
             .MapGroup("/api/market-data")
-            .WithTags("Market Data")
-            .WithOpenApi();
+            .WithTags("Market Data");
 
         group.MapGet("/{symbol}", GetAnalysis)
             .WithName("GetMarketData")
@@ -25,8 +24,8 @@ public static class MarketDataEndpoints
                 NASDAQ (Yahoo Finance) will be added in a future iteration.
                 """)
             .Produces<TechnicalAnalysisResult>(StatusCodes.Status200OK)
-            .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
-            .Produces<ProblemDetails>(StatusCodes.Status502BadGateway);
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway);
 
         return app;
     }
