@@ -4,6 +4,7 @@ using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
 using ElliotWaveAnalyzer.Api.Infrastructure;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
@@ -60,7 +61,7 @@ try
     // ── Market data providers ─────────────────────────────────────────────────
     // Multiple IMarketDataProvider registrations are collected as
     // IEnumerable<IMarketDataProvider> by WaveAnalysisService + TechnicalAnalysisService.
-    // Adding Yahoo Finance = new class + one line here (OCP).
+    // Each is wrapped in a caching decorator; selection happens at runtime via Supports().
     builder.Services.AddHttpClient<CoinGeckoMarketDataProvider>(client =>
     {
         client.BaseAddress = new Uri(
@@ -77,11 +78,28 @@ try
     // Retry, timeout, and circuit-breaker for the rate-limited upstream API.
     .AddStandardResilienceHandler();
 
-    // IMarketDataProvider is the CoinGecko provider wrapped in a caching decorator,
-    // so callers transparently get short-lived candle caching (Decorator/OCP).
+    // Yahoo Finance covers equity indices (NASDAQ, S&P 500). Yahoo rejects requests
+    // without a User-Agent, so set one explicitly.
+    builder.Services.AddHttpClient<YahooFinanceMarketDataProvider>(client =>
+    {
+        client.BaseAddress = new Uri(
+            builder.Configuration["MarketData:Yahoo:BaseUrl"]
+            ?? "https://query1.finance.yahoo.com/");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.DefaultRequestHeaders.Add("User-Agent", "ElliotWaveAnalyzer/1.0");
+    })
+    .AddStandardResilienceHandler();
+
+    // Each concrete provider is exposed as an IMarketDataProvider wrapped in a caching
+    // decorator, so callers transparently get short-lived candle caching (Decorator/OCP).
     builder.Services.AddTransient<IMarketDataProvider>(sp =>
         new CachingMarketDataProvider(
             sp.GetRequiredService<CoinGeckoMarketDataProvider>(),
+            sp.GetRequiredService<IMemoryCache>(),
+            sp.GetRequiredService<ILogger<CachingMarketDataProvider>>()));
+    builder.Services.AddTransient<IMarketDataProvider>(sp =>
+        new CachingMarketDataProvider(
+            sp.GetRequiredService<YahooFinanceMarketDataProvider>(),
             sp.GetRequiredService<IMemoryCache>(),
             sp.GetRequiredService<ILogger<CachingMarketDataProvider>>()));
 
@@ -145,6 +163,27 @@ try
 
     // ── Wave analysis orchestration ───────────────────────────────────────────
     builder.Services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();
+
+    // ── Daily report (opt-in via DailyReport:Enabled) ─────────────────────────
+    // Renders a chart per symbol and delivers it through every enabled channel.
+    // Adding a channel = new IReportDeliveryChannel + one line here (OCP).
+    builder.Services.Configure<DailyReportOptions>(
+        builder.Configuration.GetSection(DailyReportOptions.SectionName));
+    builder.Services.AddSingleton<IChartRenderer, SkiaSharpChartRenderer>();
+
+    builder.Services.AddHttpClient<TelegramDeliveryChannel>(client =>
+        client.BaseAddress = new Uri("https://api.telegram.org/"))
+        .AddStandardResilienceHandler();
+    builder.Services.AddTransient<IReportDeliveryChannel>(sp =>
+        sp.GetRequiredService<TelegramDeliveryChannel>());
+    builder.Services.AddTransient<IReportDeliveryChannel, EmailDeliveryChannel>();
+
+    builder.Services.AddTransient<IDailyReportService, DailyReportService>();
+
+    if (builder.Configuration.GetValue<bool>($"{DailyReportOptions.SectionName}:Enabled"))
+    {
+        builder.Services.AddHostedService<DailyReportBackgroundService>();
+    }
 
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();

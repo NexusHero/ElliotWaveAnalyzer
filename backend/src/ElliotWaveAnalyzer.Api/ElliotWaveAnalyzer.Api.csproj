@@ -45,6 +45,10 @@
     <!-- Standard resilience pipeline (retry, timeout, circuit-breaker, rate-limiter)
          for outbound HttpClient calls to upstream market-data APIs. -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
+
+    <!-- Daily report: SkiaSharp renders the chart PNG; Cronos parses the cron schedule. -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="Cronos" Version="0.13.0" />
   </ItemGroup>
 
 </Project>
