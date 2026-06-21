@@ -1,9 +1,12 @@
+using System.Net.Http.Json;
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using ElliotWaveAnalyzer.Tests.TestData;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,6 +24,12 @@ namespace ElliotWaveAnalyzer.Tests.Acceptance;
 /// </summary>
 public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Program>
 {
+    public const string TestEmail = "tester@example.com";
+    public const string TestPassword = "Str0ng!Passw0rd";
+
+    // Unique store per factory instance so test classes don't share auth/session state.
+    private readonly string _databaseName = $"ewa-tests-{Guid.NewGuid()}";
+
     /// <summary>The faked LLM. Tests can tweak its canned response before calling the API.</summary>
     public FakeChatClient Chat { get; } = new();
 
@@ -37,7 +46,33 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
             // Swap the (caching-decorated CoinGecko) market data for a deterministic fake.
             services.RemoveAll<IMarketDataProvider>();
             services.AddSingleton<IMarketDataProvider, FakeMarketDataProvider>();
+
+            // Replace the PostgreSQL AppDbContext with an in-memory store so auth tests
+            // need no live database. Remove every EF registration tied to AppDbContext first.
+            var toRemove = services.Where(d =>
+                d.ServiceType == typeof(AppDbContext) ||
+                (d.ServiceType.IsGenericType &&
+                 (d.ServiceType.GetGenericTypeDefinition().Name.StartsWith("DbContextOptions", StringComparison.Ordinal) ||
+                  d.ServiceType.GetGenericTypeDefinition().Name.StartsWith("IDbContextOptionsConfiguration", StringComparison.Ordinal))) ||
+                d.ServiceType == typeof(DbContextOptions)).ToList();
+            foreach (var descriptor in toRemove)
+            {
+                services.Remove(descriptor);
+            }
+
+            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
         });
+    }
+
+    /// <summary>
+    /// Registers and logs in the standard test user so the client's cookie jar holds a
+    /// valid session for subsequent requests to protected endpoints.
+    /// </summary>
+    public async Task AuthenticateAsync(HttpClient client)
+    {
+        var credentials = new { email = TestEmail, password = TestPassword };
+        await client.PostAsJsonAsync("/api/auth/register", credentials);
+        await client.PostAsJsonAsync("/api/auth/login", credentials);
     }
 }
 

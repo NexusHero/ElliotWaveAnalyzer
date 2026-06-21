@@ -14,7 +14,8 @@ public static class MarketDataEndpoints
     {
         var group = app
             .MapGroup("/api/market-data")
-            .WithTags("Market Data");
+            .WithTags("Market Data")
+            .RequireAuthorization();
 
         group.MapGet("/{symbol}", GetAnalysis)
             .WithName("GetMarketData")

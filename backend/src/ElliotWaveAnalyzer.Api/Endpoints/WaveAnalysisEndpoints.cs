@@ -12,7 +12,8 @@ public static class WaveAnalysisEndpoints
     {
         var group = app
             .MapGroup("/api")
-            .WithTags("Wave Analysis");
+            .WithTags("Wave Analysis")
+            .RequireAuthorization();
 
         // ── POST /api/wave-analysis ───────────────────────────────────────────
         group.MapPost("/wave-analysis", ValidateWaveCount)

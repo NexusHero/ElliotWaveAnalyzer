@@ -16,10 +16,11 @@ public sealed class MarketDataAcceptanceTests
     private HttpClient _client = null!;
 
     [OneTimeSetUp]
-    public void OneTimeSetUp()
+    public async Task OneTimeSetUp()
     {
         _factory = new AcceptanceWebApplicationFactory();
         _client = _factory.CreateClient();
+        await _factory.AuthenticateAsync(_client);
     }
 
     [OneTimeTearDown]
