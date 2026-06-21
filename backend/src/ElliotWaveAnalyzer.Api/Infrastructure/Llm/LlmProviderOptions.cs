@@ -41,6 +41,16 @@ public sealed class LlmProviderOptions
     {
         Model = "gpt-4o-mini"
     };
+
+    /// <summary>
+    /// Returns the API key and model for the currently <see cref="Active"/> provider.
+    /// Unknown values fall back to Gemini's section; <see cref="Active"/> itself is
+    /// validated when the <c>IChatClient</c> is constructed in Program.cs.
+    /// </summary>
+    public LlmEndpointOptions GetActiveEndpoint() =>
+        Active.Equals("Claude", StringComparison.OrdinalIgnoreCase) ? Claude
+        : Active.Equals("OpenAI", StringComparison.OrdinalIgnoreCase) ? OpenAI
+        : Gemini;
 }
 
 /// <summary>Per-provider API key and model name.</summary>

@@ -4,12 +4,13 @@ namespace ElliotWaveAnalyzer.Api.Interfaces;
 
 /// <summary>
 /// Orchestrates Elliott Wave validation: fetches candle context for the annotated
-/// period, then delegates to <see cref="IGeminiWaveAnalyzer"/> for the actual assessment.
+/// period, then delegates to <see cref="ILlmWaveAnalyzer"/> for the actual assessment.
 /// </summary>
 public interface IWaveAnalysisService
 {
     /// <summary>
-    /// Validates the given wave annotations against Elliott Wave rules via Gemini.
+    /// Validates the given wave annotations against Elliott Wave rules via the
+    /// configured LLM provider.
     /// </summary>
     /// <param name="symbol">Market symbol (e.g. "BTC").</param>
     /// <param name="annotations">
