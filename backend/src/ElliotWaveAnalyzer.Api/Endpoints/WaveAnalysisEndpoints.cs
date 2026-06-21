@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
@@ -13,7 +14,8 @@ public static class WaveAnalysisEndpoints
         var group = app
             .MapGroup("/api")
             .WithTags("Wave Analysis")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("per-user");
 
         // ── POST /api/wave-analysis ───────────────────────────────────────────
         group.MapPost("/wave-analysis", ValidateWaveCount)
@@ -48,6 +50,7 @@ public static class WaveAnalysisEndpoints
     private static async Task<IResult> ValidateWaveCount(
         WaveValidationRequest request,
         IWaveAnalysisService waveAnalysisService,
+        ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         try
@@ -61,6 +64,7 @@ public static class WaveAnalysisEndpoints
         }
         catch (ArgumentException ex)
         {
+            // Input-validation feedback is safe and actionable for the caller.
             return Results.Problem(
                 title: "Invalid wave annotations",
                 detail: ex.Message,
@@ -68,9 +72,13 @@ public static class WaveAnalysisEndpoints
         }
         catch (InvalidOperationException ex)
         {
+            // The exception may carry provider details or the raw model output — log it
+            // server-side and return a generic message so nothing internal leaks.
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Wave analysis failed for {Symbol}", request.Symbol);
             return Results.Problem(
-                title: "LLM API error",
-                detail: ex.Message,
+                title: "Analysis unavailable",
+                detail: "The analysis service is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }

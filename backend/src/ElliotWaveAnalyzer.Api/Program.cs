@@ -7,7 +7,9 @@ using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -213,20 +215,52 @@ try
             SessionAuthenticationHandler.SchemeName, configureOptions: null);
     builder.Services.AddAuthorization();
 
-    // Throttle login attempts to blunt brute-force / credential-stuffing.
+    // Rate limiting: a strict window for login (brute-force) and a per-user window for
+    // the expensive API endpoints (LLM cost / upstream abuse). The per-user partition
+    // falls back to the client IP for unauthenticated callers.
     builder.Services.AddRateLimiter(opts =>
     {
         opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
         opts.AddFixedWindowLimiter("login", limiter =>
         {
             limiter.PermitLimit = 5;
             limiter.Window = TimeSpan.FromMinutes(1);
             limiter.QueueLimit = 0;
         });
+
+        opts.AddPolicy("per-user", httpContext =>
+        {
+            var key = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                      ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                      ?? "anonymous";
+            return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            });
+        });
+    });
+
+    // Behind a TLS-terminating proxy, honour X-Forwarded-Proto/For so Request.IsHttps is
+    // accurate (drives the Secure cookie flag) and the real client IP is used for limits.
+    builder.Services.Configure<ForwardedHeadersOptions>(opts =>
+    {
+        opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     });
 
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();
+
+    // Trust proxy headers first so IP/scheme are correct for everything downstream.
+    app.UseForwardedHeaders();
+
+    // HSTS in non-development (tells browsers to stick to HTTPS).
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
 
     app.UseSerilogRequestLogging();
 

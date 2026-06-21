@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Security
+- Per-user rate limiting on the expensive endpoints (`/api/wave-analysis`, `/api/market-data`) to curb LLM-cost / upstream abuse, in addition to the login limiter
+- Cap the number of annotations per request (prompt-inflation / DoS guard)
+- Stop leaking internal details: generic client errors for upstream/LLM failures (including the raw model output), logged server-side instead
+- Honour `X-Forwarded-Proto/For` behind a proxy (correct `Secure` cookie + client IP) and enable HSTS outside Development
+- Validate the `days` query range on market data (1–365)
+- Stop logging user email addresses; log the non-PII user id instead (CodeQL `cs/exposure-of-sensitive-information`)
+- Force the patched `js-yaml` 4.2.0 via npm `overrides` (`npm audit` now reports 0 vulnerabilities)
+
 ### Added
 - Frontend auth UI: login/logout with an auth gate (probes `/api/auth/me`), plus a dark/light theme switch persisted across sessions
 - Design tokens (CSS custom properties) for dark and light themes; component styling moved into CSS Modules for easy theming/swapping

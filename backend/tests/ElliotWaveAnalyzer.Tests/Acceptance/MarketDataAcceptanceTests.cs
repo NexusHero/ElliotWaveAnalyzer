@@ -52,4 +52,12 @@ public sealed class MarketDataAcceptanceTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
+
+    [Test]
+    public async Task GetMarketData_InvalidDays_Returns400()
+    {
+        var response = await _client.GetAsync("/api/market-data/BTC?days=0");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
 }

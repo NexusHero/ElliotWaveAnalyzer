@@ -30,7 +30,8 @@ public sealed class AuthService(
 
         if (result.Succeeded)
         {
-            logger.LogInformation("Registered new user {Email}", email);
+            // Log the non-PII user id, never the email (cs/exposure-of-sensitive-information).
+            logger.LogInformation("Registered new user {UserId}", user.Id);
             return new AuthResult(true, []);
         }
 
@@ -76,7 +77,8 @@ public sealed class AuthService(
         db.Sessions.Add(session);
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("User {Email} logged in; session {SessionId} created", email, session.Id);
+        // Log the non-PII user id, never the email (cs/exposure-of-sensitive-information).
+        logger.LogInformation("User {UserId} logged in; session {SessionId} created", user.Id, session.Id);
         return new SessionResult(true, token, session.ExpiresAt, null);
     }
 

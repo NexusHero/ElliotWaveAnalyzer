@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
@@ -15,7 +16,8 @@ public static class MarketDataEndpoints
         var group = app
             .MapGroup("/api/market-data")
             .WithTags("Market Data")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireRateLimiting("per-user");
 
         group.MapGet("/{symbol}", GetAnalysis)
             .WithName("GetMarketData")
@@ -38,9 +40,18 @@ public static class MarketDataEndpoints
     private static async Task<IResult> GetAnalysis(
         string symbol,
         ITechnicalAnalysisService analysisService,
+        ILoggerFactory loggerFactory,
         int days = 90,
         CancellationToken cancellationToken = default)
     {
+        if (days < 1 || days > 365)
+        {
+            return Results.Problem(
+                title: "Invalid range",
+                detail: "days must be between 1 and 365.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         try
         {
             var result = await analysisService.GetAnalysisAsync(
@@ -50,6 +61,7 @@ public static class MarketDataEndpoints
         }
         catch (ArgumentException ex)
         {
+            // Symbol-support feedback is safe and actionable for the caller.
             return Results.Problem(
                 title: "Unsupported symbol",
                 detail: ex.Message,
@@ -57,9 +69,12 @@ public static class MarketDataEndpoints
         }
         catch (HttpRequestException ex)
         {
+            // Log the upstream detail server-side; return a generic message to the client.
+            loggerFactory.CreateLogger("MarketDataEndpoints")
+                .LogError(ex, "Upstream market data provider failed for {Symbol}", symbol);
             return Results.Problem(
                 title: "Upstream market data provider error",
-                detail: ex.Message,
+                detail: "The market data provider is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }
