@@ -1,8 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
-using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
@@ -11,18 +9,19 @@ namespace ElliotWaveAnalyzer.Api.Application;
 /// 1. Validates input annotations (no I/O — fast, no cost)
 /// 2. Checks token budget (if exceeded, aborts before any LLM call)
 /// 3. Fetches candle context for the annotated period
-/// 4. Selects the active LLM provider via <see cref="LlmProviderOptions.Active"/>
-/// 5. Delegates to the provider, records token usage, returns the result
+/// 4. Delegates to the configured <see cref="ILlmWaveAnalyzer"/>, records token usage,
+///    and returns the result
+///
+/// The concrete LLM provider is chosen at startup (Program.cs) from
+/// <c>LlmProvider:Active</c>; this service simply depends on the resulting analyzer.
 /// </summary>
 public sealed class WaveAnalysisService(
     IEnumerable<IMarketDataProvider> marketDataProviders,
-    IEnumerable<ILlmWaveAnalyzer> llmProviders,
+    ILlmWaveAnalyzer llm,
     ITokenTracker tokenTracker,
-    IOptions<LlmProviderOptions> llmOptions,
     ILogger<WaveAnalysisService>? logger = null) : IWaveAnalysisService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = marketDataProviders.ToList();
-    private readonly IReadOnlyList<ILlmWaveAnalyzer> _llmProviders = llmProviders.ToList();
 
     /// <inheritdoc/>
     public async Task<WaveValidationResult> ValidateAsync(
@@ -41,15 +40,6 @@ public sealed class WaveAnalysisService(
                 $"(used: {report.SessionTotalTokens:N0}). Restart the server to reset, " +
                 "or increase LlmProvider:TokenBudget in appsettings.json.");
         }
-
-        // Select the active LLM provider by name
-        var activeProvider = llmOptions.Value.Active;
-        var llm = _llmProviders.FirstOrDefault(p =>
-            p.ProviderName.Equals(activeProvider, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException(
-                $"LLM provider '{activeProvider}' is not registered. " +
-                $"Available: {string.Join(", ", _llmProviders.Select(p => p.ProviderName))}. " +
-                "Update LlmProvider:Active in appsettings.json.");
 
         // Select market data provider by symbol
         var marketProvider = _marketDataProviders.FirstOrDefault(p => p.Supports(symbol))

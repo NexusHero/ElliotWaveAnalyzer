@@ -1,8 +1,14 @@
+using System.ClientModel;
+using Anthropic.SDK;
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
 using ElliotWaveAnalyzer.Api.Infrastructure;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
+using OpenAI;
+using OpenAI.Chat;
 using Scalar.AspNetCore;
 using Serilog;
 
@@ -63,33 +69,53 @@ try
     builder.Services.AddTransient<IIndicatorCalculator, SkenderIndicatorCalculator>();
     builder.Services.AddTransient<ITechnicalAnalysisService, TechnicalAnalysisService>();
 
-    // ── LLM providers ─────────────────────────────────────────────────────────
-    // All three providers are registered. The active one is selected at runtime
-    // via LlmProvider:Active in appsettings.json — no code change needed to switch.
-    // Adding a new provider = one new class + one block here (OCP).
+    // ── LLM provider ──────────────────────────────────────────────────────────
+    // The active provider is selected via LlmProvider:Active in appsettings.json.
+    // We register a single IChatClient (Microsoft.Extensions.AI) for that provider;
+    // the provider-agnostic LlmWaveAnalyzer consumes it. Adding/switching providers
+    // means editing only this factory — no bespoke HTTP/JSON/token code (OCP).
     builder.Services.Configure<LlmProviderOptions>(
         builder.Configuration.GetSection(LlmProviderOptions.SectionName));
 
-    builder.Services.AddHttpClient<GeminiLlmProvider>(client =>
+    builder.Services.AddSingleton<IChatClient>(sp =>
     {
-        client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
-    });
-    builder.Services.AddTransient<ILlmWaveAnalyzer, GeminiLlmProvider>();
+        var opts = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value;
+        var endpoint = opts.GetActiveEndpoint();
 
-    builder.Services.AddHttpClient<ClaudeProvider>(client =>
-    {
-        client.BaseAddress = new Uri("https://api.anthropic.com/");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
-    });
-    builder.Services.AddTransient<ILlmWaveAnalyzer, ClaudeProvider>();
+        IChatClient inner = opts.Active.ToLowerInvariant() switch
+        {
+            // OpenAI: native endpoint.
+            "openai" => new OpenAIClient(endpoint.ApiKey)
+                .GetChatClient(endpoint.Model)
+                .AsIChatClient(),
 
-    builder.Services.AddHttpClient<OpenAiLlmProvider>(client =>
-    {
-        client.BaseAddress = new Uri("https://api.openai.com/");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
+            // Gemini: Google exposes an OpenAI-compatible endpoint, so the same
+            // client works by pointing it at that base URL.
+            "gemini" => new ChatClient(
+                    model: endpoint.Model,
+                    credential: new ApiKeyCredential(endpoint.ApiKey),
+                    options: new OpenAIClientOptions
+                    {
+                        Endpoint = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/")
+                    })
+                .AsIChatClient(),
+
+            // Claude: Anthropic.SDK exposes its Messages endpoint as an IChatClient.
+            "claude" => new AnthropicClient(endpoint.ApiKey).Messages,
+
+            _ => throw new InvalidOperationException(
+                $"Unknown LLM provider '{opts.Active}'. Valid values: Gemini, Claude, OpenAI. " +
+                "Set LlmProvider:Active in appsettings.json.")
+        };
+
+        // Standard middleware pipeline — logging here, OpenTelemetry/caching/retry
+        // can be chained the same way without touching provider code.
+        return new ChatClientBuilder(inner)
+            .UseLogging(sp.GetRequiredService<ILoggerFactory>())
+            .Build();
     });
-    builder.Services.AddTransient<ILlmWaveAnalyzer, OpenAiLlmProvider>();
+
+    builder.Services.AddTransient<ILlmWaveAnalyzer, LlmWaveAnalyzer>();
 
     // ── Token tracking (singleton — accumulates across requests) ──────────────
     builder.Services.AddSingleton<ITokenTracker, TokenTracker>();

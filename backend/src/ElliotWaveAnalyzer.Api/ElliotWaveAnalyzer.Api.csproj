@@ -30,10 +30,17 @@
          Replaces Swagger UI (Swashbuckle dependency). -->
     <PackageReference Include="Scalar.AspNetCore" Version="2.6.0" />
 
-    <!-- Gemini is called via the REST API directly (HttpClient).
-         No SDK dependency — avoids SDK type-surface changes between versions.
-         Base URL: https://generativelanguage.googleapis.com/
-         Registered in Program.cs via AddHttpClient<GeminiWaveAnalyzer>. -->
+    <!-- LLM access goes through Microsoft.Extensions.AI's IChatClient abstraction —
+         the .NET-standard "messages in, response out" surface — instead of hand-rolled
+         HttpClient providers. One domain analyzer (LlmWaveAnalyzer) targets IChatClient;
+         the concrete client is chosen at startup from LlmProvider:Active (see Program.cs):
+           OpenAI  → OpenAIClient
+           Gemini  → OpenAIClient pointed at Google's OpenAI-compatible endpoint
+           Claude  → Anthropic.SDK's IChatClient
+         Token usage comes from the standardized ChatResponse.Usage (UsageDetails). -->
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+    <PackageReference Include="Anthropic.SDK" Version="5.10.0" />
   </ItemGroup>
 
 </Project>

@@ -1,9 +1,7 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
-using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using ElliotWaveAnalyzer.Tests.TestData;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace ElliotWaveAnalyzer.Tests.Application;
@@ -58,7 +56,7 @@ public sealed class WaveAnalysisServiceTests
 
         _tokenTracker.IsBudgetExceeded().Returns(false);
 
-        _sut = BuildSut(active: "Gemini", budget: 0);
+        _sut = BuildSut();
     }
 
     // ─── Input validation ─────────────────────────────────────────────────────
@@ -131,10 +129,10 @@ public sealed class WaveAnalysisServiceTests
             Arg.Any<CancellationToken>());
     }
 
-    // ─── Provider selection ───────────────────────────────────────────────────
+    // ─── Provider delegation ──────────────────────────────────────────────────
 
     [Test]
-    public async Task ValidateAsync_ActiveProviderGemini_CallsGeminiProvider()
+    public async Task ValidateAsync_DelegatesToLlmProvider()
     {
         await _sut.ValidateAsync("BTC", ValidAnnotations);
 
@@ -143,17 +141,6 @@ public sealed class WaveAnalysisServiceTests
             Arg.Any<IReadOnlyList<MarketCandle>>(),
             Arg.Any<IReadOnlyList<WaveAnnotation>>(),
             Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public void ValidateAsync_UnknownActiveProvider_ThrowsInvalidOperationException()
-    {
-        var sut = BuildSut(active: "Unknown", budget: 0);
-
-        var ex = Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.ValidateAsync("BTC", ValidAnnotations));
-
-        Assert.That(ex!.Message, Does.Contain("Unknown"));
     }
 
     // ─── Token tracking ───────────────────────────────────────────────────────
@@ -222,10 +209,9 @@ public sealed class WaveAnalysisServiceTests
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private WaveAnalysisService BuildSut(string active, int budget) =>
+    private WaveAnalysisService BuildSut() =>
         new(
             marketDataProviders: [_provider],
-            llmProviders: [_llm],
-            tokenTracker: _tokenTracker,
-            llmOptions: Options.Create(new LlmProviderOptions { Active = active, TokenBudget = budget }));
+            llm: _llm,
+            tokenTracker: _tokenTracker);
 }
