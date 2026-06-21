@@ -27,5 +27,6 @@ public interface ILlmWaveAnalyzer
         string symbol,
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveAnnotation> annotations,
+        WaveRuleReport ruleReport,
         CancellationToken cancellationToken = default);
 }

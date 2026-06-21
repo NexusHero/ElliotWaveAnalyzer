@@ -1,6 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
@@ -28,7 +27,7 @@ public static class WaveAnalysisEndpoints
                 The response includes token usage for this call.
                 Configure the active provider via LlmProvider:Active in appsettings.json.
                 """)
-            .Produces<LlmValidation>(StatusCodes.Status200OK)
+            .Produces<WaveAnalysisResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status502BadGateway);
 

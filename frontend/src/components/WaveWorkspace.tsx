@@ -4,7 +4,7 @@ import WaveAnnotationPanel from './WaveAnnotationPanel'
 import { DUMMY_CANDLES } from '../api/dummyData'
 import { validateWaveCount } from '../api/client'
 import type { Theme } from '../hooks/useTheme'
-import type { LlmValidation, WaveAnnotation } from '../api/types'
+import type { WaveAnalysisResponse, WaveAnnotation } from '../api/types'
 import styles from './WaveWorkspace.module.css'
 
 const SYMBOL = 'BTC'
@@ -21,7 +21,7 @@ interface WaveWorkspaceProps {
 export default function WaveWorkspace({ theme }: WaveWorkspaceProps) {
   const [annotations, setAnnotations] = useState<WaveAnnotation[]>([])
   const [pending, setPending] = useState<{ time: string; price: number } | null>(null)
-  const [result, setResult] = useState<LlmValidation | null>(null)
+  const [result, setResult] = useState<WaveAnalysisResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 

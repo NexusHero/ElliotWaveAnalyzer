@@ -31,12 +31,14 @@ public sealed class WaveValidationPromptBuilderTests
     ];
     private static readonly string[] sourceArray = ["\"1\"", "\"2\"", "\"3\"", "\"4\"", "\"5\""];
 
+    private static readonly WaveRuleReport Report = new(BullishAssumed: true, Rules: [], Ratios: []);
+
     // ─── Content checks ───────────────────────────────────────────────────────
 
     [Test]
     public void Build_ContainsSymbol()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         Assert.That(prompt, Does.Contain("BTC"));
     }
@@ -44,7 +46,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_ContainsAllWaveLabels()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -56,7 +58,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_ContainsAnnotationPrices()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -68,7 +70,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_ContainsAnnotationDates()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -80,7 +82,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_RequestsJsonOutput()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         // Gemini must know to return JSON, not prose
         Assert.That(prompt, Does.Contain("JSON").IgnoreCase);
@@ -89,7 +91,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_IncludesElliotWaveRules()
     {
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         // The three cardinal Elliott Wave rules must be referenced so Gemini
         // applies them explicitly rather than relying on implicit knowledge.
@@ -104,7 +106,7 @@ public sealed class WaveValidationPromptBuilderTests
     [Test]
     public void Build_IncludesCandlePriceRange()
     {
-        var prompt = WaveValidationPromptBuilder.Build("ETH", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("ETH", Candles, FiveWaveAnnotations, Report);
 
         // The candle context (at minimum the price range) gives Gemini
         // the broader market context surrounding the annotated waves.
@@ -126,7 +128,7 @@ public sealed class WaveValidationPromptBuilderTests
     {
         // Even if caller passes unsorted annotations, prompt must be chronological.
         var reversed = FiveWaveAnnotations.Reverse().ToList();
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, reversed);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, reversed, Report);
 
         // Find positions of wave labels in prompt — must appear in 1→5 order
         var positions = sourceArray.Select(label => prompt.IndexOf(label, StringComparison.Ordinal))
@@ -141,7 +143,7 @@ public sealed class WaveValidationPromptBuilderTests
     {
         // Gemini needs the price movement between waves to check relative sizes.
         // The prompt should include Δ% between consecutive annotations.
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations, Report);
 
         Assert.That(prompt, Does.Contain("%"),
             "Prompt should include percentage price changes between waves");
@@ -156,7 +158,7 @@ public sealed class WaveValidationPromptBuilderTests
             new(new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc), 38_000m, "2"),
         };
 
-        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, minimal);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, minimal, Report);
 
         Assert.That(prompt, Is.Not.Null.And.Not.Empty);
         Assert.That(prompt.Length, Is.GreaterThan(200),

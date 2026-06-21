@@ -1,6 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.AspNetCore.RateLimiting;
 
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
@@ -44,7 +43,7 @@ public static class MarketDataEndpoints
         int days = 90,
         CancellationToken cancellationToken = default)
     {
-        if (days < 1 || days > 365)
+        if (days is < 1 or > 365)
         {
             return Results.Problem(
                 title: "Invalid range",

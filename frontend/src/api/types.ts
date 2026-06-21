@@ -60,9 +60,33 @@ export interface TokenUsage {
   totalTokens: number
 }
 
-/** Response of `POST /api/wave-analysis` — mirrors the backend `LlmValidation` record. */
-export interface LlmValidation {
+/** Status of a deterministic Elliott rule check. */
+export type RuleStatus = 'Pass' | 'Fail' | 'Indeterminate'
+
+/** One canonical rule evaluated deterministically in the backend. */
+export interface RuleResult {
+  name: string
+  status: RuleStatus
+  detail: string
+}
+
+/** A computed Fibonacci ratio between waves. */
+export interface FibRatio {
+  name: string
+  ratio: number
+}
+
+/** Deterministic, math-only rule + Fibonacci report (mirrors the backend `WaveRuleReport`). */
+export interface WaveRuleReport {
+  bullishAssumed: boolean
+  rules: RuleResult[]
+  ratios: FibRatio[]
+}
+
+/** Response of `POST /api/wave-analysis` — mirrors the backend `WaveAnalysisResponse`. */
+export interface WaveAnalysisResponse {
   result: WaveValidationResult
+  ruleReport: WaveRuleReport
   usage: TokenUsage
 }
 

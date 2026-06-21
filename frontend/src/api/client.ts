@@ -1,4 +1,4 @@
-import type { LlmValidation, WaveValidationRequest } from './types'
+import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
 
 /**
  * Thin API client. Uses same-origin relative paths: in dev the Vite proxy forwards
@@ -10,7 +10,7 @@ import type { LlmValidation, WaveValidationRequest } from './types'
 export async function validateWaveCount(
   request: WaveValidationRequest,
   signal?: AbortSignal,
-): Promise<LlmValidation> {
+): Promise<WaveAnalysisResponse> {
   const response = await fetch('/api/wave-analysis', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -22,7 +22,7 @@ export async function validateWaveCount(
     throw new Error(await extractErrorDetail(response))
   }
 
-  return (await response.json()) as LlmValidation
+  return (await response.json()) as WaveAnalysisResponse
 }
 
 /** The authenticated user, as returned by `GET /api/auth/me`. */

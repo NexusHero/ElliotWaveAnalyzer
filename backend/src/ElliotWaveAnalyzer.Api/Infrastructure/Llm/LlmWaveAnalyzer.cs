@@ -38,9 +38,10 @@ public sealed class LlmWaveAnalyzer(
         string symbol,
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveAnnotation> annotations,
+        WaveRuleReport ruleReport,
         CancellationToken cancellationToken = default)
     {
-        var prompt = WaveValidationPromptBuilder.Build(symbol, candles, annotations);
+        var prompt = WaveValidationPromptBuilder.Build(symbol, candles, annotations, ruleReport);
 
         logger.LogInformation(
             "Sending wave validation to {Provider} ({Model}) for {Symbol} with {Count} annotations",

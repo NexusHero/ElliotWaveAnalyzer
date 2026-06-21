@@ -59,6 +59,10 @@ public sealed class WaveAnalysisAcceptanceTests
         var usage = body.GetProperty("usage");
         Assert.That(usage.GetProperty("provider").GetString(), Is.EqualTo("Gemini"));
         Assert.That(usage.GetProperty("totalTokens").GetInt32(), Is.EqualTo(150));
+
+        // The deterministic rule report is computed in code and returned alongside the AI assessment.
+        var ruleReport = body.GetProperty("ruleReport");
+        Assert.That(ruleReport.GetProperty("rules").GetArrayLength(), Is.EqualTo(3));
     }
 
     [Test]

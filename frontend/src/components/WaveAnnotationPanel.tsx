@@ -1,5 +1,11 @@
-import { WAVE_LABELS, type LlmValidation, type WaveAnnotation } from '../api/types'
+import { WAVE_LABELS, type RuleStatus, type WaveAnalysisResponse, type WaveAnnotation } from '../api/types'
 import styles from './WaveAnnotationPanel.module.css'
+
+function ruleStatusClass(status: RuleStatus): string | undefined {
+  if (status === 'Fail') return styles.violation
+  if (status === 'Pass') return styles.statusValid
+  return styles.hint
+}
 
 interface PendingPoint {
   time: string
@@ -9,7 +15,7 @@ interface PendingPoint {
 interface WaveAnnotationPanelProps {
   annotations: WaveAnnotation[]
   pending: PendingPoint | null
-  result: LlmValidation | null
+  result: WaveAnalysisResponse | null
   error: string | null
   loading: boolean
   onAddLabel: (label: string) => void
@@ -107,13 +113,31 @@ export default function WaveAnnotationPanel({
   )
 }
 
-function ValidationResult({ validation }: { validation: LlmValidation }) {
-  const { result, usage } = validation
+function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) {
+  const { result, ruleReport, usage } = validation
   return (
     <section data-testid="validation-result" className={styles.result}>
       <p className={result.isValid ? styles.statusValid : styles.statusInvalid}>
         {result.isValid ? '✓ Valid wave count' : '✗ Invalid wave count'} · confidence: {result.confidence}
       </p>
+
+      <p className={styles.subHeading}>Rule checks (objective)</p>
+      <ul className={styles.list}>
+        {ruleReport.rules.map((rule, i) => (
+          <li key={i} className={ruleStatusClass(rule.status)}>
+            [{rule.status}] {rule.name}
+          </li>
+        ))}
+      </ul>
+      {ruleReport.ratios.length > 0 && (
+        <ul className={styles.list}>
+          {ruleReport.ratios.map((ratio, i) => (
+            <li key={i} className={styles.hint}>
+              {ratio.name}: {ratio.ratio.toFixed(3)}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {result.violations.length > 0 && (
         <>
@@ -141,7 +165,12 @@ function ValidationResult({ validation }: { validation: LlmValidation }) {
         </>
       )}
 
-      {result.analysis && <p className={styles.analysis}>{result.analysis}</p>}
+      {result.analysis && (
+        <>
+          <p className={styles.subHeading}>Coach reflection</p>
+          <p className={styles.analysis}>{result.analysis}</p>
+        </>
+      )}
 
       <p className={styles.usage}>
         {usage.provider}: {usage.totalTokens} tokens
