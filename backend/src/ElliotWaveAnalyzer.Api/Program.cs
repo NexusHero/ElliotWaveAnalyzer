@@ -6,6 +6,8 @@ using ElliotWaveAnalyzer.Api.Infrastructure;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
@@ -48,6 +50,13 @@ try
         });
     });
 
+    // ── Caching (per-instance) ────────────────────────────────────────────────
+    // IMemoryCache backs candle caching; IDistributedMemoryCache backs LLM response
+    // caching. Both are in-process here — for scaled-out instances, swap the
+    // distributed cache for Redis (AddStackExchangeRedisCache) with no other changes.
+    builder.Services.AddMemoryCache();
+    builder.Services.AddDistributedMemoryCache();
+
     // ── Market data providers ─────────────────────────────────────────────────
     // Multiple IMarketDataProvider registrations are collected as
     // IEnumerable<IMarketDataProvider> by WaveAnalysisService + TechnicalAnalysisService.
@@ -64,8 +73,17 @@ try
         {
             client.DefaultRequestHeaders.Add("x-cg-pro-api-key", apiKey);
         }
-    });
-    builder.Services.AddTransient<IMarketDataProvider, CoinGeckoMarketDataProvider>();
+    })
+    // Retry, timeout, and circuit-breaker for the rate-limited upstream API.
+    .AddStandardResilienceHandler();
+
+    // IMarketDataProvider is the CoinGecko provider wrapped in a caching decorator,
+    // so callers transparently get short-lived candle caching (Decorator/OCP).
+    builder.Services.AddTransient<IMarketDataProvider>(sp =>
+        new CachingMarketDataProvider(
+            sp.GetRequiredService<CoinGeckoMarketDataProvider>(),
+            sp.GetRequiredService<IMemoryCache>(),
+            sp.GetRequiredService<ILogger<CachingMarketDataProvider>>()));
 
     // ── Indicator calculation ─────────────────────────────────────────────────
     builder.Services.AddTransient<IIndicatorCalculator, SkenderIndicatorCalculator>();
@@ -110,9 +128,11 @@ try
                 "Set LlmProvider:Active in appsettings.json.")
         };
 
-        // Standard middleware pipeline — logging here, OpenTelemetry/caching/retry
-        // can be chained the same way without touching provider code.
+        // Standard middleware pipeline. Distributed caching short-circuits identical
+        // requests (same prompt → cached response, saving latency and token spend);
+        // OpenTelemetry/retry can be chained the same way without touching provider code.
         return new ChatClientBuilder(inner)
+            .UseDistributedCache(sp.GetRequiredService<IDistributedCache>())
             .UseLogging(sp.GetRequiredService<ILoggerFactory>())
             .Build();
     });
@@ -120,7 +140,8 @@ try
     builder.Services.AddTransient<ILlmWaveAnalyzer, LlmWaveAnalyzer>();
 
     // ── Token tracking (singleton — accumulates across requests) ──────────────
-    builder.Services.AddSingleton<ITokenTracker, TokenTracker>();
+    // In-memory per instance; see InMemoryTokenTracker for the distributed seam.
+    builder.Services.AddSingleton<ITokenTracker, InMemoryTokenTracker>();
 
     // ── Wave analysis orchestration ───────────────────────────────────────────
     builder.Services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();

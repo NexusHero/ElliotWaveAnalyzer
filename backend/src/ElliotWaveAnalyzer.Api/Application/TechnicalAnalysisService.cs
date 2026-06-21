@@ -16,7 +16,7 @@ namespace ElliotWaveAnalyzer.Api.Application;
 public sealed class TechnicalAnalysisService(
     IEnumerable<IMarketDataProvider> providers,
     IIndicatorCalculator calculator,
-    ILogger<TechnicalAnalysisService>? logger = null) : ITechnicalAnalysisService
+    ILogger<TechnicalAnalysisService> logger) : ITechnicalAnalysisService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _providers = [.. providers];
 
@@ -32,7 +32,7 @@ public sealed class TechnicalAnalysisService(
                 $"Registered providers support: {DescribeProviders()}",
                 nameof(symbol));
 
-        logger?.LogInformation(
+        logger.LogInformation(
             "Analysing {Symbol} ({Days} days) using {Provider}",
             symbol, days, provider.GetType().Name);
 

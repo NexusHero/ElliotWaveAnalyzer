@@ -2,6 +2,7 @@ using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using ElliotWaveAnalyzer.Tests.TestData;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace ElliotWaveAnalyzer.Tests.Application;
@@ -39,7 +40,8 @@ public sealed class TechnicalAnalysisServiceTests
 
         _sut = new TechnicalAnalysisService(
             providers: [_btcProvider, _ethProvider],
-            calculator: _calculator);
+            calculator: _calculator,
+            logger: NullLogger<TechnicalAnalysisService>.Instance);
     }
 
     // ─── Provider selection ───────────────────────────────────────────────────

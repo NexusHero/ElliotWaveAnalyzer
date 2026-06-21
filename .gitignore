@@ -39,3 +39,6 @@ logs/
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
+
+# Local IDE settings (machine-specific paths)
+.vscode/

@@ -2,6 +2,7 @@ using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using ElliotWaveAnalyzer.Tests.TestData;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace ElliotWaveAnalyzer.Tests.Application;
@@ -25,8 +26,9 @@ public sealed class WaveAnalysisServiceTests
         Violations: [],
         Warnings: [],
         Analysis: "Clean 5-wave impulse.",
-        Confidence: "high",
-        TokenUsage: DummyUsage);
+        Confidence: "high");
+
+    private static readonly LlmValidation ValidValidation = new(ValidResult, DummyUsage);
 
     private static readonly IReadOnlyList<WaveAnnotation> ValidAnnotations =
     [
@@ -52,7 +54,7 @@ public sealed class WaveAnalysisServiceTests
                 Arg.Any<IReadOnlyList<MarketCandle>>(),
                 Arg.Any<IReadOnlyList<WaveAnnotation>>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(ValidResult));
+            .Returns(Task.FromResult(ValidValidation));
 
         _tokenTracker.IsBudgetExceeded().Returns(false);
 
@@ -153,30 +155,14 @@ public sealed class WaveAnalysisServiceTests
         _tokenTracker.Received(1).Record(DummyUsage);
     }
 
-    [Test]
-    public async Task ValidateAsync_WhenResultHasNoUsage_DoesNotRecordTokens()
-    {
-        var resultWithoutUsage = ValidResult with { TokenUsage = null };
-        _llm.ValidateAsync(
-                Arg.Any<string>(),
-                Arg.Any<IReadOnlyList<MarketCandle>>(),
-                Arg.Any<IReadOnlyList<WaveAnnotation>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(resultWithoutUsage));
-
-        await _sut.ValidateAsync("BTC", ValidAnnotations);
-
-        _tokenTracker.DidNotReceive().Record(Arg.Any<TokenUsage>());
-    }
-
     // ─── Result pass-through ──────────────────────────────────────────────────
 
     [Test]
-    public async Task ValidateAsync_ReturnsLlmResult()
+    public async Task ValidateAsync_ReturnsLlmValidation()
     {
         var result = await _sut.ValidateAsync("BTC", ValidAnnotations);
 
-        Assert.That(result, Is.SameAs(ValidResult));
+        Assert.That(result, Is.SameAs(ValidValidation));
     }
 
     [Test]
@@ -213,5 +199,6 @@ public sealed class WaveAnalysisServiceTests
         new(
             marketDataProviders: [_provider],
             llm: _llm,
-            tokenTracker: _tokenTracker);
+            tokenTracker: _tokenTracker,
+            logger: NullLogger<WaveAnalysisService>.Instance);
 }

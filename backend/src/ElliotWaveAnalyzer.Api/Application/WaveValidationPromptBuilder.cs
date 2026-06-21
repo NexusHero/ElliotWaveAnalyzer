@@ -1,21 +1,26 @@
 using System.Text;
 using ElliotWaveAnalyzer.Api.Domain;
 
-namespace ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
+namespace ElliotWaveAnalyzer.Api.Application;
 
 /// <summary>
-/// Builds the structured text prompt sent to Gemini for Elliott Wave validation.
+/// Builds the structured text prompt for Elliott Wave validation. Provider-agnostic:
+/// the same prompt is sent regardless of the backing LLM (Gemini/Claude/OpenAI).
 ///
-/// WHY text prompt instead of image:
-/// Sending price data as structured text is more precise (exact prices, exact dates),
-/// cheaper (no multimodal tokens), and gives Gemini better grounding than reading
-/// numbers off a chart image. The LLM's reasoning about wave ratios is more reliable
-/// when working with numeric data directly.
+/// WHY this lives in the Application layer (not Infrastructure):
+/// it encodes the Elliott Wave rules and the validation contract — pure business
+/// logic with no I/O and no SDK dependency. Keeping it provider-neutral and here
+/// means a new LLM provider never touches it.
 ///
-/// This class is intentionally pure (static, no I/O, no dependencies) so it can be
-/// tested exhaustively without mocks. The prompt is logic — it deserves unit tests.
+/// WHY text prompt instead of an image:
+/// Sending price data as structured text is more precise (exact prices/dates),
+/// cheaper (no multimodal tokens), and gives the model better grounding than reading
+/// numbers off a chart image.
+///
+/// Intentionally pure (static, no I/O, no dependencies) so it can be tested
+/// exhaustively without mocks. The prompt is logic — it deserves unit tests.
 /// </summary>
-public static class GeminiPromptBuilder
+public static class WaveValidationPromptBuilder
 {
     private static readonly string[] ElliottWaveRules =
     [
@@ -29,7 +34,7 @@ public static class GeminiPromptBuilder
     ];
 
     /// <summary>
-    /// Builds the complete Gemini prompt for a wave validation request.
+    /// Builds the complete prompt for a wave validation request.
     /// </summary>
     /// <param name="symbol">Ticker symbol for context.</param>
     /// <param name="candles">Full candle set covering (at minimum) the annotated period.</param>

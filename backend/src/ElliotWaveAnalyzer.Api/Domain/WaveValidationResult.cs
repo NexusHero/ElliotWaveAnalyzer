@@ -1,7 +1,9 @@
 namespace ElliotWaveAnalyzer.Api.Domain;
 
 /// <summary>
-/// Gemini's assessment of an Elliott Wave count against the canonical rules.
+/// The LLM's assessment of an Elliott Wave count against the canonical rules.
+/// Pure domain result — token usage (an operational concern) is carried separately
+/// in <see cref="LlmValidation"/> so this type stays free of infrastructure details.
 /// </summary>
 /// <param name="IsValid">
 /// True only when zero violations are found.
@@ -17,14 +19,9 @@ namespace ElliotWaveAnalyzer.Api.Domain;
 /// </param>
 /// <param name="Analysis">Brief narrative of the overall wave structure.</param>
 /// <param name="Confidence">LLM self-assessed confidence: "high", "medium", or "low".</param>
-/// <param name="TokenUsage">
-/// Token consumption for this call. Null only in tests where the LLM is mocked.
-/// Included so clients can display cost information without a separate API call.
-/// </param>
 public sealed record WaveValidationResult(
     bool IsValid,
     IReadOnlyList<string> Violations,
     IReadOnlyList<string> Warnings,
     string Analysis,
-    string Confidence,
-    TokenUsage? TokenUsage = null);
+    string Confidence);

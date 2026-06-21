@@ -1,11 +1,11 @@
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
-using ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
 using ElliotWaveAnalyzer.Tests.TestData;
 
 namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 
 /// <summary>
-/// Tests for <see cref="GeminiPromptBuilder"/>.
+/// Tests for <see cref="WaveValidationPromptBuilder"/>.
 ///
 /// The prompt builder is pure (no I/O, no external dependencies), so these tests
 /// need NO mocks. They verify that the prompt Gemini receives contains all the
@@ -16,7 +16,7 @@ namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 /// The prompt is logic, not glue code — it deserves tests.
 /// </summary>
 [TestFixture]
-public sealed class GeminiPromptBuilderTests
+public sealed class WaveValidationPromptBuilderTests
 {
     private static readonly IReadOnlyList<MarketCandle> Candles =
         MarketDataFixtures.CreateCandles(60);
@@ -29,14 +29,14 @@ public sealed class GeminiPromptBuilderTests
         new(new DateTime(2024, 2, 10, 0, 0, 0, DateTimeKind.Utc), 44_000m, "4"),
         new(new DateTime(2024, 2, 25, 0, 0, 0, DateTimeKind.Utc), 58_000m, "5"),
     ];
-    private static readonly string[] sourceArray = new[] { "\"1\"", "\"2\"", "\"3\"", "\"4\"", "\"5\"" };
+    private static readonly string[] sourceArray = ["\"1\"", "\"2\"", "\"3\"", "\"4\"", "\"5\""];
 
     // ─── Content checks ───────────────────────────────────────────────────────
 
     [Test]
     public void Build_ContainsSymbol()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         Assert.That(prompt, Does.Contain("BTC"));
     }
@@ -44,7 +44,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_ContainsAllWaveLabels()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -56,7 +56,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_ContainsAnnotationPrices()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -68,7 +68,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_ContainsAnnotationDates()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
         {
@@ -80,7 +80,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_RequestsJsonOutput()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         // Gemini must know to return JSON, not prose
         Assert.That(prompt, Does.Contain("JSON").IgnoreCase);
@@ -89,7 +89,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_IncludesElliotWaveRules()
     {
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         // The three cardinal Elliott Wave rules must be referenced so Gemini
         // applies them explicitly rather than relying on implicit knowledge.
@@ -104,7 +104,7 @@ public sealed class GeminiPromptBuilderTests
     [Test]
     public void Build_IncludesCandlePriceRange()
     {
-        var prompt = GeminiPromptBuilder.Build("ETH", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("ETH", Candles, FiveWaveAnnotations);
 
         // The candle context (at minimum the price range) gives Gemini
         // the broader market context surrounding the annotated waves.
@@ -126,7 +126,7 @@ public sealed class GeminiPromptBuilderTests
     {
         // Even if caller passes unsorted annotations, prompt must be chronological.
         var reversed = FiveWaveAnnotations.Reverse().ToList();
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, reversed);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, reversed);
 
         // Find positions of wave labels in prompt — must appear in 1→5 order
         var positions = sourceArray.Select(label => prompt.IndexOf(label, StringComparison.Ordinal))
@@ -141,7 +141,7 @@ public sealed class GeminiPromptBuilderTests
     {
         // Gemini needs the price movement between waves to check relative sizes.
         // The prompt should include Δ% between consecutive annotations.
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         Assert.That(prompt, Does.Contain("%"),
             "Prompt should include percentage price changes between waves");
@@ -156,7 +156,7 @@ public sealed class GeminiPromptBuilderTests
             new(new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc), 38_000m, "2"),
         };
 
-        var prompt = GeminiPromptBuilder.Build("BTC", Candles, minimal);
+        var prompt = WaveValidationPromptBuilder.Build("BTC", Candles, minimal);
 
         Assert.That(prompt, Is.Not.Null.And.Not.Empty);
         Assert.That(prompt.Length, Is.GreaterThan(200),

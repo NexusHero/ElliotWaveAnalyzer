@@ -41,6 +41,10 @@
     <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
     <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
     <PackageReference Include="Anthropic.SDK" Version="5.10.0" />
+
+    <!-- Standard resilience pipeline (retry, timeout, circuit-breaker, rate-limiter)
+         for outbound HttpClient calls to upstream market-data APIs. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
   </ItemGroup>
 
 </Project>
