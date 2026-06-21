@@ -3,9 +3,13 @@ using Anthropic.SDK;
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
 using ElliotWaveAnalyzer.Api.Infrastructure;
+using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
@@ -185,6 +189,42 @@ try
         builder.Services.AddHostedService<DailyReportBackgroundService>();
     }
 
+    // ── Authentication (Identity + opaque session cookies on PostgreSQL) ──────
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddDbContext<AppDbContext>(opts =>
+        opts.UseNpgsql(builder.Configuration.GetConnectionString("Postgres") ?? string.Empty));
+    builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
+
+    builder.Services
+        .AddIdentityCore<AppUser>(opts =>
+        {
+            opts.User.RequireUniqueEmail = true;
+            opts.Password.RequiredLength = 12;
+            opts.Lockout.MaxFailedAccessAttempts = 5;
+            opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        })
+        .AddEntityFrameworkStores<AppDbContext>();
+
+    builder.Services.AddScoped<IAuthService, AuthService>();
+
+    builder.Services
+        .AddAuthentication(SessionAuthenticationHandler.SchemeName)
+        .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
+            SessionAuthenticationHandler.SchemeName, configureOptions: null);
+    builder.Services.AddAuthorization();
+
+    // Throttle login attempts to blunt brute-force / credential-stuffing.
+    builder.Services.AddRateLimiter(opts =>
+    {
+        opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        opts.AddFixedWindowLimiter("login", limiter =>
+        {
+            limiter.PermitLimit = 5;
+            limiter.Window = TimeSpan.FromMinutes(1);
+            limiter.QueueLimit = 0;
+        });
+    });
+
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();
 
@@ -201,6 +241,12 @@ try
     });
 
     app.UseHttpsRedirection();
+
+    app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapAuthEndpoints();
     app.MapMarketDataEndpoints();
     app.MapWaveAnalysisEndpoints();
 

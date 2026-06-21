@@ -17,10 +17,11 @@ public sealed class WaveAnalysisAcceptanceTests
     private HttpClient _client = null!;
 
     [OneTimeSetUp]
-    public void OneTimeSetUp()
+    public async Task OneTimeSetUp()
     {
         _factory = new AcceptanceWebApplicationFactory();
         _client = _factory.CreateClient();
+        await _factory.AuthenticateAsync(_client);
     }
 
     [OneTimeTearDown]
@@ -101,6 +102,7 @@ public sealed class WaveAnalysisAcceptanceTests
         // A fresh factory so the singleton token tracker starts empty for this assertion.
         using var factory = new AcceptanceWebApplicationFactory();
         using var client = factory.CreateClient();
+        await factory.AuthenticateAsync(client);
 
         await client.PostAsJsonAsync("/api/wave-analysis", BuildValidRequest());
 

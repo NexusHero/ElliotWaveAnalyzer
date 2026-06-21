@@ -46,6 +46,12 @@
          for outbound HttpClient calls to upstream market-data APIs. -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
 
+    <!-- Authentication: ASP.NET Core Identity (user store + password hashing) on EF Core
+         with PostgreSQL. Sessions are opaque tokens stored hashed in the DB. -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
+
     <!-- Daily report: SkiaSharp renders the chart PNG; Cronos parses the cron schedule. -->
     <PackageReference Include="SkiaSharp" Version="3.119.4" />
     <!-- Linux native libSkiaSharp for CI/containers (Windows/macOS ship with SkiaSharp).
