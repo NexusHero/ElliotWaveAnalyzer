@@ -10,6 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
+- `YahooFinanceMarketDataProvider` for equity indices (NASDAQ, S&P 500) via the Yahoo Finance chart API
 - ASP.NET Core .NET 10 Minimal API backend with SOLID architecture
 - `IMarketDataProvider` interface with `CoinGeckoMarketDataProvider` for BTC/ETH
 - `IIndicatorCalculator` interface with `SkenderIndicatorCalculator` (RSI, MACD via Skender.Stock.Indicators)

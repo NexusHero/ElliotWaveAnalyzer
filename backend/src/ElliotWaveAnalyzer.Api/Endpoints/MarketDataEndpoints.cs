@@ -20,8 +20,8 @@ public static class MarketDataEndpoints
             .WithName("GetMarketData")
             .WithSummary("Returns OHLCV candles + MACD + RSI for the requested symbol")
             .WithDescription("""
-                Supported symbols: BTC, ETH (CoinGecko free tier).
-                NASDAQ (Yahoo Finance) will be added in a future iteration.
+                Supported symbols: BTC, ETH (CoinGecko free tier);
+                NASDAQ, SP500 (Yahoo Finance).
                 """)
             .Produces<TechnicalAnalysisResult>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
