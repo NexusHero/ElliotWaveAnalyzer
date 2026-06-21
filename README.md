@@ -21,7 +21,7 @@ Web application for technical analysis of financial markets (BTC, ETH, NASDAQ) b
 ElliotWaveAnalyzer/
 ├── backend/
 │   ├── src/
-│   │   └── ElliotWaveAnalyzer.Api/   # ASP.NET Core Minimal API (.NET 9)
+│   │   └── ElliotWaveAnalyzer.Api/   # ASP.NET Core Minimal API (.NET 10)
 │   ├── tests/
 │   │   └── ElliotWaveAnalyzer.Tests/ # NUnit + NSubstitute
 │   └── ElliotWaveAnalyzer.sln
@@ -74,7 +74,7 @@ Architecture decisions are documented as ADRs under `docs/adr/`.
 
 | Layer        | Technology                              |
 |-------------|-----------------------------------------|
-| Backend API | ASP.NET Core Minimal API (.NET 9)       |
+| Backend API | ASP.NET Core Minimal API (.NET 10)      |
 | Indicators  | Skender.Stock.Indicators                |
 | Charts (srv)| SkiaSharp                               |
 | LLM         | Google Gemini 2.5 Flash (configurable)  |

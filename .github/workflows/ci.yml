@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  # ── Backend (.NET 9 / NUnit) ─────────────────────────────────────────────
+  # ── Backend (.NET 10 / NUnit) ────────────────────────────────────────────
   backend:
-    name: Backend — .NET 9
+    name: Backend — .NET 10
     runs-on: ubuntu-latest
 
     steps:

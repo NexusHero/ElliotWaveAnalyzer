@@ -35,7 +35,7 @@ The same prompt structure from `GeminiPromptBuilder` can be reused — it is pro
 
 ### C# Patterns to Follow
 
-- Use primary constructors for services (C# 12 / .NET 9)
+- Use primary constructors for services (C# 12 / .NET 10)
 - Use `sealed record` for all domain types in `Domain/`
 - Use `IReadOnlyList<T>` as the return type for collections (never `List<T>` in public APIs)
 - All interfaces in `Interfaces/` must be narrow (ISP) — do not add unrelated methods

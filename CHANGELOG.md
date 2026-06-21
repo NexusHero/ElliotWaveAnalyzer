@@ -10,7 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
-- ASP.NET Core .NET 9 Minimal API backend with SOLID architecture
+- ASP.NET Core .NET 10 Minimal API backend with SOLID architecture
 - `IMarketDataProvider` interface with `CoinGeckoMarketDataProvider` for BTC/ETH
 - `IIndicatorCalculator` interface with `SkenderIndicatorCalculator` (RSI, MACD via Skender.Stock.Indicators)
 - `ITechnicalAnalysisService` / `TechnicalAnalysisService` — provider chain-of-responsibility selection

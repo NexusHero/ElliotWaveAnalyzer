@@ -24,7 +24,7 @@ Claude-specific guidance for this repository.
 - **No trailing summaries** at the end of responses — the diff is self-explanatory
 - **Terse, direct answers** — no preambles like "Great question!" or "Certainly!"
 - **No co-author lines** in commit messages unless explicitly requested
-- When writing C#: prefer `record` over `class` for immutable domain types; use primary constructors where available (.NET 9)
+- When writing C#: prefer `record` over `class` for immutable domain types; use primary constructors where available (.NET 10)
 - When writing tests: always show the full test method, never abbreviate with `// ...`
 
 ---
@@ -42,7 +42,7 @@ Apply them automatically without being asked:
 ## C# Patterns to Follow
 
 ```csharp
-// ✓ Use primary constructors for services (C# 12 / .NET 9)
+// ✓ Use primary constructors for services (C# 12 / .NET 10)
 public sealed class TechnicalAnalysisService(
     IEnumerable<IMarketDataProvider> providers,
     IIndicatorCalculator calculator,
@@ -74,7 +74,7 @@ After every frontend edit: `npx tsc --noEmit && npm test && npm run build` — a
 Every change ships through a PR — see `elliottwave-agents` → **Pull Request Workflow**.
 A task is done only when the PR exists and **all** CI checks are green:
 
-- Backend — .NET 9 (build + NUnit)
+- Backend — .NET 10 (build + NUnit)
 - Frontend — React/TypeScript (tsc + vitest + build)
 - Security Scan (vuln + audit + license)
 - CodeQL (C# + TypeScript)
