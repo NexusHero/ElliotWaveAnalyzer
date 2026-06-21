@@ -19,7 +19,7 @@ public interface IWaveAnalysisService
     /// <exception cref="ArgumentException">
     /// When annotations are empty, contain invalid labels, or are not in chronological order.
     /// </exception>
-    Task<WaveValidationResult> ValidateAsync(
+    Task<LlmValidation> ValidateAsync(
         string symbol,
         IReadOnlyList<WaveAnnotation> annotations,
         CancellationToken cancellationToken = default);

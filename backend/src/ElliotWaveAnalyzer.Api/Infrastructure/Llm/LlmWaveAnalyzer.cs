@@ -1,6 +1,6 @@
 using System.Text.Json;
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
-using ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
@@ -16,7 +16,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// WHY this replaced the three hand-rolled HttpClient providers:
 /// per-provider HTTP plumbing, request/response DTOs, and token-usage extraction are
 /// exactly what <see cref="IChatClient"/> standardizes. We keep only what is genuinely
-/// ours: the prompt (<see cref="GeminiPromptBuilder"/>) and the JSON result shape.
+/// ours: the prompt (<see cref="WaveValidationPromptBuilder"/>) and the JSON result shape.
 /// </summary>
 public sealed class LlmWaveAnalyzer(
     IChatClient chatClient,
@@ -34,13 +34,13 @@ public sealed class LlmWaveAnalyzer(
     public string ProviderName => options.Value.Active;
 
     /// <inheritdoc/>
-    public async Task<WaveValidationResult> ValidateAsync(
+    public async Task<LlmValidation> ValidateAsync(
         string symbol,
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveAnnotation> annotations,
         CancellationToken cancellationToken = default)
     {
-        var prompt = GeminiPromptBuilder.Build(symbol, candles, annotations);
+        var prompt = WaveValidationPromptBuilder.Build(symbol, candles, annotations);
 
         logger.LogInformation(
             "Sending wave validation to {Provider} ({Model}) for {Symbol} with {Count} annotations",
@@ -84,7 +84,8 @@ public sealed class LlmWaveAnalyzer(
         var usage = ToTokenUsage(response.Usage);
         logger.LogDebug("{Provider} token usage: {Usage}", ProviderName, usage);
 
-        return ParseValidationJson(text, usage);
+        var result = ParseValidationJson(text);
+        return new LlmValidation(result, usage);
     }
 
     private TokenUsage ToTokenUsage(UsageDetails? details)
@@ -96,7 +97,7 @@ public sealed class LlmWaveAnalyzer(
         return new TokenUsage(ProviderName, prompt, completion, total);
     }
 
-    private WaveValidationResult ParseValidationJson(string text, TokenUsage usage)
+    private WaveValidationResult ParseValidationJson(string text)
     {
         // Defensive fence stripping — some models wrap JSON in ```json … ``` despite instructions.
         var cleaned = text.Trim();
@@ -128,8 +129,7 @@ public sealed class LlmWaveAnalyzer(
             Violations: dto.Violations ?? [],
             Warnings: dto.Warnings ?? [],
             Analysis: dto.Analysis ?? string.Empty,
-            Confidence: dto.Confidence ?? "low",
-            TokenUsage: usage);
+            Confidence: dto.Confidence ?? "low");
     }
 
     private sealed class WaveValidationDto

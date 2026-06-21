@@ -44,7 +44,9 @@ public sealed class CoinGeckoMarketDataProvider(
         response.EnsureSuccessStatusCode();
 
         // CoinGecko returns a JSON array of arrays: [[ts_ms, open, high, low, close], ...]
-        var raw = await response.Content.ReadFromJsonAsync<List<List<double>>>(
+        // Deserialize prices straight to decimal — never route money through double,
+        // which loses precision. System.Text.Json maps JSON numbers to decimal directly.
+        var raw = await response.Content.ReadFromJsonAsync<List<List<decimal>>>(
             cancellationToken: cancellationToken);
 
         if (raw is null || raw.Count == 0)
@@ -53,16 +55,31 @@ public sealed class CoinGeckoMarketDataProvider(
             return [];
         }
 
+        var malformed = raw.Count(entry => entry.Count < 5);
+        if (malformed > 0)
+        {
+            logger.LogWarning(
+                "CoinGecko returned {Count} malformed OHLC row(s) for {Symbol}; skipping them",
+                malformed, symbol);
+        }
+
         var candles = raw
+            .Where(entry => entry.Count >= 5)
             .Select(entry => new MarketCandle(
                 OpenTime: DateTimeOffset.FromUnixTimeMilliseconds((long)entry[0]).UtcDateTime,
-                Open: (decimal)entry[1],
-                High: (decimal)entry[2],
-                Low: (decimal)entry[3],
-                Close: (decimal)entry[4],
+                Open: entry[1],
+                High: entry[2],
+                Low: entry[3],
+                Close: entry[4],
                 Volume: 0m))  // Not provided by this endpoint; see class doc
             .OrderBy(c => c.OpenTime)
             .ToList();
+
+        if (candles.Count == 0)
+        {
+            logger.LogWarning("CoinGecko returned no usable candles for {Symbol}", symbol);
+            return [];
+        }
 
         logger.LogInformation(
             "Received {Count} candles for {Symbol} ({From:yyyy-MM-dd} – {To:yyyy-MM-dd})",

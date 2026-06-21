@@ -3,28 +3,27 @@ using ElliotWaveAnalyzer.Api.Domain;
 namespace ElliotWaveAnalyzer.Api.Interfaces;
 
 /// <summary>
-/// Common abstraction over all LLM providers for Elliott Wave validation.
+/// Validates an Elliott Wave count via an LLM. A single implementation
+/// (<c>LlmWaveAnalyzer</c>) targets the Microsoft.Extensions.AI <c>IChatClient</c>
+/// abstraction; the concrete provider (Gemini/Claude/OpenAI) is chosen at the
+/// composition root.
 ///
-/// WHY a shared interface instead of provider-specific ones:
-/// ISP — callers depend only on wave validation, not on Gemini/Claude/OpenAI specifics.
-/// OCP — new providers are added without touching existing code.
-/// LSP — all implementations are interchangeable at the <c>LlmProvider:Active</c> config key.
-///
-/// Each implementation must:
-///   1. Build a prompt via <see cref="Infrastructure.Llm.GeminiPromptBuilder"/> (provider-agnostic)
-///   2. Call its LLM API and parse the JSON response
-///   3. Return token usage so the <see cref="ITokenTracker"/> can accumulate the session total
+/// WHY this interface still exists with one implementation:
+/// it keeps the application layer (<see cref="IWaveAnalysisService"/>) depending on an
+/// abstraction it can mock in tests (DIP), and leaves room for alternative strategies
+/// (e.g. an ensemble of providers, or a deterministic rules-only analyzer) without
+/// touching callers.
 /// </summary>
 public interface ILlmWaveAnalyzer
 {
-    /// <summary>Provider identifier used for routing and reporting ("Gemini", "Claude", "OpenAI").</summary>
+    /// <summary>Provider identifier used for reporting ("Gemini", "Claude", "OpenAI").</summary>
     string ProviderName { get; }
 
     /// <summary>
-    /// Validates the wave count against Elliott Wave rules via the provider's LLM.
-    /// The returned <see cref="WaveValidationResult.TokenUsage"/> is always populated.
+    /// Validates the wave count against Elliott Wave rules via the LLM and returns the
+    /// assessment together with the token usage of the call.
     /// </summary>
-    Task<WaveValidationResult> ValidateAsync(
+    Task<LlmValidation> ValidateAsync(
         string symbol,
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveAnnotation> annotations,

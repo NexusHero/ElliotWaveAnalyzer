@@ -25,7 +25,7 @@ public static class WaveAnalysisEndpoints
                 The response includes token usage for this call.
                 Configure the active provider via LlmProvider:Active in appsettings.json.
                 """)
-            .Produces<WaveValidationResult>(StatusCodes.Status200OK)
+            .Produces<LlmValidation>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status502BadGateway);
 

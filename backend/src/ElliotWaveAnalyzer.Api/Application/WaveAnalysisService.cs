@@ -18,12 +18,12 @@ public sealed class WaveAnalysisService(
     IEnumerable<IMarketDataProvider> marketDataProviders,
     ILlmWaveAnalyzer llm,
     ITokenTracker tokenTracker,
-    ILogger<WaveAnalysisService>? logger = null) : IWaveAnalysisService
+    ILogger<WaveAnalysisService> logger) : IWaveAnalysisService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
 
     /// <inheritdoc/>
-    public async Task<WaveValidationResult> ValidateAsync(
+    public async Task<LlmValidation> ValidateAsync(
         string symbol,
         IReadOnlyList<WaveAnnotation> annotations,
         CancellationToken cancellationToken = default)
@@ -50,24 +50,22 @@ public sealed class WaveAnalysisService(
         var annotatedDays = (int)(lastAnnotation - firstAnnotation).TotalDays;
         var daysToFetch = Math.Max(annotatedDays + 14, 90);
 
-        logger?.LogInformation(
+        logger.LogInformation(
             "Validating {Symbol} wave count via {Provider} ({Days} days of candle context)",
             symbol, llm.ProviderName, daysToFetch);
 
         var candles = await marketProvider.GetCandlesAsync(symbol, daysToFetch, cancellationToken);
 
-        var result = await llm.ValidateAsync(symbol, candles, annotations, cancellationToken);
+        var validation = await llm.ValidateAsync(symbol, candles, annotations, cancellationToken);
 
-        // Record token usage for session tracking
-        if (result.TokenUsage is { } usage)
-        {
-            tokenTracker.Record(usage);
-            logger?.LogInformation(
-                "Token usage — provider: {Provider}, prompt: {P}, completion: {C}, total: {T}",
-                usage.Provider, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
-        }
+        // Record token usage for session tracking / budget enforcement.
+        var usage = validation.Usage;
+        tokenTracker.Record(usage);
+        logger.LogInformation(
+            "Token usage — provider: {Provider}, prompt: {P}, completion: {C}, total: {T}",
+            usage.Provider, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
 
-        return result;
+        return validation;
     }
 
     // ─── Input validation (pure, no I/O, no cost) ─────────────────────────────

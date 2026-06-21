@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 
 /// <summary>
-/// Unit tests for <see cref="TokenTracker"/>.
+/// Unit tests for <see cref="InMemoryTokenTracker"/>.
 /// Tests cover accumulation, per-provider breakdown, budget enforcement, and thread safety.
 /// </summary>
 [TestFixture]
@@ -164,6 +164,6 @@ public sealed class TokenTrackerTests
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private static TokenTracker BuildTracker(int budget) =>
+    private static InMemoryTokenTracker BuildTracker(int budget) =>
         new(Options.Create(new LlmProviderOptions { TokenBudget = budget }));
 }
