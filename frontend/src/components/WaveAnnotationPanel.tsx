@@ -124,8 +124,9 @@ function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) 
       <p className={styles.subHeading}>Rule checks (objective)</p>
       <ul className={styles.list}>
         {ruleReport.rules.map((rule, i) => (
-          <li key={i} className={ruleStatusClass(rule.status)}>
-            [{rule.status}] {rule.name}
+          <li key={i}>
+            <span className={ruleStatusClass(rule.status)}>[{rule.status}] {rule.name}</span>
+            {rule.detail && <span className={styles.hint}> — {rule.detail}</span>}
           </li>
         ))}
       </ul>
