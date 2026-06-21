@@ -61,7 +61,7 @@ try
     // ── Market data providers ─────────────────────────────────────────────────
     // Multiple IMarketDataProvider registrations are collected as
     // IEnumerable<IMarketDataProvider> by WaveAnalysisService + TechnicalAnalysisService.
-    // Adding Yahoo Finance = new class + one line here (OCP).
+    // Each is wrapped in a caching decorator; selection happens at runtime via Supports().
     builder.Services.AddHttpClient<CoinGeckoMarketDataProvider>(client =>
     {
         client.BaseAddress = new Uri(
@@ -78,11 +78,28 @@ try
     // Retry, timeout, and circuit-breaker for the rate-limited upstream API.
     .AddStandardResilienceHandler();
 
-    // IMarketDataProvider is the CoinGecko provider wrapped in a caching decorator,
-    // so callers transparently get short-lived candle caching (Decorator/OCP).
+    // Yahoo Finance covers equity indices (NASDAQ, S&P 500). Yahoo rejects requests
+    // without a User-Agent, so set one explicitly.
+    builder.Services.AddHttpClient<YahooFinanceMarketDataProvider>(client =>
+    {
+        client.BaseAddress = new Uri(
+            builder.Configuration["MarketData:Yahoo:BaseUrl"]
+            ?? "https://query1.finance.yahoo.com/");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.DefaultRequestHeaders.Add("User-Agent", "ElliotWaveAnalyzer/1.0");
+    })
+    .AddStandardResilienceHandler();
+
+    // Each concrete provider is exposed as an IMarketDataProvider wrapped in a caching
+    // decorator, so callers transparently get short-lived candle caching (Decorator/OCP).
     builder.Services.AddTransient<IMarketDataProvider>(sp =>
         new CachingMarketDataProvider(
             sp.GetRequiredService<CoinGeckoMarketDataProvider>(),
+            sp.GetRequiredService<IMemoryCache>(),
+            sp.GetRequiredService<ILogger<CachingMarketDataProvider>>()));
+    builder.Services.AddTransient<IMarketDataProvider>(sp =>
+        new CachingMarketDataProvider(
+            sp.GetRequiredService<YahooFinanceMarketDataProvider>(),
             sp.GetRequiredService<IMemoryCache>(),
             sp.GetRequiredService<ILogger<CachingMarketDataProvider>>()));
 
