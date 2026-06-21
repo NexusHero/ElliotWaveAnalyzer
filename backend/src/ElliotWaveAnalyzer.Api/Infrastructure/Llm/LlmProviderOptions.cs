@@ -25,7 +25,7 @@ public sealed class LlmProviderOptions
     /// When the session total reaches this value, further LLM calls are blocked
     /// and <c>GET /api/tokens</c> reports <c>isBudgetExceeded: true</c>.
     /// </summary>
-    public int TokenBudget { get; init; } = 0;
+    public int TokenBudget { get; init; }
 
     public LlmEndpointOptions Gemini { get; init; } = new()
     {
