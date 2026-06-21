@@ -10,6 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
+- Interactive Elliott Wave annotation layer in the frontend: click the chart to place wave labels, relabel/remove them, and validate the count against the backend
 - ASP.NET Core .NET 10 Minimal API backend with SOLID architecture
 - `IMarketDataProvider` interface with `CoinGeckoMarketDataProvider` for BTC/ETH
 - `IIndicatorCalculator` interface with `SkenderIndicatorCalculator` (RSI, MACD via Skender.Stock.Indicators)
