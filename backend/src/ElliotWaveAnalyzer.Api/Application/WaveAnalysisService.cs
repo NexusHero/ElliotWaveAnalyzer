@@ -70,6 +70,8 @@ public sealed class WaveAnalysisService(
 
     // ─── Input validation (pure, no I/O, no cost) ─────────────────────────────
 
+    private const int MaxAnnotations = 50;
+
     private static void ValidateAnnotations(IReadOnlyList<WaveAnnotation> annotations)
     {
         if (annotations.Count < 2)
@@ -77,6 +79,14 @@ public sealed class WaveAnalysisService(
             throw new ArgumentException(
                 $"At least 2 annotations are required for Elliott Wave validation. " +
                 $"Received: {annotations.Count}.",
+                nameof(annotations));
+        }
+
+        // Cap the count so a huge payload can't inflate the prompt (token cost / DoS).
+        if (annotations.Count > MaxAnnotations)
+        {
+            throw new ArgumentException(
+                $"Too many annotations: {annotations.Count}. Maximum is {MaxAnnotations}.",
                 nameof(annotations));
         }
 

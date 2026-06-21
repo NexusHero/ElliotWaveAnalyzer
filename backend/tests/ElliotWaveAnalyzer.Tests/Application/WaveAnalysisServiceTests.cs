@@ -105,6 +105,18 @@ public sealed class WaveAnalysisServiceTests
         Assert.ThrowsAsync<ArgumentException>(() => _sut.ValidateAsync("BTC", outOfOrder));
     }
 
+    [Test]
+    public void ValidateAsync_TooManyAnnotations_ThrowsArgumentException()
+    {
+        var start = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var many = Enumerable.Range(0, 51)
+            .Select(i => new WaveAnnotation(start.AddDays(i), 100m + i, "3"))
+            .ToList();
+
+        var ex = Assert.ThrowsAsync<ArgumentException>(() => _sut.ValidateAsync("BTC", many));
+        Assert.That(ex!.Message, Does.Contain("Too many"));
+    }
+
     // ─── Budget enforcement ───────────────────────────────────────────────────
 
     [Test]
