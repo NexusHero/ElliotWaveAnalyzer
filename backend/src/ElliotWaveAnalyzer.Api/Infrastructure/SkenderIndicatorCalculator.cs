@@ -27,13 +27,12 @@ public sealed class SkenderIndicatorCalculator : IIndicatorCalculator
     public IReadOnlyList<Domain.RsiResult> CalculateRsi(
         IReadOnlyList<MarketCandle> candles, int period = 14)
     {
-        return candles
+        return [.. candles
             .AsSkenderQuotes()
             .GetRsi(period)
             .Select(r => new Domain.RsiResult(
                 Date: r.Date,
-                Value: r.Rsi.HasValue ? (decimal)r.Rsi.Value : null))
-            .ToList();
+                Value: r.Rsi.HasValue ? (decimal)r.Rsi.Value : null))];
     }
 
     /// <inheritdoc/>
@@ -43,15 +42,14 @@ public sealed class SkenderIndicatorCalculator : IIndicatorCalculator
         int slowPeriods = 26,
         int signalPeriods = 9)
     {
-        return candles
+        return [.. candles
             .AsSkenderQuotes()
             .GetMacd(fastPeriods, slowPeriods, signalPeriods)
             .Select(r => new Domain.MacdResult(
                 Date: r.Date,
                 MacdLine: r.Macd.HasValue ? (decimal)r.Macd.Value : null,
                 SignalLine: r.Signal.HasValue ? (decimal)r.Signal.Value : null,
-                Histogram: r.Histogram.HasValue ? (decimal)r.Histogram.Value : null))
-            .ToList();
+                Histogram: r.Histogram.HasValue ? (decimal)r.Histogram.Value : null))];
     }
 }
 

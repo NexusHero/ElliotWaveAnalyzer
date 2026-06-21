@@ -1,6 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.Extensions.Logging;
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure;
 
@@ -51,7 +50,7 @@ public sealed class CoinGeckoMarketDataProvider(
         if (raw is null || raw.Count == 0)
         {
             logger.LogWarning("CoinGecko returned empty OHLC data for {Symbol}", symbol);
-            return Array.Empty<MarketCandle>();
+            return [];
         }
 
         var candles = raw

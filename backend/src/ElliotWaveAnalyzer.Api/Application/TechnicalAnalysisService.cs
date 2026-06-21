@@ -1,6 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.Extensions.Logging;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
@@ -19,7 +18,7 @@ public sealed class TechnicalAnalysisService(
     IIndicatorCalculator calculator,
     ILogger<TechnicalAnalysisService>? logger = null) : ITechnicalAnalysisService
 {
-    private readonly IReadOnlyList<IMarketDataProvider> _providers = providers.ToList();
+    private readonly IReadOnlyList<IMarketDataProvider> _providers = [.. providers];
 
     /// <inheritdoc/>
     public async Task<TechnicalAnalysisResult> GetAnalysisAsync(

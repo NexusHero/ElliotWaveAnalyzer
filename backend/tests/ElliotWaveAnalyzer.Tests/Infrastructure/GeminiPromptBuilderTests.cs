@@ -29,6 +29,7 @@ public sealed class GeminiPromptBuilderTests
         new(new DateTime(2024, 2, 10, 0, 0, 0, DateTimeKind.Utc), 44_000m, "4"),
         new(new DateTime(2024, 2, 25, 0, 0, 0, DateTimeKind.Utc), 58_000m, "5"),
     ];
+    private static readonly string[] sourceArray = new[] { "\"1\"", "\"2\"", "\"3\"", "\"4\"", "\"5\"" };
 
     // ─── Content checks ───────────────────────────────────────────────────────
 
@@ -46,8 +47,10 @@ public sealed class GeminiPromptBuilderTests
         var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
+        {
             Assert.That(prompt, Does.Contain(annotation.Label),
                 $"Prompt must mention wave label '{annotation.Label}'");
+        }
     }
 
     [Test]
@@ -56,8 +59,10 @@ public sealed class GeminiPromptBuilderTests
         var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
+        {
             Assert.That(prompt, Does.Contain(annotation.Price.ToString("F2")),
                 $"Prompt must include price {annotation.Price} for wave {annotation.Label}");
+        }
     }
 
     [Test]
@@ -66,8 +71,10 @@ public sealed class GeminiPromptBuilderTests
         var prompt = GeminiPromptBuilder.Build("BTC", Candles, FiveWaveAnnotations);
 
         foreach (var annotation in FiveWaveAnnotations)
+        {
             Assert.That(prompt, Does.Contain(annotation.Date.ToString("yyyy-MM-dd")),
                 $"Prompt must include date {annotation.Date:yyyy-MM-dd} for wave {annotation.Label}");
+        }
     }
 
     [Test]
@@ -122,8 +129,7 @@ public sealed class GeminiPromptBuilderTests
         var prompt = GeminiPromptBuilder.Build("BTC", Candles, reversed);
 
         // Find positions of wave labels in prompt — must appear in 1→5 order
-        var positions = new[] { "\"1\"", "\"2\"", "\"3\"", "\"4\"", "\"5\"" }
-            .Select(label => prompt.IndexOf(label, StringComparison.Ordinal))
+        var positions = sourceArray.Select(label => prompt.IndexOf(label, StringComparison.Ordinal))
             .ToList();
 
         Assert.That(positions, Is.Ordered.Ascending,

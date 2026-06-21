@@ -1,6 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.Extensions.Logging;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
@@ -21,7 +20,7 @@ public sealed class WaveAnalysisService(
     ITokenTracker tokenTracker,
     ILogger<WaveAnalysisService>? logger = null) : IWaveAnalysisService
 {
-    private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = marketDataProviders.ToList();
+    private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
 
     /// <inheritdoc/>
     public async Task<WaveValidationResult> ValidateAsync(
@@ -76,10 +75,12 @@ public sealed class WaveAnalysisService(
     private static void ValidateAnnotations(IReadOnlyList<WaveAnnotation> annotations)
     {
         if (annotations.Count < 2)
+        {
             throw new ArgumentException(
                 $"At least 2 annotations are required for Elliott Wave validation. " +
                 $"Received: {annotations.Count}.",
                 nameof(annotations));
+        }
 
         var invalidLabels = annotations
             .Where(a => !WaveAnnotation.IsValidLabel(a.Label))
@@ -87,19 +88,23 @@ public sealed class WaveAnalysisService(
             .ToList();
 
         if (invalidLabels.Count > 0)
+        {
             throw new ArgumentException(
                 $"Invalid wave label(s): {string.Join(", ", invalidLabels.Select(l => $"'{l}'"))}. " +
                 "Valid labels: 1 2 3 4 5 A B C W X Y",
                 nameof(annotations));
+        }
 
         for (var i = 1; i < annotations.Count; i++)
         {
             if (annotations[i].Date <= annotations[i - 1].Date)
+            {
                 throw new ArgumentException(
                     $"Annotations must be in chronological order. " +
                     $"Wave '{annotations[i].Label}' ({annotations[i].Date:yyyy-MM-dd}) " +
                     $"is not after wave '{annotations[i - 1].Label}' ({annotations[i - 1].Date:yyyy-MM-dd}).",
                     nameof(annotations));
+            }
         }
     }
 }

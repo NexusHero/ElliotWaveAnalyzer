@@ -3,7 +3,6 @@ using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Gemini;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
@@ -106,7 +105,9 @@ public sealed class LlmWaveAnalyzer(
             var start = cleaned.IndexOf('\n');
             var end = cleaned.LastIndexOf("```", StringComparison.Ordinal);
             if (start >= 0 && end > start)
+            {
                 cleaned = cleaned[(start + 1)..end].Trim();
+            }
         }
 
         WaveValidationDto dto;

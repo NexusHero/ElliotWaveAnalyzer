@@ -21,8 +21,8 @@ public sealed class TechnicalAnalysisServiceTests
     private IIndicatorCalculator _calculator = null!;
     private ITechnicalAnalysisService _sut = null!;
 
-    private static readonly IReadOnlyList<MacdResult> EmptyMacd = Array.Empty<MacdResult>();
-    private static readonly IReadOnlyList<RsiResult> EmptyRsi = Array.Empty<RsiResult>();
+    private static readonly IReadOnlyList<MacdResult> EmptyMacd = [];
+    private static readonly IReadOnlyList<RsiResult> EmptyRsi = [];
 
     [SetUp]
     public void SetUp()
@@ -103,7 +103,7 @@ public sealed class TechnicalAnalysisServiceTests
     [Test]
     public async Task GetAnalysisAsync_ResultContainsCorrectSymbol()
     {
-        var candles = ArrangeBtcWithCandles(30);
+        _ = ArrangeBtcWithCandles(30);
 
         var result = await _sut.GetAnalysisAsync("BTC");
 

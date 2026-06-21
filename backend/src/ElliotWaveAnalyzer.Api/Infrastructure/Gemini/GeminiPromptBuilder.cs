@@ -53,19 +53,19 @@ public static class GeminiPromptBuilder
 
     // ─── Sections ─────────────────────────────────────────────────────────────
 
-    private static void AppendSystemRole(StringBuilder sb)
-    {
-        sb.AppendLine("""
+    private static void AppendSystemRole(StringBuilder sb) => sb.AppendLine("""
             You are an expert technical analyst specializing in Elliott Wave Theory.
             Your task is to validate a user-drawn Elliott Wave count against the canonical rules.
             Be precise, refer to specific wave labels and prices when citing violations.
             """);
-    }
 
     private static void AppendMarketContext(
         StringBuilder sb, string symbol, IReadOnlyList<MarketCandle> candles)
     {
-        if (candles.Count == 0) return;
+        if (candles.Count == 0)
+        {
+            return;
+        }
 
         var low = candles.Min(c => c.Low);
         var high = candles.Max(c => c.High);
@@ -109,13 +109,14 @@ public static class GeminiPromptBuilder
     {
         sb.AppendLine("## Elliott Wave Rules & Guidelines to Apply");
         foreach (var rule in ElliottWaveRules)
+        {
             sb.AppendLine($"- {rule}");
+        }
+
         sb.AppendLine();
     }
 
-    private static void AppendResponseSchema(StringBuilder sb)
-    {
-        sb.AppendLine("""
+    private static void AppendResponseSchema(StringBuilder sb) => sb.AppendLine("""
             ## Required Output
             Respond ONLY with valid JSON — no markdown fences, no prose before or after.
             Use exactly this schema:
@@ -134,7 +135,6 @@ public static class GeminiPromptBuilder
             - "confidence" reflects how certain you are of your assessment
               given the available data (e.g. "low" if fewer than 3 waves are annotated).
             """);
-    }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 

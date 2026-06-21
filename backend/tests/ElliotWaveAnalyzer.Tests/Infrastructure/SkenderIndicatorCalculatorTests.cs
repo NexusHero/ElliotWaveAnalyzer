@@ -68,7 +68,7 @@ public sealed class SkenderIndicatorCalculatorTests
 
         var computed = result.Where(r => r.Value.HasValue).ToList();
         Assert.That(computed, Is.Not.Empty, "Should produce at least one non-null RSI value");
-        Assert.That(computed.All(r => r.Value >= 0m && r.Value <= 100m), Is.True,
+        Assert.That(computed.All(r => r.Value is >= 0m and <= 100m), Is.True,
             "RSI must always be in [0, 100]");
     }
 

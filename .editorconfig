@@ -167,14 +167,6 @@ dotnet_naming_symbols.interface_symbols.applicable_kinds           = interface
 dotnet_naming_style.interface_style.required_prefix                = I
 dotnet_naming_style.interface_style.capitalization                 = pascal_case
 
-; Type parameters — TPascalCase
-dotnet_naming_rule.type_parameters_must_start_with_t.severity = warning
-dotnet_naming_rule.type_parameters_must_start_with_t.symbols  = type_parameter_symbols
-dotnet_naming_rule.type_parameters_must_start_with_t.style    = type_parameter_style
-dotnet_naming_symbols.type_parameters_symbols.applicable_kinds = type_parameter
-dotnet_naming_style.type_parameter_style.required_prefix       = T
-dotnet_naming_style.type_parameter_style.capitalization        = pascal_case
-
 ; Constants — PascalCase
 dotnet_naming_rule.constants_must_be_pascal_case.severity = warning
 dotnet_naming_rule.constants_must_be_pascal_case.symbols  = constant_symbols

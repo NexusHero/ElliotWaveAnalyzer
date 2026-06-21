@@ -61,7 +61,9 @@ try
 
         var apiKey = builder.Configuration["MarketData:CoinGecko:ApiKey"];
         if (!string.IsNullOrWhiteSpace(apiKey))
+        {
             client.DefaultRequestHeaders.Add("x-cg-pro-api-key", apiKey);
+        }
     });
     builder.Services.AddTransient<IMarketDataProvider, CoinGeckoMarketDataProvider>();
 
@@ -82,7 +84,7 @@ try
         var opts = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value;
         var endpoint = opts.GetActiveEndpoint();
 
-        IChatClient inner = opts.Active.ToLowerInvariant() switch
+        var inner = opts.Active.ToLowerInvariant() switch
         {
             // OpenAI: native endpoint.
             "openai" => new OpenAIClient(endpoint.ApiKey)

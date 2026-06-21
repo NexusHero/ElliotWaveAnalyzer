@@ -148,7 +148,9 @@ public sealed class TokenTrackerTests
             .Select(_ => new Thread(() =>
             {
                 for (var i = 0; i < callsPerThread; i++)
+                {
                     _sut.Record(new TokenUsage("Gemini", 70, 30, tokensPerCall));
+                }
             }))
             .ToList();
 
