@@ -9,6 +9,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Security
+- Stop logging user email addresses; log the non-PII user id instead (CodeQL `cs/exposure-of-sensitive-information`)
+- Force the patched `js-yaml` 4.2.0 via npm `overrides` (the dev-only `openapi-typescript` → `@redocly/openapi-core` pinned the vulnerable 4.1.1); `npm audit` now reports 0 vulnerabilities
+
 ### Added
 - Frontend auth UI: login/logout with an auth gate (probes `/api/auth/me`), plus a dark/light theme switch persisted across sessions
 - Design tokens (CSS custom properties) for dark and light themes; component styling moved into CSS Modules for easy theming/swapping
