@@ -42,7 +42,8 @@ public static class WaveValidationPromptBuilder
     public static string Build(
         string symbol,
         IReadOnlyList<MarketCandle> candles,
-        IReadOnlyList<WaveAnnotation> annotations)
+        IReadOnlyList<WaveAnnotation> annotations,
+        WaveRuleReport ruleReport)
     {
         var sorted = annotations.OrderBy(a => a.Date).ToList();
         var sb = new StringBuilder();
@@ -51,17 +52,43 @@ public static class WaveValidationPromptBuilder
         AppendMarketContext(sb, symbol, candles);
         AppendAnnotations(sb, sorted);
         AppendRules(sb);
+        AppendDeterministicChecks(sb, ruleReport);
         AppendResponseSchema(sb);
 
         return sb.ToString();
     }
 
+    private static void AppendDeterministicChecks(StringBuilder sb, WaveRuleReport report)
+    {
+        sb.AppendLine("## Deterministic Checks (AUTHORITATIVE — already computed, do NOT re-derive)");
+        sb.AppendLine($"Assumed direction: {(report.BullishAssumed ? "bullish (up)" : "bearish (down)")}");
+        foreach (var rule in report.Rules)
+        {
+            sb.AppendLine($"- [{rule.Status}] {rule.Name} — {rule.Detail}");
+        }
+        if (report.Ratios.Count > 0)
+        {
+            sb.AppendLine("Fibonacci ratios:");
+            foreach (var ratio in report.Ratios)
+            {
+                sb.AppendLine($"- {ratio.Name}: {ratio.Ratio:0.###}");
+            }
+        }
+        sb.AppendLine();
+    }
+
     // ─── Sections ─────────────────────────────────────────────────────────────
 
     private static void AppendSystemRole(StringBuilder sb) => sb.AppendLine("""
-            You are an expert technical analyst specializing in Elliott Wave Theory.
-            Your task is to validate a user-drawn Elliott Wave count against the canonical rules.
-            Be precise, refer to specific wave labels and prices when citing violations.
+            You are an Elliott Wave coach helping a trader LEARN, not a signal service.
+            The objective rule checks have already been computed deterministically and are
+            given below as authoritative — trust them; do not re-derive rule pass/fail.
+            Your job is the qualitative layer: explain WHY in plain terms, point out the
+            Fibonacci context, suggest one plausible ALTERNATIVE count, and ask 1–2 short
+            reflective questions that help the trader reason for themselves.
+            Refer to specific wave labels and prices. Be concise and educational.
+            Hard guardrail: NEVER give buy/sell/hold advice, price predictions, or position
+            sizing. This is wave-structure education only.
             """);
 
     private static void AppendMarketContext(
@@ -130,15 +157,18 @@ public static class WaveValidationPromptBuilder
               "isValid": true | false,
               "violations": ["string", ...],
               "warnings": ["string", ...],
-              "analysis": "string (2–4 sentence overall assessment)",
+              "analysis": "string (the coaching reflection)",
               "confidence": "high" | "medium" | "low"
             }
 
-            - "isValid" is true only when "violations" is empty.
-            - "violations" are hard rule breaches (Rules 1–3 above).
-            - "warnings" are guideline deviations or ambiguous patterns.
-            - "confidence" reflects how certain you are of your assessment
-              given the available data (e.g. "low" if fewer than 3 waves are annotated).
+            - "isValid" / "violations" MUST mirror the authoritative deterministic checks
+              above (isValid = true only when no rule has status Fail). Do not contradict them.
+            - "warnings" are guideline deviations or ambiguous patterns (e.g. unusual
+              Fibonacci ratios, a possible diagonal).
+            - "analysis" is your coaching: a short plain-language explanation, the Fibonacci
+              context, ONE plausible alternative count, and 1–2 reflective questions for the
+              trader. No trading advice.
+            - "confidence" reflects how certain the wave count is given the available pivots.
             """);
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

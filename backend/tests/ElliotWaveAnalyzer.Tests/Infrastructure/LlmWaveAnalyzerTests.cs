@@ -29,6 +29,8 @@ public sealed class LlmWaveAnalyzerTests
         new(new DateTime(2024, 1, 15, 0, 0, 0, DateTimeKind.Utc), 35_000m, "2"),
     ];
 
+    private static readonly WaveRuleReport Report = new(BullishAssumed: false, Rules: [], Ratios: []);
+
     [SetUp]
     public void SetUp()
     {
@@ -63,7 +65,7 @@ public sealed class LlmWaveAnalyzerTests
               "analysis": "Clean impulse.", "confidence": "high" }
             """);
 
-        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations);
+        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations, Report);
 
         Assert.That(validation.Result.IsValid, Is.True);
         Assert.That(validation.Result.Warnings, Does.Contain("check wave 2"));
@@ -81,7 +83,7 @@ public sealed class LlmWaveAnalyzerTests
             ```
             """);
 
-        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations);
+        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations, Report);
 
         Assert.That(validation.Result.IsValid, Is.False);
         Assert.That(validation.Result.Violations, Does.Contain("wave 3 shortest"));
@@ -94,7 +96,7 @@ public sealed class LlmWaveAnalyzerTests
             """{ "isValid": true, "violations": [], "warnings": [], "analysis": "ok", "confidence": "low" }""",
             new UsageDetails { InputTokenCount = 120, OutputTokenCount = 30, TotalTokenCount = 150 });
 
-        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations);
+        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations, Report);
 
         Assert.That(validation.Usage.Provider, Is.EqualTo("Gemini"));
         Assert.That(validation.Usage.PromptTokens, Is.EqualTo(120));
@@ -108,7 +110,7 @@ public sealed class LlmWaveAnalyzerTests
         GivenResponse(
             """{ "isValid": true, "violations": [], "warnings": [], "analysis": "ok", "confidence": "low" }""");
 
-        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations);
+        var validation = await _sut.ValidateAsync("BTC", Candles, Annotations, Report);
 
         Assert.That(validation.Usage.TotalTokens, Is.Zero);
     }
@@ -121,7 +123,7 @@ public sealed class LlmWaveAnalyzerTests
         GivenResponse("   ");
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => _sut.ValidateAsync("BTC", Candles, Annotations));
+            () => _sut.ValidateAsync("BTC", Candles, Annotations, Report));
     }
 
     [Test]
@@ -130,7 +132,7 @@ public sealed class LlmWaveAnalyzerTests
         GivenResponse("not json at all");
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => _sut.ValidateAsync("BTC", Candles, Annotations));
+            () => _sut.ValidateAsync("BTC", Candles, Annotations, Report));
     }
 
     // ─── Provider name ───────────────────────────────────────────────────────────

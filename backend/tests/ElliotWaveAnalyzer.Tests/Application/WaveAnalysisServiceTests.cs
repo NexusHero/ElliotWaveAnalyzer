@@ -53,6 +53,7 @@ public sealed class WaveAnalysisServiceTests
                 Arg.Any<string>(),
                 Arg.Any<IReadOnlyList<MarketCandle>>(),
                 Arg.Any<IReadOnlyList<WaveAnnotation>>(),
+                Arg.Any<WaveRuleReport>(),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(ValidValidation));
 
@@ -140,6 +141,7 @@ public sealed class WaveAnalysisServiceTests
             Arg.Any<string>(),
             Arg.Any<IReadOnlyList<MarketCandle>>(),
             Arg.Any<IReadOnlyList<WaveAnnotation>>(),
+            Arg.Any<WaveRuleReport>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -154,6 +156,7 @@ public sealed class WaveAnalysisServiceTests
             "BTC",
             Arg.Any<IReadOnlyList<MarketCandle>>(),
             Arg.Any<IReadOnlyList<WaveAnnotation>>(),
+            Arg.Any<WaveRuleReport>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -170,11 +173,14 @@ public sealed class WaveAnalysisServiceTests
     // ─── Result pass-through ──────────────────────────────────────────────────
 
     [Test]
-    public async Task ValidateAsync_ReturnsLlmValidation()
+    public async Task ValidateAsync_ReturnsAssessmentUsageAndDeterministicReport()
     {
         var result = await _sut.ValidateAsync("BTC", ValidAnnotations);
 
-        Assert.That(result, Is.SameAs(ValidValidation));
+        Assert.That(result.Result, Is.SameAs(ValidResult));
+        Assert.That(result.Usage, Is.EqualTo(DummyUsage));
+        Assert.That(result.RuleReport, Is.Not.Null);
+        Assert.That(result.RuleReport.Rules, Is.Not.Empty);
     }
 
     [Test]
@@ -188,6 +194,7 @@ public sealed class WaveAnalysisServiceTests
             Arg.Any<string>(),
             Arg.Any<IReadOnlyList<MarketCandle>>(),
             Arg.Any<IReadOnlyList<WaveAnnotation>>(),
+            Arg.Any<WaveRuleReport>(),
             cts.Token);
     }
 

@@ -9,6 +9,15 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- Deterministic `ElliottRuleChecker`: the three hard Elliott rules + Fibonacci ratios computed in code (objective, no LLM) and returned alongside the AI assessment as `ruleReport`
+- The LLM is now grounded on the deterministic checks and prompted as a Socratic **coach** (explanation, alternative count, reflective questions) with a hard guardrail against trading advice
+- Frontend shows the objective rule checks and Fibonacci ratios next to the coach reflection
+- API serializes enum values as strings
+
+### Changed
+- CI/release/security workflows and the frontend target Node.js 24 (was 20)
+
 ### Security
 - Per-user rate limiting on the expensive endpoints (`/api/wave-analysis`, `/api/market-data`) to curb LLM-cost / upstream abuse, in addition to the login limiter
 - Cap the number of annotations per request (prompt-inflation / DoS guard)

@@ -23,12 +23,16 @@ public sealed class WaveAnalysisService(
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
 
     /// <inheritdoc/>
-    public async Task<LlmValidation> ValidateAsync(
+    public async Task<WaveAnalysisResponse> ValidateAsync(
         string symbol,
         IReadOnlyList<WaveAnnotation> annotations,
         CancellationToken cancellationToken = default)
     {
         ValidateAnnotations(annotations);
+
+        // Objective, deterministic rule check first — this grounds the LLM and is returned
+        // to the client as authoritative (the LLM only adds qualitative coaching on top).
+        var ruleReport = ElliottRuleChecker.Check(annotations);
 
         // Check budget BEFORE fetching candles — avoid unnecessary API calls
         if (tokenTracker.IsBudgetExceeded())
@@ -56,7 +60,7 @@ public sealed class WaveAnalysisService(
 
         var candles = await marketProvider.GetCandlesAsync(symbol, daysToFetch, cancellationToken);
 
-        var validation = await llm.ValidateAsync(symbol, candles, annotations, cancellationToken);
+        var validation = await llm.ValidateAsync(symbol, candles, annotations, ruleReport, cancellationToken);
 
         // Record token usage for session tracking / budget enforcement.
         var usage = validation.Usage;
@@ -65,7 +69,7 @@ public sealed class WaveAnalysisService(
             "Token usage — provider: {Provider}, prompt: {P}, completion: {C}, total: {T}",
             usage.Provider, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
 
-        return validation;
+        return new WaveAnalysisResponse(validation.Result, ruleReport, usage);
     }
 
     // ─── Input validation (pure, no I/O, no cost) ─────────────────────────────

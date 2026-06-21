@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { validateWaveCount, login, getCurrentUser } from './client'
-import type { LlmValidation, WaveValidationRequest } from './types'
+import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
 
 const request: WaveValidationRequest = {
   symbol: 'BTC',
@@ -10,8 +10,9 @@ const request: WaveValidationRequest = {
   ],
 }
 
-const okResponse: LlmValidation = {
+const okResponse: WaveAnalysisResponse = {
   result: { isValid: true, violations: [], warnings: [], analysis: 'ok', confidence: 'high' },
+  ruleReport: { bullishAssumed: true, rules: [], ratios: [] },
   usage: { provider: 'Gemini', promptTokens: 100, completionTokens: 50, totalTokens: 150 },
 }
 

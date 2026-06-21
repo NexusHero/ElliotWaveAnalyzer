@@ -1,4 +1,6 @@
 using System.ClientModel;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Anthropic.SDK;
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Endpoints;
@@ -7,7 +9,6 @@ using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -56,6 +57,10 @@ try
             return Task.CompletedTask;
         });
     });
+
+    // Serialize enums as strings (e.g. RuleStatus -> "Pass") for a clean JSON contract.
+    builder.Services.ConfigureHttpJsonOptions(opts =>
+        opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
     // ── Caching (per-instance) ────────────────────────────────────────────────
     // IMemoryCache backs candle caching; IDistributedMemoryCache backs LLM response
@@ -245,10 +250,7 @@ try
 
     // Behind a TLS-terminating proxy, honour X-Forwarded-Proto/For so Request.IsHttps is
     // accurate (drives the Secure cookie flag) and the real client IP is used for limits.
-    builder.Services.Configure<ForwardedHeadersOptions>(opts =>
-    {
-        opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    });
+    builder.Services.Configure<ForwardedHeadersOptions>(opts => opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();
