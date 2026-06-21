@@ -47,7 +47,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     const container = containerRef.current
     if (!container) return
 
-    const colors = readChartColors()
+    const colors = chartColors(theme)
     const chart = createChart(container, {
       layout: {
         background: { type: ColorType.Solid, color: colors.background },
@@ -118,7 +118,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     const series = seriesRef.current
     if (!chart || !series) return
 
-    const colors = readChartColors()
+    const colors = chartColors(theme)
     chart.applyOptions({
       layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
       grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
@@ -133,7 +133,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     const series = seriesRef.current
     if (!series) return
 
-    const color = readChartColors().marker
+    const color = chartColors(theme).marker
     const markers: SeriesMarker<Time>[] = annotations.map(a => ({
       time: a.time as Time,
       position: 'aboveBar',
@@ -157,19 +157,30 @@ interface ChartColors {
   marker: string
 }
 
-/** Reads the chart palette from the app's CSS custom properties (theme-aware). */
-function readChartColors(): ChartColors {
-  const css = getComputedStyle(document.documentElement)
-  const read = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback
-  return {
-    background: read('--color-bg', '#0d1117'),
-    text: read('--color-text-muted', '#8b949e'),
-    border: read('--color-border', '#30363d'),
-    grid: read('--color-border', '#21262d'),
-    up: read('--color-up', '#3fb950'),
-    down: read('--color-down', '#f85149'),
-    marker: read('--color-accent', '#58a6ff'),
-  }
+// Palettes mirror the CSS theme tokens in index.css. Derived straight from the `theme`
+// prop (not getComputedStyle) so the chart can never lag the DOM's data-theme and invert.
+const DARK_COLORS: ChartColors = {
+  background: '#0d1117',
+  text: '#8b949e',
+  border: '#30363d',
+  grid: '#21262d',
+  up: '#3fb950',
+  down: '#f85149',
+  marker: '#58a6ff',
+}
+
+const LIGHT_COLORS: ChartColors = {
+  background: '#ffffff',
+  text: '#57606a',
+  border: '#d0d7de',
+  grid: '#eaeef2',
+  up: '#1a7f37',
+  down: '#cf222e',
+  marker: '#0969da',
+}
+
+function chartColors(theme: Theme): ChartColors {
+  return theme === 'light' ? LIGHT_COLORS : DARK_COLORS
 }
 
 function candleColors(colors: ChartColors): Partial<CandlestickSeriesOptions> {
