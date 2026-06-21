@@ -1,21 +1,21 @@
 # Elliott Wave Analyzer
 
-Webanwendung zur technischen Analyse von Finanzmärkten (BTC, ETH, NASDAQ) nach der Elliott-Wellen-Theorie.
+Web application for technical analysis of financial markets (BTC, ETH, NASDAQ) based on Elliott Wave Theory.
 
-## Überblick
+## Overview
 
 ```
 [CoinGecko / Yahoo Finance]
          ↓
   [ASP.NET Core Backend]
-  Minimal API · Indikator-Berechnung · Gemini-Integration · SQLite-Persistenz
+  Minimal API · Indicator calculation · Gemini integration · SQLite persistence
          ↓ JSON (REST)              ↓ PNG (SkiaSharp)
-  [React Frontend]              [Telegram / E-Mail]
+  [React Frontend]              [Telegram / Email]
   TradingView Lightweight Charts
-  Interaktive Elliott-Wellen-Annotation
+  Interactive Elliott Wave annotation
 ```
 
-## Monorepo-Struktur
+## Monorepo structure
 
 ```
 ElliotWaveAnalyzer/
@@ -29,13 +29,13 @@ ElliotWaveAnalyzer/
 └── README.md
 ```
 
-## Voraussetzungen
+## Prerequisites
 
 - .NET 10 SDK
 - Node.js 20+
-- (Optional) Docker für containerisiertes Deployment
+- (Optional) Docker for containerized deployment
 
-## Lokaler Dev-Workflow
+## Local dev workflow
 
 ### Backend
 
@@ -43,9 +43,9 @@ ElliotWaveAnalyzer/
 cd backend
 dotnet restore
 dotnet build
-dotnet test                          # alle Tests
+dotnet test                          # all tests
 dotnet run --project src/ElliotWaveAnalyzer.Api
-# API läuft auf https://localhost:5001
+# API runs on https://localhost:5001
 # Swagger UI: https://localhost:5001/swagger
 ```
 
@@ -54,32 +54,32 @@ dotnet run --project src/ElliotWaveAnalyzer.Api
 ```bash
 cd frontend
 npm install
-npm run dev                          # Vite Dev Server auf http://localhost:5173
+npm run dev                          # Vite dev server on http://localhost:5173
 npm run test                         # Vitest
-npm run build                        # Produktions-Build
+npm run build                        # Production build
 ```
 
-### OpenAPI-Codegen (TypeScript-Typen aus Backend generieren)
+### OpenAPI codegen (generate TypeScript types from the backend)
 
 ```bash
 cd frontend
 npm run generate:api                 # openapi-typescript → src/api/generated.ts
 ```
 
-## Architektur-Entscheidungen
+## Architecture decisions
 
-Architekturentscheidungen werden als ADRs unter `docs/adr/` dokumentiert.
+Architecture decisions are documented as ADRs under `docs/adr/`.
 
-## Tech-Stack
+## Tech stack
 
-| Schicht      | Technologie                             |
-|-------------|----------------------------------------|
+| Layer        | Technology                              |
+|-------------|-----------------------------------------|
 | Backend API | ASP.NET Core Minimal API (.NET 9)       |
-| Indikatoren | Skender.Stock.Indicators                |
+| Indicators  | Skender.Stock.Indicators                |
 | Charts (srv)| SkiaSharp                               |
-| LLM         | Google Gemini 2.5 Flash (konfigurierbar)|
-| Persistenz  | SQLite (→ Postgres-Migration möglich)   |
-| Logging     | Serilog (strukturiertes JSON)           |
+| LLM         | Google Gemini 2.5 Flash (configurable)  |
+| Persistence | SQLite (→ Postgres migration possible)  |
+| Logging     | Serilog (structured JSON)               |
 | Frontend    | React 18 + TypeScript + Vite            |
 | Charts (UI) | TradingView Lightweight Charts          |
 | Tests BE    | NUnit + NSubstitute                     |
@@ -87,4 +87,4 @@ Architekturentscheidungen werden als ADRs unter `docs/adr/` dokumentiert.
 
 ## Deployment
 
-Self-Contained Single-File als Zielbild; Containerisierung für Home-Assistant-Add-on geplant.
+Self-contained single-file as the target; containerization for a Home Assistant add-on is planned.
