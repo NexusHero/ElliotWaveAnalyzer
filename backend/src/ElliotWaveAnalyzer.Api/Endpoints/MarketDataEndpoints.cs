@@ -16,7 +16,7 @@ public static class MarketDataEndpoints
             .MapGroup("/api/market-data")
             .WithTags("Market Data")
             .RequireAuthorization()
-            .RequireRateLimiting("per-user");
+            .RequireRateLimiting("ip-global");
 
         group.MapGet("/{symbol}", GetAnalysis)
             .WithName("GetMarketData")
