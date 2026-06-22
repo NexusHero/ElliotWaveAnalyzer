@@ -217,7 +217,8 @@ try
 
     // ── Authentication ────────────────────────────────────────────────────────
     // Primary scheme: custom opaque session tokens stored hashed in PostgreSQL (existing).
-    // Secondary scheme: Google OAuth 2.0 via ExternalCookie (new — foundation for SSO).
+    // Secondary scheme: Google OAuth 2.0 via ExternalCookie (registered only when
+    // credentials are configured — OAuthOptions.Validate() throws on empty ClientId).
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddDbContext<AppDbContext>(opts =>
         opts.UseNpgsql(builder.Configuration.GetConnectionString("Postgres") ?? string.Empty));
@@ -235,7 +236,7 @@ try
 
     builder.Services.AddScoped<IAuthService, AuthService>();
 
-    builder.Services
+    var authBuilder = builder.Services
         .AddAuthentication(SessionAuthenticationHandler.SchemeName)
         .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
             SessionAuthenticationHandler.SchemeName, configureOptions: null)
@@ -245,15 +246,24 @@ try
             options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             options.Cookie.SameSite = SameSiteMode.Lax;
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        })
-        .AddGoogle(options =>
+        });
+
+    // Google OAuth is only wired up when credentials are present.
+    // OAuthOptions.Validate() throws ArgumentException for an empty ClientId,
+    // which would crash test hosts and dev environments without credentials configured.
+    var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+    var googleEnabled = !string.IsNullOrEmpty(googleClientId);
+    if (googleEnabled)
+    {
+        authBuilder.AddGoogle(options =>
         {
             options.SignInScheme = "ExternalCookie";
-            options.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
+            options.ClientId = googleClientId!;
             options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
             options.Scope.Add("email");
             options.Scope.Add("profile");
         });
+    }
 
     builder.Services.AddAuthorization();
 
@@ -360,15 +370,15 @@ try
     app.UseAuthorization();
     app.UseRateLimiter();
 
-    // Google OAuth login entrypoint.
-    // Redirects the browser to Google's consent screen; after approval Google calls
-    // /signin-google (handled automatically by the Google middleware) and then
-    // issues an ExternalCookie before redirecting to the frontend.
-    app.MapGet("/api/auth/google/login", () =>
-        Results.Challenge(
-            new AuthenticationProperties { RedirectUri = "http://localhost:5173" },
-            [GoogleDefaults.AuthenticationScheme]))
-        .AllowAnonymous();
+    // Google OAuth login entrypoint — only registered when credentials are configured.
+    if (googleEnabled)
+    {
+        app.MapGet("/api/auth/google/login", () =>
+            Results.Challenge(
+                new AuthenticationProperties { RedirectUri = "http://localhost:5173" },
+                [GoogleDefaults.AuthenticationScheme]))
+            .AllowAnonymous();
+    }
 
     app.MapAuthEndpoints();
     app.MapMarketDataEndpoints();
