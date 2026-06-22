@@ -17,6 +17,8 @@ import type { Theme } from '../hooks/useTheme'
 export interface ChartMarker {
   time: string // YYYY-MM-DD
   label: string
+  /** Whose count this marker belongs to — drives colour + position. */
+  kind?: 'user' | 'ai'
 }
 
 interface PriceChartProps {
@@ -133,11 +135,11 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     const series = seriesRef.current
     if (!series) return
 
-    const color = chartColors(theme).marker
+    const colors = chartColors(theme)
     const markers: SeriesMarker<Time>[] = annotations.map(a => ({
       time: a.time as Time,
-      position: 'aboveBar',
-      color,
+      position: a.kind === 'ai' ? 'belowBar' : 'aboveBar',
+      color: a.kind === 'ai' ? colors.aiMarker : colors.marker,
       shape: 'circle',
       text: a.label,
     }))
@@ -155,28 +157,32 @@ interface ChartColors {
   up: string
   down: string
   marker: string
+  aiMarker: string
 }
 
-// Palettes mirror the CSS theme tokens in index.css. Derived straight from the `theme`
-// prop (not getComputedStyle) so the chart can never lag the DOM's data-theme and invert.
+// Palettes mirror the oklch theme tokens in index.css (approximated to hex so the
+// canvas renderer is happy everywhere). Derived from the `theme` prop, not
+// getComputedStyle, so the chart can never lag the DOM's data-theme and invert.
 const DARK_COLORS: ChartColors = {
-  background: '#0d1117',
-  text: '#8b949e',
-  border: '#30363d',
-  grid: '#21262d',
-  up: '#3fb950',
-  down: '#f85149',
-  marker: '#58a6ff',
+  background: '#101218', // --inset
+  text: '#a7adb8',       // --muted
+  border: '#3a3f49',     // --line
+  grid: 'rgba(56, 61, 70, 0.55)', // --grid
+  up: '#3cc08b',         // --up
+  down: '#e0655c',       // --down
+  marker: '#e8eaed',     // --text (user labels)
+  aiMarker: '#e0b34e',   // --acc (AI labels)
 }
 
 const LIGHT_COLORS: ChartColors = {
-  background: '#ffffff',
-  text: '#57606a',
-  border: '#d0d7de',
-  grid: '#eaeef2',
-  up: '#1a7f37',
-  down: '#cf222e',
-  marker: '#0969da',
+  background: '#f1f3f5', // --inset
+  text: '#6a7180',       // --muted
+  border: '#e2e5e9',     // --line
+  grid: 'rgba(128, 133, 142, 0.16)', // --grid
+  up: '#1d9e6e',         // --up
+  down: '#d6473d',       // --down
+  marker: '#2b2f38',     // --text (user labels)
+  aiMarker: '#cf9438',   // --acc (AI labels)
 }
 
 function chartColors(theme: Theme): ChartColors {
