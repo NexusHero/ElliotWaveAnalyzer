@@ -13,10 +13,11 @@ public static class WaveAnalysisEndpoints
         var group = app
             .MapGroup("/api")
             .WithTags("Wave Analysis")
-            .RequireAuthorization()
-            .RequireRateLimiting("per-user");
+            .RequireAuthorization();
 
         // ── POST /api/wave-analysis ───────────────────────────────────────────
+        // Uses the strict "gemini-analysis" policy: LLM calls are expensive and
+        // must be tightly throttled to control upstream cost and prevent abuse.
         group.MapPost("/wave-analysis", ValidateWaveCount)
             .WithName("ValidateWaveCount")
             .WithSummary("Validate an Elliott Wave annotation set via the active LLM provider")
@@ -29,7 +30,8 @@ public static class WaveAnalysisEndpoints
                 """)
             .Produces<WaveAnalysisResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status502BadGateway);
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
 
         // ── GET /api/tokens ───────────────────────────────────────────────────
         group.MapGet("/tokens", GetTokenUsage)
@@ -41,7 +43,8 @@ public static class WaveAnalysisEndpoints
                 remaining budget, and whether the budget has been exceeded.
                 Budget is configured via LlmProvider:TokenBudget in appsettings.json (0 = unlimited).
                 """)
-            .Produces<TokenUsageReport>(StatusCodes.Status200OK);
+            .Produces<TokenUsageReport>(StatusCodes.Status200OK)
+            .RequireRateLimiting("ip-global");
 
         return app;
     }

@@ -3,15 +3,17 @@
 ## Supported Versions
 
 | Version | Supported          |
-|---------|--------------------|
+|---------|--------------------- |
 | 1.x     | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Please report security vulnerabilities by emailing:
-**suhay.sevinc@gmail.com**
+Please report security vulnerabilities via
+[GitHub Private Security Advisories](https://github.com/NexusHero/ElliotWaveAnalyzer/security/advisories/new).
+
+For urgent issues you may additionally email: **[security-alias@your-domain.com]**
 
 Include in your report:
 - A description of the vulnerability
@@ -34,5 +36,6 @@ You will receive an acknowledgement within 48 hours and a status update within 7
 
 - **CoinGecko API Key**: Set via `appsettings.json → MarketData:CoinGecko:ApiKey` or env var `MarketData__CoinGecko__ApiKey`
 - **Gemini API Key**: Set via `appsettings.json → Gemini:ApiKey` or env var `Gemini__ApiKey`
+- **Google OAuth**: Set via `dotnet user-secrets set "Authentication:Google:ClientId" "…"` locally; env vars in production
 
 Never commit `appsettings.json` files containing real API keys. Use `appsettings.Development.json` (in `.gitignore`) for local secrets or use [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets).
