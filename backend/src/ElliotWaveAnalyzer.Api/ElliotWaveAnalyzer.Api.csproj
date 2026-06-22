@@ -23,7 +23,7 @@
     <!-- Built-in ASP.NET Core 10 OpenAPI support.
          Replaces Swashbuckle (not .NET 10 compatible).
          Serves OpenAPI JSON at /openapi/v1.json. -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
 
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
