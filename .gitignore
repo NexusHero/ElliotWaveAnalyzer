@@ -35,10 +35,9 @@ Thumbs.db
 *.log
 logs/
 
-# Local dev secrets — never commit
+# Local dev secrets — never commit real keys or credentials
 appsettings.*.json
 !appsettings.json
-!appsettings.Development.json
 
 # Local IDE settings (machine-specific paths)
 .vscode/

@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.Security.Claims;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Anthropic.SDK;
@@ -9,7 +10,10 @@ using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +21,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using NetEscapades.AspNetCore.SecurityHeaders;
 using OpenAI;
 using OpenAI.Chat;
 using Scalar.AspNetCore;
@@ -68,6 +73,20 @@ try
     // distributed cache for Redis (AddStackExchangeRedisCache) with no other changes.
     builder.Services.AddMemoryCache();
     builder.Services.AddDistributedMemoryCache();
+
+    // ── CORS — only known frontend origins, never AllowAnyOrigin ─────────────
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("FrontendOnly", policy =>
+            policy
+                .WithOrigins(
+                    "http://localhost:5173",               // Vite dev server
+                    "https://your-production-domain.com"  // TODO: replace before production deploy
+                )
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials()); // Required for HttpOnly auth cookies
+    });
 
     // ── Market data providers ─────────────────────────────────────────────────
     // Multiple IMarketDataProvider registrations are collected as
@@ -196,7 +215,10 @@ try
         builder.Services.AddHostedService<DailyReportBackgroundService>();
     }
 
-    // ── Authentication (Identity + opaque session cookies on PostgreSQL) ──────
+    // ── Authentication ────────────────────────────────────────────────────────
+    // Primary scheme: custom opaque session tokens stored hashed in PostgreSQL (existing).
+    // Secondary scheme: Google OAuth 2.0 via ExternalCookie (registered only when
+    // credentials are configured — OAuthOptions.Validate() throws on empty ClientId).
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddDbContext<AppDbContext>(opts =>
         opts.UseNpgsql(builder.Configuration.GetConnectionString("Postgres") ?? string.Empty));
@@ -214,18 +236,65 @@ try
 
     builder.Services.AddScoped<IAuthService, AuthService>();
 
-    builder.Services
+    var authBuilder = builder.Services
         .AddAuthentication(SessionAuthenticationHandler.SchemeName)
         .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
-            SessionAuthenticationHandler.SchemeName, configureOptions: null);
+            SessionAuthenticationHandler.SchemeName, configureOptions: null)
+        .AddCookie("ExternalCookie", options =>
+        {
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        });
+
+    // Google OAuth is only wired up when credentials are present.
+    // OAuthOptions.Validate() throws ArgumentException for an empty ClientId,
+    // which would crash test hosts and dev environments without credentials configured.
+    var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+    var googleEnabled = !string.IsNullOrEmpty(googleClientId);
+    if (googleEnabled)
+    {
+        authBuilder.AddGoogle(options =>
+        {
+            options.SignInScheme = "ExternalCookie";
+            options.ClientId = googleClientId!;
+            options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
+            options.Scope.Add("email");
+            options.Scope.Add("profile");
+        });
+    }
+
     builder.Services.AddAuthorization();
 
-    // Rate limiting: a strict window for login (brute-force) and a per-user window for
-    // the expensive API endpoints (LLM cost / upstream abuse). The per-user partition
-    // falls back to the client IP for unauthenticated callers.
+    // ── Input validation (FluentValidation) ───────────────────────────────────
+    // Scans this assembly for all AbstractValidator<T> implementations and registers them.
+    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+    // ── Rate limiting ─────────────────────────────────────────────────────────
+    // Three named policies:
+    //   ip-global       — 30 req/min per IP, for cheap read endpoints
+    //   gemini-analysis — 5 req/min global, for expensive LLM calls
+    //   login           — 5 req/min global, brute-force protection
+    //   per-user        — 20 req/min partitioned by userId (falls back to IP)
     builder.Services.AddRateLimiter(opts =>
     {
         opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        opts.AddFixedWindowLimiter("ip-global", limiter =>
+        {
+            limiter.PermitLimit = 30;
+            limiter.Window = TimeSpan.FromMinutes(1);
+            limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            limiter.QueueLimit = 5;
+        });
+
+        opts.AddFixedWindowLimiter("gemini-analysis", limiter =>
+        {
+            limiter.PermitLimit = 5;
+            limiter.Window = TimeSpan.FromMinutes(1);
+            limiter.QueueLimit = 0;
+        });
 
         opts.AddFixedWindowLimiter("login", limiter =>
         {
@@ -236,7 +305,7 @@ try
 
         opts.AddPolicy("per-user", httpContext =>
         {
-            var key = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            var key = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                       ?? httpContext.Connection.RemoteIpAddress?.ToString()
                       ?? "anonymous";
             return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
@@ -250,13 +319,34 @@ try
 
     // Behind a TLS-terminating proxy, honour X-Forwarded-Proto/For so Request.IsHttps is
     // accurate (drives the Secure cookie flag) and the real client IP is used for limits.
-    builder.Services.Configure<ForwardedHeadersOptions>(opts => opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+    builder.Services.Configure<ForwardedHeadersOptions>(opts =>
+        opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
 
     // ── Build & configure pipeline ────────────────────────────────────────────
     var app = builder.Build();
 
     // Trust proxy headers first so IP/scheme are correct for everything downstream.
     app.UseForwardedHeaders();
+
+    // Security headers applied to every response before any application logic runs.
+    app.UseSecurityHeaders(policies =>
+        policies
+            .AddDefaultSecurityHeaders()
+            .AddContentSecurityPolicy(csp =>
+            {
+                csp.AddDefaultSrc().Self();
+                csp.AddScriptSrc().Self();
+                csp.AddStyleSrc().Self().UnsafeInline(); // TradingView widget requires unsafe-inline
+                csp.AddConnectSrc().Self()
+                    .From("https://api.coingecko.com")
+                    .From("https://query1.finance.yahoo.com");
+            })
+            .AddStrictTransportSecurityMaxAge(maxAgeInSeconds: 60 * 60 * 24 * 365)
+    );
+
+    app.UseCors("FrontendOnly");
+
+    app.UseHttpsRedirection();
 
     // HSTS in non-development (tells browsers to stick to HTTPS).
     if (!app.Environment.IsDevelopment())
@@ -276,11 +366,19 @@ try
             .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
     });
 
-    app.UseHttpsRedirection();
-
-    app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
+
+    // Google OAuth login entrypoint — only registered when credentials are configured.
+    if (googleEnabled)
+    {
+        app.MapGet("/api/auth/google/login", () =>
+            Results.Challenge(
+                new AuthenticationProperties { RedirectUri = "http://localhost:5173" },
+                [GoogleDefaults.AuthenticationScheme]))
+            .AllowAnonymous();
+    }
 
     app.MapAuthEndpoints();
     app.MapMarketDataEndpoints();
