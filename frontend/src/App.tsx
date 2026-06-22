@@ -2,20 +2,26 @@ import { useCallback, useEffect, useState } from 'react'
 import LoginForm, { type AuthMode } from './components/LoginForm'
 import ThemeToggle from './components/ThemeToggle'
 import WaveWorkspace from './components/WaveWorkspace'
+import SettingsPage from './components/SettingsPage'
+import { WaveLogo, Gear, Alert } from './components/Icons'
 import { useTheme } from './hooks/useTheme'
+import { useApiKeys } from './hooks/useApiKeys'
 import { getCurrentUser, login, logout, register, type CurrentUser } from './api/client'
-import styles from './App.module.css'
+
+type View = 'workspace' | 'settings'
 
 /**
- * Root component. Gates the app behind authentication, hosts the dark/light theme
- * switch, and renders the wave workspace once the user is logged in.
+ * Root component. Gates the app behind authentication, hosts the topbar (theme,
+ * settings, account), and switches between the wave workspace and the settings page.
  */
 export default function App() {
   const { theme, toggleTheme } = useTheme()
+  const { keys, hasAnyKey, saveKey, removeKey, setDefault } = useApiKeys()
   const [user, setUser] = useState<CurrentUser | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
+  const [view, setView] = useState<View>('workspace')
 
   // Probe the session once on load.
   useEffect(() => {
@@ -44,36 +50,66 @@ export default function App() {
   const handleLogout = useCallback(async () => {
     await logout()
     setUser(null)
+    setView('workspace')
   }, [])
 
+  if (!authChecked) {
+    return <div className="center-view">Loading…</div>
+  }
+
+  if (!user) {
+    return <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} />
+  }
+
   return (
-    <div className={styles.app}>
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Elliott Wave Analyzer</h1>
-          <p className={styles.subtitle}>BTC/USD · dummy candles · click the chart to annotate waves</p>
+    <div className="ws">
+      <header className="topbar">
+        <div className="tb-left">
+          <span className="tb-logo">
+            <WaveLogo size={20} style={{ color: 'var(--acc)' }} />
+          </span>
+          <div className="tb-title">
+            <strong>Elliott Wave Analyzer</strong>
+            <span className="tb-sub">Practice workspace</span>
+          </div>
         </div>
-        <div className={styles.actions}>
-          {user && <span className={styles.user}>{user.email}</span>}
-          {user && (
-            <button type="button" className={styles.logout} onClick={handleLogout}>
-              Log out
+
+        <div className="tb-right">
+          {!hasAnyKey && (
+            <button type="button" className="tb-warn" onClick={() => setView('settings')}>
+              <Alert size={14} /> No API key
             </button>
           )}
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <button
+            type="button"
+            className="tb-btn"
+            aria-current={view === 'settings'}
+            onClick={() => setView(v => (v === 'settings' ? 'workspace' : 'settings'))}
+          >
+            <Gear size={16} />
+            <span>Settings</span>
+          </button>
+          <div className="tb-user">
+            <span className="avatar">{user.email.charAt(0).toUpperCase()}</span>
+            <span className="tb-email">{user.email}</span>
+          </div>
+          <button type="button" className="tb-btn ghost" onClick={handleLogout}>
+            Log out
+          </button>
         </div>
       </header>
 
-      {!authChecked ? (
-        <div className={styles.center}>
-          <p>Loading…</p>
-        </div>
-      ) : user ? (
-        <WaveWorkspace theme={theme} />
+      {view === 'settings' ? (
+        <SettingsPage
+          keys={keys}
+          onSave={saveKey}
+          onRemove={removeKey}
+          onSetDefault={setDefault}
+          onBack={() => setView('workspace')}
+        />
       ) : (
-        <div className={styles.center}>
-          <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} />
-        </div>
+        <WaveWorkspace theme={theme} hasApiKey={hasAnyKey} onOpenSettings={() => setView('settings')} />
       )}
     </div>
   )
