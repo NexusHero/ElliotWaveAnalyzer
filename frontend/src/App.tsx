@@ -6,7 +6,7 @@ import SettingsPage from './components/SettingsPage'
 import { WaveLogo, Gear, Alert } from './components/Icons'
 import { useTheme } from './hooks/useTheme'
 import { useApiKeys } from './hooks/useApiKeys'
-import { getCurrentUser, login, logout, register, type CurrentUser } from './api/client'
+import { getAuthProviders, getCurrentUser, login, logout, register, type CurrentUser } from './api/client'
 
 type View = 'workspace' | 'settings'
 
@@ -21,6 +21,7 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
+  const [googleEnabled, setGoogleEnabled] = useState(false)
   const [view, setView] = useState<View>('workspace')
 
   // Probe the session once on load.
@@ -29,6 +30,11 @@ export default function App() {
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setAuthChecked(true))
+  }, [])
+
+  // Ask the backend whether Google sign-in is available.
+  useEffect(() => {
+    getAuthProviders().then(p => setGoogleEnabled(p.google)).catch(() => setGoogleEnabled(false))
   }, [])
 
   const handleAuth = useCallback(async (mode: AuthMode, email: string, password: string) => {
@@ -58,7 +64,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} />
+    return <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} googleEnabled={googleEnabled} />
   }
 
   return (

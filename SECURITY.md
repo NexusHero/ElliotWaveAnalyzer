@@ -36,6 +36,6 @@ You will receive an acknowledgement within 48 hours and a status update within 7
 
 - **CoinGecko API Key**: Set via `appsettings.json → MarketData:CoinGecko:ApiKey` or env var `MarketData__CoinGecko__ApiKey`
 - **LLM provider API key** (Claude / Gemini / OpenAI): Set via `appsettings.json → LlmProvider:{Provider}:ApiKey` or env var `LlmProvider__{Provider}__ApiKey` (e.g. `LlmProvider__Claude__ApiKey`)
-- **Google OAuth**: Set via `dotnet user-secrets set "Authentication:Google:ClientId" "…"` locally; env vars in production
+- **Google OAuth**: Set via `dotnet user-secrets set "Authentication:Google:ClientId" "…"` (and `…:ClientSecret`) locally; env vars in production. Register `https://<host>/signin-google` as an authorized redirect URI in the Google Cloud console (e.g. `https://localhost:5001/signin-google` for local dev). Optionally set `Authentication:Google:PostLoginRedirectUri` to the frontend origin users return to after sign-in (defaults to `http://localhost:5173`). Google sign-in is disabled automatically when no `ClientId` is configured.
 
 Never commit `appsettings.json` files containing real API keys. Use `appsettings.Development.json` (in `.gitignore`) for local secrets or use [.NET User Secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets).

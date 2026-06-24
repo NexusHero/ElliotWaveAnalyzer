@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { validateWaveCount, login, getCurrentUser } from './client'
+import { validateWaveCount, login, getCurrentUser, getAuthProviders } from './client'
 import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
 
 const request: WaveValidationRequest = {
@@ -74,6 +74,20 @@ describe('login', () => {
     }))
 
     await expect(login('a@b.com', 'wrong')).rejects.toThrow('Invalid email or password.')
+  })
+})
+
+describe('getAuthProviders', () => {
+  it('returns the providers payload from /api/auth/providers', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ google: true }) }))
+
+    expect(await getAuthProviders()).toEqual({ google: true })
+  })
+
+  it('fails closed (google: false) when the request errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+
+    expect(await getAuthProviders()).toEqual({ google: false })
   })
 })
 

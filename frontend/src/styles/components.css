@@ -96,6 +96,17 @@
 .auth-card .check { margin-bottom: 22px; }
 .auth-row .check { margin-bottom: 0; }
 
+.btn-google { display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; height: 46px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--card); color: var(--text); font-size: 14.5px; font-weight: 600;
+  text-decoration: none; cursor: pointer; transition: background .15s, border-color .15s, transform .05s; }
+.btn-google:hover { background: var(--card-2, var(--bg)); border-color: var(--acc); }
+.btn-google:active { transform: translateY(1px); }
+
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--faint); }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.auth-divider span { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+
 .auth-switch { text-align: center; color: var(--muted); font-size: 13.5px; margin: 18px 0 0; }
 .auth-error { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 18px; padding: 11px 13px;
   background: var(--fail-soft); border: 1px solid color-mix(in oklab, var(--fail) 35%, transparent);

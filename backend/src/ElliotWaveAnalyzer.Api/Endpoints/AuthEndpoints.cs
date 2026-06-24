@@ -61,17 +61,24 @@ public static class AuthEndpoints
             return Results.Problem(title: "Login failed", detail: result.Error, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        context.Response.Cookies.Append(options.Value.CookieName, result.Token!, new CookieOptions
+        AppendSessionCookie(context, options.Value, result.Token!, result.ExpiresAt);
+
+        return Results.Ok(new { email = request.Email });
+    }
+
+    /// <summary>
+    /// Writes the opaque session token as the HttpOnly session cookie. Shared by the
+    /// password login and the Google OAuth callback so both issue an identical cookie.
+    /// </summary>
+    internal static void AppendSessionCookie(HttpContext context, AuthOptions options, string token, DateTimeOffset? expiresAt) =>
+        context.Response.Cookies.Append(options.CookieName, token, new CookieOptions
         {
             HttpOnly = true,
             Secure = context.Request.IsHttps,
             SameSite = SameSiteMode.Strict,
-            Expires = result.ExpiresAt,
+            Expires = expiresAt,
             Path = "/",
         });
-
-        return Results.Ok(new { email = request.Email });
-    }
 
     private static async Task<IResult> Logout(HttpContext context, IAuthService auth, IOptions<AuthOptions> options, CancellationToken ct)
     {

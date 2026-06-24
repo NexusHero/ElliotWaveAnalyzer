@@ -20,6 +20,14 @@ public interface IAuthService
     Task<SessionResult> LoginAsync(
         string email, string password, string? ip, string? userAgent, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Logs in a user authenticated by an external provider (e.g. Google). The provider
+    /// has already verified the identity, so there is no password: the account is created
+    /// on first sign-in (just-in-time provisioning) and an opaque session is issued.
+    /// </summary>
+    Task<SessionResult> ExternalLoginAsync(
+        string email, string? ip, string? userAgent, CancellationToken cancellationToken = default);
+
     Task<SessionPrincipal?> ValidateSessionAsync(string token, CancellationToken cancellationToken = default);
 
     Task LogoutAsync(string token, CancellationToken cancellationToken = default);

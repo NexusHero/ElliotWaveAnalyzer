@@ -60,6 +60,28 @@ export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST' })
 }
 
+/** Which external sign-in providers the backend has configured. */
+export interface AuthProviders {
+  google: boolean
+}
+
+/**
+ * Asks the backend which external auth providers are enabled, so the UI only shows a
+ * "Continue with Google" button when Google OAuth is actually configured. Fails closed
+ * (everything disabled) so a transient error never renders a button that would 404.
+ */
+export async function getAuthProviders(): Promise<AuthProviders> {
+  try {
+    const response = await fetch('/api/auth/providers')
+    if (!response.ok) {
+      return { google: false }
+    }
+    return (await response.json()) as AuthProviders
+  } catch {
+    return { google: false }
+  }
+}
+
 /** Returns the current user, or null when not authenticated (401). */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   const response = await fetch('/api/auth/me')
