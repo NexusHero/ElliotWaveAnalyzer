@@ -139,7 +139,7 @@ C4Context
 |---------|----------|--------|----------|
 | Frontend ↔ Backend | HTTPS | JSON (REST) | `/api/*` |
 | Backend → CoinGecko | HTTPS (GET) | JSON (array of arrays) | `api.coingecko.com/api/v3/coins/{id}/ohlc` |
-| Backend → Gemini | HTTPS (POST) | JSON (Google.GenAI SDK) | `generativelanguage.googleapis.com` |
+| Backend → LLM provider | HTTPS (POST) | JSON (`Microsoft.Extensions.AI` `IChatClient`) | Claude / Gemini / OpenAI — selected via `LlmProvider:Active` |
 | Backend → Telegram | HTTPS | Multipart (PNG) | `api.telegram.org/bot{token}/sendPhoto` |
 
 ---
@@ -150,8 +150,8 @@ C4Context
 |---------|----------|-----------|--------------|
 | Multiple data sources (CoinGecko, Yahoo Finance) | `IMarketDataProvider` interface + chain-of-responsibility selection | New provider = new class + one DI line; no existing code changes | Extensibility (OCP) |
 | Indicator calculation | Delegate to Skender.Stock.Indicators behind `IIndicatorCalculator` | Avoids reimplementing Wilder's Smoothing and EMA seeding; Skender types never leak into domain | Correctness, Testability |
-| Gemini model deprecations | Model name in `appsettings.json → Gemini:Model` | Changing model requires only config update, no deployment | Maintainability |
-| Gemini integration in tests | `IGeminiWaveAnalyzer` interface mocked via NSubstitute | Tests never call Gemini; fast, deterministic, free | Testability |
+| Multiple LLM providers (Claude, Gemini, OpenAI) & model deprecations | Single `IChatClient` (`Microsoft.Extensions.AI`) selected via `appsettings.json → LlmProvider:Active`; model name is config | Switching provider or model is a config change, no deployment; one factory, no bespoke HTTP/JSON per provider | Extensibility (OCP), Maintainability |
+| LLM integration in tests | `IChatClient` faked (`FakeChatClient`) at the boundary | Tests never call a real LLM; fast, deterministic, free | Testability |
 | Prompt quality | Structured text with wave table + Elliott rules + JSON schema instruction | More precise than image analysis; gives Gemini exact prices and dates | Correctness |
 | Frontend indicator rendering | Backend calculates, frontend only renders | TradingView Lightweight Charts is rendering-only; no ambiguity about calculation correctness | Correctness |
 | API contract synchronization | OpenAPI codegen (`openapi-typescript`) generates TypeScript interfaces | No manual type maintenance; single source of truth in backend OpenAPI spec | Maintainability |
@@ -600,19 +600,17 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | R1 | CoinGecko changes OHLC response format without notice (free tier, undocumented SLA) | Medium | High | Catch `JsonException` in provider; return 502; fix `List<List<double>>` mapping |
 | R2 | Google deprecates `gemini-2.5-flash` without warning | Low | Medium | Model name is configurable; update appsettings without deployment |
 | R3 | Skender major version introduces breaking changes to `IQuote` or extension methods | Low | Medium | Skender isolated in single file (`SkenderIndicatorCalculator.cs`); fix in one place |
-| R4 | CoinGecko free-tier rate limits (10–30 req/min) exceeded in multi-user scenario | Low | Low | Add response caching (IMemoryCache); not yet implemented |
+| R4 | CoinGecko free-tier rate limits (10–30 req/min) exceeded in multi-user scenario | Low | Low | Short-lived response caching (`CachingMarketDataProvider` over `IMemoryCache`) implemented; per-IP rate limiting also guards the endpoint |
 | R5 | Gemini returns malformed JSON despite `ResponseMimeType` | Low | Low | `GeminiWaveAnalyzer` catches `JsonException` and throws `InvalidOperationException` → 502 |
 
 ## Technical Debt
 
 | ID | Debt | Priority | Effort | Description |
 |----|------|----------|--------|-------------|
-| S1 | Yahoo Finance provider not yet implemented | High | Medium | NASDAQ support promised; `IMarketDataProvider` is ready; only the implementation is missing |
-| S2 | SQLite persistence not yet implemented | High | Medium | Wave counts and daily reports need persistence; planned for next milestone |
-| S3 | Frontend wave annotation layer missing | High | High | Core feature (click-to-label on chart) not yet built; `PriceChart` renders candles only |
-| S4 | Server-side PNG chart generation (SkiaSharp) not yet implemented | Medium | Medium | Needed for Telegram/Email daily report; SkiaSharp dependency already planned |
-| S5 | No response caching for CoinGecko | Low | Low | Every request hits CoinGecko; add `IMemoryCache` with short TTL |
+| S2 | Wave-count / daily-report persistence not yet implemented | High | Medium | Auth & sessions are persisted in PostgreSQL (`AppDbContext`), but wave counts and daily reports are not yet stored; planned for the next milestone |
 | S6 | OpenAPI codegen not yet automated in CI | Low | Low | `npm run generate:api` must be run manually; add to CI after backend stabilizes |
+
+Resolved since the last revision: Yahoo Finance provider (`YahooFinanceMarketDataProvider`), the frontend wave-annotation layer (`WaveWorkspace` / `WaveAnnotationPanel`), server-side PNG rendering (`SkiaSharpChartRenderer`), and response caching (`CachingMarketDataProvider`) are now all implemented.
 
 ---
 
