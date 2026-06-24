@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { WaveLogo, Check } from './Icons'
+import { WaveLogo, Check, GoogleG } from './Icons'
 
 export type AuthMode = 'login' | 'register'
 
@@ -7,6 +7,8 @@ interface LoginFormProps {
   onSubmit: (mode: AuthMode, email: string, password: string) => void
   error: string | null
   loading: boolean
+  /** When true, render the "Continue with Google" option (backend has Google OAuth configured). */
+  googleEnabled?: boolean
 }
 
 const POINTS = [
@@ -19,7 +21,7 @@ const POINTS = [
  * Auth screen — a branded two-column layout with a segmented Login/Register
  * switch. Keeps the parent contract: onSubmit(mode, email, password).
  */
-export default function LoginForm({ onSubmit, error, loading }: LoginFormProps) {
+export default function LoginForm({ onSubmit, error, loading, googleEnabled = false }: LoginFormProps) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -112,6 +114,19 @@ export default function LoginForm({ onSubmit, error, loading }: LoginFormProps) 
                 : 'Pick up where you left off and keep refining your eye.'}
             </p>
           </div>
+
+          {googleEnabled && (
+            <>
+              {/* Full-page navigation (not fetch): the OAuth flow needs real browser redirects. */}
+              <a className="btn-google" href="/api/auth/google/login">
+                <GoogleG size={18} />
+                Continue with Google
+              </a>
+              <div className="auth-divider" aria-hidden>
+                <span>or</span>
+              </div>
+            </>
+          )}
 
           <label className="field">
             <span>Email</span>

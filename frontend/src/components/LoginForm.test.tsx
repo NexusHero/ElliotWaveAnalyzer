@@ -41,6 +41,19 @@ describe('LoginForm', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
+  it('shows a Google sign-in link to the OAuth endpoint when Google is enabled', () => {
+    render(<LoginForm onSubmit={vi.fn()} error={null} loading={false} googleEnabled />)
+
+    const link = screen.getByRole('link', { name: /continue with google/i })
+    expect(link).toHaveAttribute('href', '/api/auth/google/login')
+  })
+
+  it('hides the Google option when Google is not enabled', () => {
+    render(<LoginForm onSubmit={vi.fn()} error={null} loading={false} />)
+
+    expect(screen.queryByRole('link', { name: /continue with google/i })).toBeNull()
+  })
+
   it('shows an error and disables submit while loading', () => {
     render(<LoginForm onSubmit={vi.fn()} error="Invalid email or password." loading={true} />)
 

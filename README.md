@@ -110,7 +110,7 @@ Architecture decisions are documented as ADRs in [`docs/architecture.md`](docs/a
 | Layer        | Technology                              |
 |-------------|-----------------------------------------|
 | Backend API | ASP.NET Core Minimal API (.NET 10)      |
-| Auth        | ASP.NET Core Identity + opaque session cookies |
+| Auth        | ASP.NET Core Identity + opaque session cookies; optional Google OAuth |
 | Indicators  | Skender.Stock.Indicators                |
 | Charts (srv)| SkiaSharp                               |
 | LLM coach   | Claude / Gemini / OpenAI (configurable) |

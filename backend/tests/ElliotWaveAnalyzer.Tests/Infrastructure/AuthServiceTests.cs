@@ -100,6 +100,44 @@ public sealed class AuthServiceTests
     }
 
     [Test]
+    public async Task ExternalLogin_NewEmail_ProvisionsUserAndIssuesToken()
+    {
+        var result = await _sut.ExternalLoginAsync("new.google.user@example.com", ip: null, userAgent: null);
+
+        Assert.That(result.Succeeded, Is.True);
+        Assert.That(result.Token, Is.Not.Null.And.Not.Empty);
+        Assert.That(result.ExpiresAt, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task ExternalLogin_IssuedToken_ValidatesToTheSameUser()
+    {
+        var result = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
+
+        var principal = await _sut.ValidateSessionAsync(result.Token!);
+
+        Assert.That(principal, Is.Not.Null);
+        Assert.That(principal!.Email, Is.EqualTo(Email));
+    }
+
+    [Test]
+    public async Task ExternalLogin_ExistingEmail_ReusesAccountWithoutDuplicating()
+    {
+        // Account already exists from a prior password registration.
+        await _sut.RegisterAsync(Email, Password);
+
+        var first = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
+        var second = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
+
+        Assert.That(first.Succeeded, Is.True);
+        Assert.That(second.Succeeded, Is.True);
+
+        var users = _scope.ServiceProvider.GetRequiredService<AppDbContext>().Users
+            .Count(u => u.Email == Email);
+        Assert.That(users, Is.EqualTo(1));
+    }
+
+    [Test]
     public async Task ValidateSession_AfterLogin_ReturnsPrincipal()
     {
         await _sut.RegisterAsync(Email, Password);

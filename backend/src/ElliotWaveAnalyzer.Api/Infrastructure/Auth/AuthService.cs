@@ -61,6 +61,36 @@ public sealed class AuthService(
 
         await userManager.ResetAccessFailedCountAsync(user);
 
+        return await CreateSessionAsync(user, ip, userAgent, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<SessionResult> ExternalLoginAsync(
+        string email, string? ip, string? userAgent, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            // Just-in-time provisioning: the external provider has verified the email, so
+            // we create a passwordless account on first sign-in. EmailConfirmed is true
+            // because the provider already confirmed ownership.
+            user = new AppUser { UserName = email, Email = email, EmailConfirmed = true };
+            var create = await userManager.CreateAsync(user);
+            if (!create.Succeeded)
+            {
+                return new SessionResult(false, null, null, string.Join(" ", create.Errors.Select(e => e.Description)));
+            }
+
+            logger.LogInformation("Provisioned new user {UserId} from external login", user.Id);
+        }
+
+        return await CreateSessionAsync(user, ip, userAgent, cancellationToken);
+    }
+
+    /// <summary>Issues an opaque server-side session for an already-authenticated user.</summary>
+    private async Task<SessionResult> CreateSessionAsync(
+        AppUser user, string? ip, string? userAgent, CancellationToken cancellationToken)
+    {
         var token = GenerateToken();
         var now = timeProvider.GetUtcNow();
         var session = new UserSession

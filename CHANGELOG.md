@@ -10,6 +10,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 ## [Unreleased]
 
 ### Added
+- **Google sign-in (end-to-end).** "Continue with Google" on the login screen; the OAuth callback provisions the account just-in-time and issues the same opaque session cookie as password login. Shown only when Google OAuth is configured (`Authentication:Google:ClientId`), surfaced to the frontend via `GET /api/auth/providers`. Post-login redirect is configurable (`Authentication:Google:PostLoginRedirectUri`)
 - Deterministic `ElliottRuleChecker`: the three hard Elliott rules + Fibonacci ratios computed in code (objective, no LLM) and returned alongside the AI assessment as `ruleReport`
 - The LLM is now grounded on the deterministic checks and prompted as a Socratic **coach** (explanation, alternative count, reflective questions) with a hard guardrail against trading advice
 - Frontend shows the objective rule checks and Fibonacci ratios next to the coach reflection

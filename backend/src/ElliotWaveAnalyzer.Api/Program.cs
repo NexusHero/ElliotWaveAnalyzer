@@ -373,13 +373,53 @@ try
     app.UseAuthorization();
     app.UseRateLimiter();
 
-    // Google OAuth login entrypoint — only registered when credentials are configured.
+    // Lets the frontend decide whether to render the "Continue with Google" button.
+    app.MapGet("/api/auth/providers", () => Results.Ok(new { google = googleEnabled }))
+        .AllowAnonymous();
+
+    // Google OAuth — only registered when credentials are configured.
     if (googleEnabled)
     {
+        // Where to send the browser once it holds our session cookie. Configurable so the
+        // deployed frontend origin can differ from the local Vite dev server.
+        var postLoginRedirect = builder.Configuration["Authentication:Google:PostLoginRedirectUri"]
+            ?? "http://localhost:5173";
+
+        // Step 1: kick off the OAuth dance; Google returns to our callback (not the SPA),
+        // so we can exchange the external identity for our own opaque session.
         app.MapGet("/api/auth/google/login", () =>
             Results.Challenge(
-                new AuthenticationProperties { RedirectUri = "http://localhost:5173" },
+                new AuthenticationProperties { RedirectUri = "/api/auth/google/callback" },
                 [GoogleDefaults.AuthenticationScheme]))
+            .AllowAnonymous();
+
+        // Step 2: read the verified external identity, provision/find the user, issue our
+        // session cookie, then redirect into the SPA. On any failure, bounce back with a flag.
+        app.MapGet("/api/auth/google/callback",
+            async (HttpContext http, IAuthService auth, IOptions<AuthOptions> authOptions, CancellationToken ct) =>
+            {
+                var external = await http.AuthenticateAsync("ExternalCookie");
+                var email = external.Principal?.FindFirstValue(ClaimTypes.Email);
+                if (!external.Succeeded || string.IsNullOrWhiteSpace(email))
+                {
+                    return Results.Redirect($"{postLoginRedirect}?error=google");
+                }
+
+                var ip = http.Connection.RemoteIpAddress?.ToString();
+                var userAgent = http.Request.Headers.UserAgent.ToString();
+                var session = await auth.ExternalLoginAsync(email, ip, userAgent, ct);
+
+                // The external cookie is transient — once we have our own session, drop it.
+                await http.SignOutAsync("ExternalCookie");
+
+                if (!session.Succeeded)
+                {
+                    return Results.Redirect($"{postLoginRedirect}?error=google");
+                }
+
+                AuthEndpoints.AppendSessionCookie(http, authOptions.Value, session.Token!, session.ExpiresAt);
+                return Results.Redirect(postLoginRedirect);
+            })
             .AllowAnonymous();
     }
 
