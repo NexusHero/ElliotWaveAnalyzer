@@ -75,14 +75,17 @@ try
     builder.Services.AddDistributedMemoryCache();
 
     // ── CORS — only known frontend origins, never AllowAnyOrigin ─────────────
+    // Origins come from configuration (Cors:AllowedOrigins), so production hosts are set
+    // via appsettings/env without touching code. Defaults to the Vite dev server.
+    var allowedOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins").Get<string[]>() is { Length: > 0 } configured
+        ? configured
+        : ["http://localhost:5173"]; // Vite dev server
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("FrontendOnly", policy =>
             policy
-                .WithOrigins(
-                    "http://localhost:5173",               // Vite dev server
-                    "https://your-production-domain.com"  // TODO: replace before production deploy
-                )
+                .WithOrigins(allowedOrigins)
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials()); // Required for HttpOnly auth cookies
