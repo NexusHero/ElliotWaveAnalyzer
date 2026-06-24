@@ -17,6 +17,11 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ### Changed
 - CI/release/security workflows and the frontend target Node.js 24 (was 20)
+- Upgraded frontend tooling: Vite 8, Vitest 4, TypeScript 6, `@vitejs/plugin-react` 6
+
+### Fixed
+- Login now works in local dev: the Vite proxy strips the `Secure` attribute from the session cookie so the browser (http://localhost:5173) stores it. Previously the backend marked the cookie `Secure` over the proxy's HTTPS hop, and the browser dropped it on the insecure dev origin — so `/api/auth/me` returned 401 and the app bounced straight back to the login screen
+- Restored the frontend test suite after the tooling upgrade by declaring the `@testing-library/dom` peer dependency explicitly (`legacy-peer-deps=true` in `.npmrc` no longer installs it transitively)
 
 ### Security
 - Per-user rate limiting on the expensive endpoints (`/api/wave-analysis`, `/api/market-data`) to curb LLM-cost / upstream abuse, in addition to the login limiter
@@ -49,13 +54,10 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - arc42 architecture documentation (`docs/architecture.md`)
 - GitHub Actions: CI (`ci.yml`), Security (`security.yml`), CodeQL (`codeql.yml`), Release (`release.yml`)
 - `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, `LICENSE`
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1) and a pull-request template (`.github/PULL_REQUEST_TEMPLATE.md`)
 
 ### Planned
-- Yahoo Finance provider for NASDAQ
-- SQLite persistence for wave counts and daily analysis history
-- Elliott Wave annotation layer on the frontend chart
-- Server-side PNG chart generation via SkiaSharp
-- Telegram / SMTP daily report delivery
+- Persistence for wave counts and daily analysis history
 - OpenAPI codegen automation in CI
 
 ---

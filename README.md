@@ -29,7 +29,7 @@ themes are both first-class.
 [CoinGecko / Yahoo Finance]
          ↓
   [ASP.NET Core Backend]
-  Minimal API · Indicator calculation · LLM coach · Postgres/SQLite persistence
+  Minimal API · Indicator calculation · LLM coach · PostgreSQL (auth & sessions)
          ↓ JSON (REST)              ↓ PNG (SkiaSharp)
   [React Frontend]              [Telegram / Email]
   TradingView Lightweight Charts
@@ -103,7 +103,7 @@ Dependency updates are automated via [Dependabot](.github/dependabot.yml).
 
 ## Architecture decisions
 
-Architecture decisions are documented as ADRs under `docs/adr/`.
+Architecture decisions are documented as ADRs in [`docs/architecture.md`](docs/architecture.md) (ADR-001 … ADR-006).
 
 ## Tech stack
 
@@ -114,7 +114,7 @@ Architecture decisions are documented as ADRs under `docs/adr/`.
 | Indicators  | Skender.Stock.Indicators                |
 | Charts (srv)| SkiaSharp                               |
 | LLM coach   | Claude / Gemini / OpenAI (configurable) |
-| Persistence | PostgreSQL (SQLite for local dev)       |
+| Persistence | PostgreSQL via EF Core / Npgsql          |
 | Logging     | Serilog (structured JSON)               |
 | Frontend    | React 18 + TypeScript + Vite            |
 | Charts (UI) | TradingView Lightweight Charts          |
@@ -124,3 +124,14 @@ Architecture decisions are documented as ADRs under `docs/adr/`.
 ## Deployment
 
 Self-contained single-file as the target; containerization for a Home Assistant add-on is planned.
+
+## Contributing & community
+
+Contributions are welcome! Please read:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, workflow, and the pull-request checklist
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — our community standards
+- [SECURITY.md](SECURITY.md) — how to report a vulnerability
+
+Pull requests use the [PR template](.github/PULL_REQUEST_TEMPLATE.md); bug reports and
+feature requests use the [issue templates](.github/ISSUE_TEMPLATE).

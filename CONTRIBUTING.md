@@ -2,6 +2,12 @@
 
 Thanks for taking the time to contribute!
 
+## Code of Conduct
+
+This project and everyone participating in it is governed by our
+[Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold it.
+Please report unacceptable behavior as described there.
+
 ## Before you start
 
 - Check [open issues](https://github.com/NexusHero/ElliotWaveAnalyzer/issues) to avoid duplicate work.
