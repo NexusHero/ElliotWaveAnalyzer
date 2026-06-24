@@ -66,8 +66,16 @@ public sealed class AuthService(
 
     /// <inheritdoc/>
     public async Task<SessionResult> ExternalLoginAsync(
-        string email, string? ip, string? userAgent, CancellationToken cancellationToken = default)
+        string email, bool emailVerified, string? ip, string? userAgent, CancellationToken cancellationToken = default)
     {
+        // Never trust an unverified external email: it could be an attacker-controlled
+        // account asserting someone else's address, which would take over their account.
+        if (!emailVerified)
+        {
+            logger.LogWarning("Rejected external login with an unverified email");
+            return new SessionResult(false, null, null, GenericLoginError);
+        }
+
         var user = await userManager.FindByEmailAsync(email);
         if (user is null)
         {

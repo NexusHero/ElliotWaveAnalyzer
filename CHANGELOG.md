@@ -25,6 +25,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Restored the frontend test suite after the tooling upgrade by declaring the `@testing-library/dom` peer dependency explicitly (`legacy-peer-deps=true` in `.npmrc` no longer installs it transitively)
 
 ### Security
+- Google sign-in now rejects logins whose email Google has not verified (`email_verified`). Without this, an attacker controlling a provider account that asserts someone else's address could take over the matching local account (or pre-provision one). Enforced both at the OAuth callback and inside `ExternalLoginAsync` (defense in depth)
 - Per-user rate limiting on the expensive endpoints (`/api/wave-analysis`, `/api/market-data`) to curb LLM-cost / upstream abuse, in addition to the login limiter
 - Cap the number of annotations per request (prompt-inflation / DoS guard)
 - Stop leaking internal details: generic client errors for upstream/LLM failures (including the raw model output), logged server-side instead
