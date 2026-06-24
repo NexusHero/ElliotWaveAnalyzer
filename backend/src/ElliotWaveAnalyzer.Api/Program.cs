@@ -265,6 +265,9 @@ try
             options.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
             options.Scope.Add("email");
             options.Scope.Add("profile");
+            // Surface Google's email_verified flag as a claim so the callback can reject
+            // logins for unverified addresses (account-takeover guard).
+            options.ClaimActions.MapJsonKey("email_verified", "email_verified");
         });
     }
 
@@ -405,9 +408,13 @@ try
                     return Results.Redirect($"{postLoginRedirect}?error=google");
                 }
 
+                // Only honour emails Google reports as verified (account-takeover guard).
+                var emailVerified = string.Equals(
+                    external.Principal?.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
+
                 var ip = http.Connection.RemoteIpAddress?.ToString();
                 var userAgent = http.Request.Headers.UserAgent.ToString();
-                var session = await auth.ExternalLoginAsync(email, ip, userAgent, ct);
+                var session = await auth.ExternalLoginAsync(email, emailVerified, ip, userAgent, ct);
 
                 // The external cookie is transient — once we have our own session, drop it.
                 await http.SignOutAsync("ExternalCookie");

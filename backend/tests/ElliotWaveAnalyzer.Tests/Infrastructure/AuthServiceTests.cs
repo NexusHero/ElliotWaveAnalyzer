@@ -102,7 +102,7 @@ public sealed class AuthServiceTests
     [Test]
     public async Task ExternalLogin_NewEmail_ProvisionsUserAndIssuesToken()
     {
-        var result = await _sut.ExternalLoginAsync("new.google.user@example.com", ip: null, userAgent: null);
+        var result = await _sut.ExternalLoginAsync("new.google.user@example.com", emailVerified: true, ip: null, userAgent: null);
 
         Assert.That(result.Succeeded, Is.True);
         Assert.That(result.Token, Is.Not.Null.And.Not.Empty);
@@ -112,7 +112,7 @@ public sealed class AuthServiceTests
     [Test]
     public async Task ExternalLogin_IssuedToken_ValidatesToTheSameUser()
     {
-        var result = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
+        var result = await _sut.ExternalLoginAsync(Email, emailVerified: true, ip: null, userAgent: null);
 
         var principal = await _sut.ValidateSessionAsync(result.Token!);
 
@@ -126,8 +126,8 @@ public sealed class AuthServiceTests
         // Account already exists from a prior password registration.
         await _sut.RegisterAsync(Email, Password);
 
-        var first = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
-        var second = await _sut.ExternalLoginAsync(Email, ip: null, userAgent: null);
+        var first = await _sut.ExternalLoginAsync(Email, emailVerified: true, ip: null, userAgent: null);
+        var second = await _sut.ExternalLoginAsync(Email, emailVerified: true, ip: null, userAgent: null);
 
         Assert.That(first.Succeeded, Is.True);
         Assert.That(second.Succeeded, Is.True);
@@ -135,6 +135,31 @@ public sealed class AuthServiceTests
         var users = _scope.ServiceProvider.GetRequiredService<AppDbContext>().Users
             .Count(u => u.Email == Email);
         Assert.That(users, Is.EqualTo(1));
+    }
+
+    [Test]
+    public async Task ExternalLogin_UnverifiedEmail_IsRejectedAndProvisionsNothing()
+    {
+        // An existing victim account the attacker would try to hijack.
+        await _sut.RegisterAsync(Email, Password);
+
+        var result = await _sut.ExternalLoginAsync(Email, emailVerified: false, ip: null, userAgent: null);
+
+        Assert.That(result.Succeeded, Is.False);
+        Assert.That(result.Token, Is.Null);
+        // No session was created for the unverified attempt.
+        var sessions = _scope.ServiceProvider.GetRequiredService<AppDbContext>().Sessions.Count();
+        Assert.That(sessions, Is.EqualTo(0));
+    }
+
+    [Test]
+    public async Task ExternalLogin_UnverifiedEmail_DoesNotProvisionNewAccount()
+    {
+        var result = await _sut.ExternalLoginAsync("attacker-controlled@example.com", emailVerified: false, ip: null, userAgent: null);
+
+        Assert.That(result.Succeeded, Is.False);
+        var users = _scope.ServiceProvider.GetRequiredService<AppDbContext>().Users.Count();
+        Assert.That(users, Is.EqualTo(0));
     }
 
     [Test]
