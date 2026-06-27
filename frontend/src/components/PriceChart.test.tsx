@@ -8,9 +8,8 @@ import PriceChart from './PriceChart'
 // container div, accepts candles prop) without needing a real browser canvas.
 vi.mock('lightweight-charts', () => ({
   createChart: vi.fn(() => ({
-    addCandlestickSeries: vi.fn(() => ({
+    addSeries: vi.fn(() => ({
       setData: vi.fn(),
-      setMarkers: vi.fn(),
       coordinateToPrice: vi.fn(() => 100),
       applyOptions: vi.fn(),
     })),
@@ -21,6 +20,9 @@ vi.mock('lightweight-charts', () => ({
     resize: vi.fn(),
     remove: vi.fn(),
   })),
+  // v5: series type passed to addSeries, and markers are a separate primitive.
+  CandlestickSeries: 'Candlestick',
+  createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
   ColorType: { Solid: 'solid' },
   CrosshairMode: { Normal: 'normal' },
 }))
