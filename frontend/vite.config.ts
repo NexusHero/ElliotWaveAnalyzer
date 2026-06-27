@@ -38,6 +38,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 60,
+      },
+      exclude: [
+        'src/api/generated.ts',
+        'src/main.tsx',
+        'src/components/Icons.tsx', // presentational SVG icons
+        'src/test/**',
+        'src/vite-env.d.ts',
+        '**/*.test.{ts,tsx}',
+        '**/*.config.{ts,js}',
+      ],
     },
   },
 })
