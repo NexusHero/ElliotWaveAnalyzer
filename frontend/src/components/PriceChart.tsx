@@ -1,15 +1,15 @@
-import { useEffect, useRef } from 'react'
 import {
+  type CandlestickSeriesOptions,
+  ColorType,
+  CrosshairMode,
   createChart,
   type IChartApi,
   type ISeriesApi,
-  type CandlestickSeriesOptions,
+  type MouseEventParams,
   type SeriesMarker,
   type Time,
-  type MouseEventParams,
-  ColorType,
-  CrosshairMode,
 } from 'lightweight-charts'
+import { useEffect, useRef } from 'react'
 import type { MarketCandle } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 
@@ -36,7 +36,12 @@ interface PriceChartProps {
  * annotation layer. Colours are read from the app's CSS custom properties so the chart
  * follows the active theme; on a theme switch the options are re-applied.
  */
-export default function PriceChart({ candles, annotations = [], onPointClick, theme = 'dark' }: PriceChartProps) {
+export default function PriceChart({
+  candles,
+  annotations = [],
+  onPointClick,
+  theme = 'dark',
+}: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -66,7 +71,9 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
       height: container.clientHeight,
     })
 
-    const series = chart.addCandlestickSeries(candleColors(colors) satisfies Partial<CandlestickSeriesOptions>)
+    const series = chart.addCandlestickSeries(
+      candleColors(colors) satisfies Partial<CandlestickSeriesOptions>
+    )
 
     chartRef.current = chart
     seriesRef.current = series
@@ -80,7 +87,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     }
     chart.subscribeClick(handleClick)
 
-    const observer = new ResizeObserver(entries => {
+    const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry) {
         chart.resize(entry.contentRect.width, entry.contentRect.height)
@@ -102,7 +109,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     const series = seriesRef.current
     if (!series || candles.length === 0) return
 
-    const chartData = candles.map(c => ({
+    const chartData = candles.map((c) => ({
       time: c.openTime.split('T')[0] as `${number}-${number}-${number}`,
       open: c.open,
       high: c.high,
@@ -122,7 +129,10 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
 
     const colors = chartColors(theme)
     chart.applyOptions({
-      layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
+      layout: {
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.text,
+      },
       grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
       timeScale: { borderColor: colors.border },
       rightPriceScale: { borderColor: colors.border },
@@ -136,7 +146,7 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     if (!series) return
 
     const colors = chartColors(theme)
-    const markers: SeriesMarker<Time>[] = annotations.map(a => ({
+    const markers: SeriesMarker<Time>[] = annotations.map((a) => ({
       time: a.time as Time,
       position: a.kind === 'ai' ? 'belowBar' : 'aboveBar',
       color: a.kind === 'ai' ? colors.aiMarker : colors.marker,
@@ -146,7 +156,9 @@ export default function PriceChart({ candles, annotations = [], onPointClick, th
     series.setMarkers(markers)
   }, [annotations, theme])
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="price-chart" />
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="price-chart" />
+  )
 }
 
 interface ChartColors {
@@ -165,24 +177,24 @@ interface ChartColors {
 // getComputedStyle, so the chart can never lag the DOM's data-theme and invert.
 const DARK_COLORS: ChartColors = {
   background: '#101218', // --inset
-  text: '#a7adb8',       // --muted
-  border: '#3a3f49',     // --line
+  text: '#a7adb8', // --muted
+  border: '#3a3f49', // --line
   grid: 'rgba(56, 61, 70, 0.55)', // --grid
-  up: '#3cc08b',         // --up
-  down: '#e0655c',       // --down
-  marker: '#e8eaed',     // --text (user labels)
-  aiMarker: '#e0b34e',   // --acc (AI labels)
+  up: '#3cc08b', // --up
+  down: '#e0655c', // --down
+  marker: '#e8eaed', // --text (user labels)
+  aiMarker: '#e0b34e', // --acc (AI labels)
 }
 
 const LIGHT_COLORS: ChartColors = {
   background: '#f1f3f5', // --inset
-  text: '#6a7180',       // --muted
-  border: '#e2e5e9',     // --line
+  text: '#6a7180', // --muted
+  border: '#e2e5e9', // --line
   grid: 'rgba(128, 133, 142, 0.16)', // --grid
-  up: '#1d9e6e',         // --up
-  down: '#d6473d',       // --down
-  marker: '#2b2f38',     // --text (user labels)
-  aiMarker: '#cf9438',   // --acc (AI labels)
+  up: '#1d9e6e', // --up
+  down: '#d6473d', // --down
+  marker: '#2b2f38', // --text (user labels)
+  aiMarker: '#cf9438', // --acc (AI labels)
 }
 
 function chartColors(theme: Theme): ChartColors {

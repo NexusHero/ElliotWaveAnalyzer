@@ -9,7 +9,7 @@ import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
 /** Validates a wave annotation set via `POST /api/wave-analysis`. */
 export async function validateWaveCount(
   request: WaveValidationRequest,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<WaveAnalysisResponse> {
   const response = await fetch('/api/wave-analysis', {
     method: 'POST',

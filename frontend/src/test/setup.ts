@@ -12,11 +12,11 @@ window.ResizeObserver = class ResizeObserver {
 if (!('localStorage' in window) || window.localStorage == null) {
   const store = new Map<string, string>()
   const localStorageMock: Storage = {
-    getItem: key => store.get(key) ?? null,
+    getItem: (key) => store.get(key) ?? null,
     setItem: (key, value) => void store.set(key, String(value)),
-    removeItem: key => void store.delete(key),
+    removeItem: (key) => void store.delete(key),
     clear: () => store.clear(),
-    key: index => Array.from(store.keys())[index] ?? null,
+    key: (index) => Array.from(store.keys())[index] ?? null,
     get length() {
       return store.size
     },

@@ -1,4 +1,9 @@
-import { WAVE_LABELS, type RuleStatus, type WaveAnalysisResponse, type WaveAnnotation } from '../api/types'
+import {
+  type RuleStatus,
+  WAVE_LABELS,
+  type WaveAnalysisResponse,
+  type WaveAnnotation,
+} from '../api/types'
 
 function ruleStatusClass(status: RuleStatus): string {
   if (status === 'Fail') return 'wap-violation'
@@ -51,8 +56,13 @@ export default function WaveAnnotationPanel({
             Label point at {pending.time} · ${pending.price.toFixed(2)}
           </p>
           <div className="wap-labels">
-            {WAVE_LABELS.map(label => (
-              <button key={label} type="button" onClick={() => onAddLabel(label)} className="wap-label-btn">
+            {WAVE_LABELS.map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => onAddLabel(label)}
+                className="wap-label-btn"
+              >
                 {label}
               </button>
             ))}
@@ -75,9 +85,9 @@ export default function WaveAnnotationPanel({
                 className="wap-select"
                 aria-label={`Label for annotation ${i + 1}`}
                 value={a.label}
-                onChange={e => onRelabel(i, e.target.value)}
+                onChange={(e) => onRelabel(i, e.target.value)}
               >
-                {WAVE_LABELS.map(label => (
+                {WAVE_LABELS.map((label) => (
                   <option key={label} value={label}>
                     {label}
                   </option>
@@ -117,7 +127,8 @@ function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) 
   return (
     <section data-testid="validation-result" className="wap-result">
       <p className={result.isValid ? 'wap-status-valid' : 'wap-status-invalid'}>
-        {result.isValid ? '✓ Valid wave count' : '✗ Invalid wave count'} · confidence: {result.confidence}
+        {result.isValid ? '✓ Valid wave count' : '✗ Invalid wave count'} · confidence:{' '}
+        {result.confidence}
       </p>
 
       <p className="wap-subheading">Rule checks (objective)</p>

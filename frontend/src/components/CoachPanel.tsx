@@ -1,5 +1,5 @@
 import type { RuleResult, RuleStatus, WaveAnalysisResponse } from '../api/types'
-import { Seal, Spark, Target, Lock, CheckCircle, XMark, Alert } from './Icons'
+import { Alert, CheckCircle, Lock, Seal, Spark, Target, XMark } from './Icons'
 
 export type CoachState = 'empty' | 'needkey' | 'loading' | 'result'
 export type CoachMode = 'user' | 'ai'
@@ -34,7 +34,12 @@ export default function CoachPanel({
   return (
     <section className="coach" aria-label="Coach">
       <div className="coach-actions">
-        <button type="button" className="btn-primary" disabled={labelCount < 2} onClick={onValidate}>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={labelCount < 2}
+          onClick={onValidate}
+        >
           <Seal size={17} /> Validate my count
         </button>
         <button type="button" className="btn-ghost-acc" onClick={onAnalyze}>
@@ -60,7 +65,10 @@ function EmptyState({ labelCount }: { labelCount: number }) {
         <Target size={24} />
       </span>
       <h4>Place at least two labels</h4>
-      <p>Click the chart to mark your wave pivots. With two or more, the canonical rules can be checked.</p>
+      <p>
+        Click the chart to mark your wave pivots. With two or more, the canonical rules can be
+        checked.
+      </p>
       <div className="state-progress">
         <span className={`dot${labelCount >= 1 ? ' on' : ''}`} />
         <span className={`dot${labelCount >= 2 ? ' on' : ''}`} />
@@ -77,7 +85,10 @@ function NeedKeyState({ onOpenSettings }: { onOpenSettings: () => void }) {
         <Lock size={22} />
       </span>
       <h4>No API key configured</h4>
-      <p>Add an LLM API key in Settings to unlock the coach’s reflection. Rule checks stay available without one.</p>
+      <p>
+        Add an LLM API key in Settings to unlock the coach’s reflection. Rule checks stay available
+        without one.
+      </p>
       <button type="button" className="btn-primary" onClick={onOpenSettings}>
         Go to Settings
       </button>
@@ -119,11 +130,15 @@ interface Verdict {
 }
 
 function computeVerdict(rules: RuleResult[]): Verdict {
-  const real = rules.filter(r => r.status !== 'Indeterminate')
-  const passed = real.filter(r => r.status === 'Pass').length
+  const real = rules.filter((r) => r.status !== 'Indeterminate')
+  const passed = real.filter((r) => r.status === 'Pass').length
   const total = real.length
   if (total === 0) return { state: 'partial', passed, total }
-  return { state: passed === total ? 'valid' : passed === 0 ? 'invalid' : 'questionable', passed, total }
+  return {
+    state: passed === total ? 'valid' : passed === 0 ? 'invalid' : 'questionable',
+    passed,
+    total,
+  }
 }
 
 const VERDICT_META: Record<Verdict['state'], { cls: string; label: string }> = {
@@ -143,7 +158,15 @@ function RuleMark({ status }: { status: RuleStatus }) {
   return <span style={{ width: 8, height: 2, background: 'currentColor', borderRadius: 2 }} />
 }
 
-function Report({ result, mode, error }: { result: WaveAnalysisResponse; mode: CoachMode; error: string | null }) {
+function Report({
+  result,
+  mode,
+  error,
+}: {
+  result: WaveAnalysisResponse
+  mode: CoachMode
+  error: string | null
+}) {
   const { ruleReport, result: assessment } = result
   const verdict = computeVerdict(ruleReport.rules)
   const meta = VERDICT_META[verdict.state]
@@ -153,7 +176,10 @@ function Report({ result, mode, error }: { result: WaveAnalysisResponse; mode: C
       {mode === 'ai' && (
         <div className="ai-note">
           <Spark size={16} />
-          <span>This is the AI’s own count, drawn in amber on the chart. Compare it with yours and notice where they differ.</span>
+          <span>
+            This is the AI’s own count, drawn in amber on the chart. Compare it with yours and
+            notice where they differ.
+          </span>
         </div>
       )}
 
@@ -263,7 +289,10 @@ function Report({ result, mode, error }: { result: WaveAnalysisResponse; mode: C
 
         {assessment.confidence && (
           <div className="reflection-block q">
-            <p>Coach confidence in this read: {assessment.confidence}. Where does your own conviction differ?</p>
+            <p>
+              Coach confidence in this read: {assessment.confidence}. Where does your own conviction
+              differ?
+            </p>
           </div>
         )}
       </div>

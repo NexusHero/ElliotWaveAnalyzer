@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
+import { getAuthProviders, getCurrentUser, login, logout, register } from './api/client'
+import { Alert, Gear, WaveLogo } from './components/Icons'
 import LoginForm, { type AuthMode } from './components/LoginForm'
+import SettingsPage from './components/SettingsPage'
 import ThemeToggle from './components/ThemeToggle'
 import WaveWorkspace from './components/WaveWorkspace'
-import SettingsPage from './components/SettingsPage'
-import { WaveLogo, Gear, Alert } from './components/Icons'
-import { useTheme } from './hooks/useTheme'
 import { useApiKeys } from './hooks/useApiKeys'
-import { getAuthProviders, getCurrentUser, login, logout, register } from './api/client'
+import { useTheme } from './hooks/useTheme'
 
 type View = 'workspace' | 'settings'
 
@@ -37,14 +37,22 @@ export default function App() {
   })
 
   const authMutation = useMutation({
-    mutationFn: async ({ mode, email, password }: { mode: AuthMode; email: string; password: string }) => {
+    mutationFn: async ({
+      mode,
+      email,
+      password,
+    }: {
+      mode: AuthMode
+      email: string
+      password: string
+    }) => {
       if (mode === 'register') {
         await register(email, password)
       }
       await login(email, password)
       return getCurrentUser()
     },
-    onSuccess: currentUser => queryClient.setQueryData(CURRENT_USER_KEY, currentUser),
+    onSuccess: (currentUser) => queryClient.setQueryData(CURRENT_USER_KEY, currentUser),
   })
 
   const logoutMutation = useMutation({
@@ -59,7 +67,7 @@ export default function App() {
     (mode: AuthMode, email: string, password: string) => {
       authMutation.mutate({ mode, email, password })
     },
-    [authMutation],
+    [authMutation]
   )
 
   const authError = authMutation.isError
@@ -107,7 +115,7 @@ export default function App() {
             type="button"
             className="tb-btn"
             aria-current={view === 'settings'}
-            onClick={() => setView(v => (v === 'settings' ? 'workspace' : 'settings'))}
+            onClick={() => setView((v) => (v === 'settings' ? 'workspace' : 'settings'))}
           >
             <Gear size={16} />
             <span>Settings</span>
@@ -131,7 +139,11 @@ export default function App() {
           onBack={() => setView('workspace')}
         />
       ) : (
-        <WaveWorkspace theme={theme} hasApiKey={hasAnyKey} onOpenSettings={() => setView('settings')} />
+        <WaveWorkspace
+          theme={theme}
+          hasApiKey={hasAnyKey}
+          onOpenSettings={() => setView('settings')}
+        />
       )}
     </div>
   )

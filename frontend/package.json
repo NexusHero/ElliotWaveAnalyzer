@@ -10,6 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
     "generate:api": "openapi-typescript http://localhost:5001/swagger/v1/swagger.json -o src/api/generated.ts"
   },
   "dependencies": {
@@ -22,6 +25,7 @@
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",

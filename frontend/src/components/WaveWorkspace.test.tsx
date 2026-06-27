@@ -47,7 +47,7 @@ function renderWorkspace(hasApiKey = true) {
   return render(
     <QueryClientProvider client={queryClient}>
       <WaveWorkspace theme="dark" hasApiKey={hasApiKey} onOpenSettings={() => {}} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
 }
 

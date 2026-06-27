@@ -50,14 +50,14 @@ export function useApiKeys() {
 
   const saveKey = useCallback((provider: ProviderId, plaintext: string) => {
     const last4 = plaintext.trim().slice(-4)
-    setKeys(prev => {
-      const hadDefault = Object.values(prev).some(k => k?.isDefault)
+    setKeys((prev) => {
+      const hadDefault = Object.values(prev).some((k) => k?.isDefault)
       return { ...prev, [provider]: { last4, isDefault: !hadDefault } }
     })
   }, [])
 
   const removeKey = useCallback((provider: ProviderId) => {
-    setKeys(prev => {
+    setKeys((prev) => {
       const next = { ...prev }
       const removed = next[provider]
       delete next[provider]
@@ -71,7 +71,7 @@ export function useApiKeys() {
   }, [])
 
   const setDefault = useCallback((provider: ProviderId) => {
-    setKeys(prev => {
+    setKeys((prev) => {
       const next: KeyState = {}
       for (const [id, val] of Object.entries(prev)) {
         if (val) next[id as ProviderId] = { ...val, isDefault: id === provider }

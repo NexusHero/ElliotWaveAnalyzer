@@ -1,8 +1,8 @@
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentProps } from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import WaveAnnotationPanel from './WaveAnnotationPanel'
+import { describe, expect, it, vi } from 'vitest'
 import type { WaveAnalysisResponse, WaveAnnotation } from '../api/types'
+import WaveAnnotationPanel from './WaveAnnotationPanel'
 
 const twoAnnotations: WaveAnnotation[] = [
   { date: '2024-01-05T00:00:00Z', price: 38_000, label: '1' },
@@ -77,7 +77,9 @@ describe('WaveAnnotationPanel', () => {
       },
       ruleReport: {
         bullishAssumed: true,
-        rules: [{ name: 'Rule 2 — Wave 3 is not the shortest impulse wave', status: 'Fail', detail: '' }],
+        rules: [
+          { name: 'Rule 2 — Wave 3 is not the shortest impulse wave', status: 'Fail', detail: '' },
+        ],
         ratios: [{ name: 'Wave 2 retracement of Wave 1', ratio: 0.5 }],
       },
       usage: { provider: 'Gemini', promptTokens: 100, completionTokens: 50, totalTokens: 150 },

@@ -1,5 +1,5 @@
 import type { Theme } from '../hooks/useTheme'
-import { Sun, Moon } from './Icons'
+import { Moon, Sun } from './Icons'
 
 interface ThemeToggleProps {
   theme: Theme

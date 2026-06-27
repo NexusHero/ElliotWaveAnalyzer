@@ -5,7 +5,7 @@ export const TIMEFRAMES: Timeframe[] = ['4H', '1D', '1W']
 
 /** Seeded RNG (mulberry32) so each timeframe renders identically every load. */
 function mulberry32(a: number) {
-  return function () {
+  return () => {
     a |= 0
     a = (a + 0x6d2b79f5) | 0
     let t = Math.imul(a ^ (a >>> 15), 1 | a)
@@ -20,8 +20,14 @@ const STEP_DAYS: Record<Timeframe, number> = { '4H': 0.5, '1D': 1, '1W': 7 }
 // Anchor swings shaping a clean 5-wave impulse + pullback so the rule checks
 // have a believable structure to evaluate.
 const ANCHORS: [number, number][] = [
-  [0, 58200], [9, 63100], [16, 61600], [33, 66400],
-  [40, 63800], [52, 71050], [60, 67900], [63, 68500],
+  [0, 58200],
+  [9, 63100],
+  [16, 61600],
+  [33, 66400],
+  [40, 63800],
+  [52, 71050],
+  [60, 67900],
+  [63, 68500],
 ]
 
 function anchorPrice(i: number): number {
