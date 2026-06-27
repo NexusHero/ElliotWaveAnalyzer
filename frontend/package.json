@@ -13,6 +13,8 @@
     "generate:api": "openapi-typescript http://localhost:5001/swagger/v1/swagger.json -o src/api/generated.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.1",
+    "@tanstack/react-query-devtools": "^5.101.1",
     "lightweight-charts": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
@@ -25,12 +27,12 @@
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
     "openapi-typescript": "^7.8.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9",
-    "@vitest/coverage-v8": "^4.1.9",
-    "jsdom": "^29.1.1"
+    "vitest": "^4.1.9"
   },
   "overrides": {
     "js-yaml": "4.2.0"

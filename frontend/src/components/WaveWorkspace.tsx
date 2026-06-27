@@ -1,3 +1,4 @@
+import { useMutation } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 import PriceChart, { type ChartMarker } from './PriceChart'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
@@ -5,12 +6,7 @@ import { Trash } from './Icons'
 import { generateCandles, TIMEFRAMES, type Timeframe } from '../api/dummyData'
 import { validateWaveCount } from '../api/client'
 import type { Theme } from '../hooks/useTheme'
-import {
-  WAVE_LABELS,
-  type MarketCandle,
-  type WaveAnalysisResponse,
-  type WaveAnnotation,
-} from '../api/types'
+import { WAVE_LABELS, type MarketCandle, type WaveAnnotation } from '../api/types'
 
 const SYMBOL = 'BTC'
 const IMPULSE: string[] = ['1', '2', '3', '4', '5']
@@ -69,18 +65,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const [aiAnnotations, setAiAnnotations] = useState<WaveAnnotation[]>([])
   const [coachState, setCoachState] = useState<CoachState>('empty')
   const [mode, setMode] = useState<CoachMode>('user')
-  const [result, setResult] = useState<WaveAnalysisResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+
+  const validation = useMutation({
+    mutationFn: (payload: WaveAnnotation[]) => validateWaveCount({ symbol: SYMBOL, annotations: payload }),
+  })
 
   const nextLabel = IMPULSE[annotations.length] ?? null
 
   const resetCoach = useCallback(() => {
     setCoachState('empty')
-    setResult(null)
-    setError(null)
     setMode('user')
     setAiAnnotations([])
-  }, [])
+    validation.reset()
+  }, [validation])
 
   const handlePointClick = useCallback(
     (time: string, price: number) => {
@@ -115,27 +112,23 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   }, [resetCoach])
 
   const runAnalysis = useCallback(
-    async (which: CoachMode, payload: WaveAnnotation[]) => {
+    (which: CoachMode, payload: WaveAnnotation[]) => {
+      setMode(which)
       if (!hasApiKey) {
-        setMode(which)
         setCoachState('needkey')
         return
       }
-      setMode(which)
       setCoachState('loading')
-      setResult(null)
-      setError(null)
-      try {
-        const validation = await validateWaveCount({ symbol: SYMBOL, annotations: payload })
-        setResult(validation)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Validation failed')
-      } finally {
-        setCoachState('result')
-      }
+      validation.mutate(payload, { onSettled: () => setCoachState('result') })
     },
-    [hasApiKey],
+    [hasApiKey, validation],
   )
+
+  const analysisError = validation.isError
+    ? validation.error instanceof Error
+      ? validation.error.message
+      : 'Validation failed'
+    : null
 
   const handleValidate = useCallback(() => {
     if (annotations.length < 2) return
@@ -247,8 +240,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             labelCount={annotations.length}
             state={coachState}
             mode={mode}
-            result={result}
-            error={error}
+            result={validation.data ?? null}
+            error={analysisError}
             onValidate={handleValidate}
             onAnalyze={handleAnalyze}
             onOpenSettings={onOpenSettings}

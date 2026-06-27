@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 import LoginForm, { type AuthMode } from './components/LoginForm'
 import ThemeToggle from './components/ThemeToggle'
 import WaveWorkspace from './components/WaveWorkspace'
@@ -6,65 +7,80 @@ import SettingsPage from './components/SettingsPage'
 import { WaveLogo, Gear, Alert } from './components/Icons'
 import { useTheme } from './hooks/useTheme'
 import { useApiKeys } from './hooks/useApiKeys'
-import { getAuthProviders, getCurrentUser, login, logout, register, type CurrentUser } from './api/client'
+import { getAuthProviders, getCurrentUser, login, logout, register } from './api/client'
 
 type View = 'workspace' | 'settings'
+
+const CURRENT_USER_KEY = ['currentUser'] as const
 
 /**
  * Root component. Gates the app behind authentication, hosts the topbar (theme,
  * settings, account), and switches between the wave workspace and the settings page.
+ * Server state (the session, login/logout, available providers) is managed with TanStack Query.
  */
 export default function App() {
   const { theme, toggleTheme } = useTheme()
   const { keys, hasAnyKey, saveKey, removeKey, setDefault } = useApiKeys()
-  const [user, setUser] = useState<CurrentUser | null>(null)
-  const [authChecked, setAuthChecked] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
-  const [authLoading, setAuthLoading] = useState(false)
-  const [googleEnabled, setGoogleEnabled] = useState(false)
+  const queryClient = useQueryClient()
   const [view, setView] = useState<View>('workspace')
 
-  // Probe the session once on load.
-  useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setAuthChecked(true))
-  }, [])
+  // Probe the session. getCurrentUser resolves to null (not an error) when unauthenticated.
+  const { data: user, isPending: authChecking } = useQuery({
+    queryKey: CURRENT_USER_KEY,
+    queryFn: () => getCurrentUser(),
+  })
 
-  // Ask the backend whether Google sign-in is available.
-  useEffect(() => {
-    getAuthProviders().then(p => setGoogleEnabled(p.google)).catch(() => setGoogleEnabled(false))
-  }, [])
+  // Ask the backend whether Google sign-in is available (fails closed to disabled).
+  const { data: googleEnabled = false } = useQuery({
+    queryKey: ['authProviders'],
+    queryFn: async () => (await getAuthProviders()).google,
+  })
 
-  const handleAuth = useCallback(async (mode: AuthMode, email: string, password: string) => {
-    setAuthLoading(true)
-    setAuthError(null)
-    try {
+  const authMutation = useMutation({
+    mutationFn: async ({ mode, email, password }: { mode: AuthMode; email: string; password: string }) => {
       if (mode === 'register') {
         await register(email, password)
       }
       await login(email, password)
-      setUser(await getCurrentUser())
-    } catch (e) {
-      setAuthError(e instanceof Error ? e.message : 'Authentication failed')
-    } finally {
-      setAuthLoading(false)
-    }
-  }, [])
+      return getCurrentUser()
+    },
+    onSuccess: currentUser => queryClient.setQueryData(CURRENT_USER_KEY, currentUser),
+  })
 
-  const handleLogout = useCallback(async () => {
-    await logout()
-    setUser(null)
-    setView('workspace')
-  }, [])
+  const logoutMutation = useMutation({
+    mutationFn: () => logout(),
+    onSuccess: () => {
+      queryClient.setQueryData(CURRENT_USER_KEY, null)
+      setView('workspace')
+    },
+  })
 
-  if (!authChecked) {
+  const handleAuth = useCallback(
+    (mode: AuthMode, email: string, password: string) => {
+      authMutation.mutate({ mode, email, password })
+    },
+    [authMutation],
+  )
+
+  const authError = authMutation.isError
+    ? authMutation.error instanceof Error
+      ? authMutation.error.message
+      : 'Authentication failed'
+    : null
+
+  if (authChecking) {
     return <div className="center-view">Loading…</div>
   }
 
   if (!user) {
-    return <LoginForm onSubmit={handleAuth} error={authError} loading={authLoading} googleEnabled={googleEnabled} />
+    return (
+      <LoginForm
+        onSubmit={handleAuth}
+        error={authError}
+        loading={authMutation.isPending}
+        googleEnabled={googleEnabled}
+      />
+    )
   }
 
   return (
@@ -100,7 +116,7 @@ export default function App() {
             <span className="avatar">{user.email.charAt(0).toUpperCase()}</span>
             <span className="tb-email">{user.email}</span>
           </div>
-          <button type="button" className="tb-btn ghost" onClick={handleLogout}>
+          <button type="button" className="tb-btn ghost" onClick={() => logoutMutation.mutate()}>
             Log out
           </button>
         </div>
