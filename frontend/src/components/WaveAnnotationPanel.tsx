@@ -1,10 +1,9 @@
 import { WAVE_LABELS, type RuleStatus, type WaveAnalysisResponse, type WaveAnnotation } from '../api/types'
-import styles from './WaveAnnotationPanel.module.css'
 
-function ruleStatusClass(status: RuleStatus): string | undefined {
-  if (status === 'Fail') return styles.violation
-  if (status === 'Pass') return styles.statusValid
-  return styles.hint
+function ruleStatusClass(status: RuleStatus): string {
+  if (status === 'Fail') return 'wap-violation'
+  if (status === 'Pass') return 'wap-status-valid'
+  return 'wap-hint'
 }
 
 interface PendingPoint {
@@ -43,37 +42,37 @@ export default function WaveAnnotationPanel({
   const canSubmit = annotations.length >= 2 && !loading
 
   return (
-    <aside className={styles.panel} aria-label="Wave annotations">
-      <h2 className={styles.heading}>Wave annotations</h2>
+    <aside className="wap-panel" aria-label="Wave annotations">
+      <h2 className="wap-heading">Wave annotations</h2>
 
       {pending ? (
-        <div data-testid="label-picker" className={styles.picker}>
-          <p className={styles.hint}>
+        <div data-testid="label-picker" className="wap-picker">
+          <p className="wap-hint">
             Label point at {pending.time} · ${pending.price.toFixed(2)}
           </p>
-          <div className={styles.labels}>
+          <div className="wap-labels">
             {WAVE_LABELS.map(label => (
-              <button key={label} type="button" onClick={() => onAddLabel(label)} className={styles.labelButton}>
+              <button key={label} type="button" onClick={() => onAddLabel(label)} className="wap-label-btn">
                 {label}
               </button>
             ))}
           </div>
         </div>
       ) : (
-        <p className={styles.hint}>Click the chart to place a wave label.</p>
+        <p className="wap-hint">Click the chart to place a wave label.</p>
       )}
 
       {annotations.length === 0 ? (
-        <p className={styles.hint}>No labels yet.</p>
+        <p className="wap-hint">No labels yet.</p>
       ) : (
-        <ul className={styles.list}>
+        <ul className="wap-list">
           {annotations.map((a, i) => (
-            <li key={`${a.date}-${i}`} className={styles.listItem}>
-              <span className={styles.listItemLabel}>
+            <li key={`${a.date}-${i}`} className="wap-list-item">
+              <span className="wap-list-item-label">
                 {a.date.split('T')[0]} · ${a.price.toFixed(2)}
               </span>
               <select
-                className={styles.select}
+                className="wap-select"
                 aria-label={`Label for annotation ${i + 1}`}
                 value={a.label}
                 onChange={e => onRelabel(i, e.target.value)}
@@ -85,7 +84,7 @@ export default function WaveAnnotationPanel({
                 ))}
               </select>
               <button
-                className={styles.removeButton}
+                className="wap-remove-btn"
                 type="button"
                 aria-label={`Remove annotation ${i + 1}`}
                 onClick={() => onRemove(i)}
@@ -97,13 +96,13 @@ export default function WaveAnnotationPanel({
         </ul>
       )}
 
-      <button type="button" onClick={onSubmit} disabled={!canSubmit} className={styles.submit}>
+      <button type="button" onClick={onSubmit} disabled={!canSubmit} className="wap-submit">
         {loading ? 'Validating…' : 'Validate wave count'}
       </button>
-      {annotations.length < 2 && <p className={styles.hint}>At least 2 labels are required.</p>}
+      {annotations.length < 2 && <p className="wap-hint">At least 2 labels are required.</p>}
 
       {error && (
-        <p role="alert" className={styles.error}>
+        <p role="alert" className="wap-error">
           {error}
         </p>
       )}
@@ -116,24 +115,26 @@ export default function WaveAnnotationPanel({
 function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) {
   const { result, ruleReport, usage } = validation
   return (
-    <section data-testid="validation-result" className={styles.result}>
-      <p className={result.isValid ? styles.statusValid : styles.statusInvalid}>
+    <section data-testid="validation-result" className="wap-result">
+      <p className={result.isValid ? 'wap-status-valid' : 'wap-status-invalid'}>
         {result.isValid ? '✓ Valid wave count' : '✗ Invalid wave count'} · confidence: {result.confidence}
       </p>
 
-      <p className={styles.subHeading}>Rule checks (objective)</p>
-      <ul className={styles.list}>
+      <p className="wap-subheading">Rule checks (objective)</p>
+      <ul className="wap-list">
         {ruleReport.rules.map((rule, i) => (
           <li key={i}>
-            <span className={ruleStatusClass(rule.status)}>[{rule.status}] {rule.name}</span>
-            {rule.detail && <span className={styles.hint}> — {rule.detail}</span>}
+            <span className={ruleStatusClass(rule.status)}>
+              [{rule.status}] {rule.name}
+            </span>
+            {rule.detail && <span className="wap-hint"> — {rule.detail}</span>}
           </li>
         ))}
       </ul>
       {ruleReport.ratios.length > 0 && (
-        <ul className={styles.list}>
+        <ul className="wap-list">
           {ruleReport.ratios.map((ratio, i) => (
-            <li key={i} className={styles.hint}>
+            <li key={i} className="wap-hint">
               {ratio.name}: {ratio.ratio.toFixed(3)}
             </li>
           ))}
@@ -142,10 +143,10 @@ function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) 
 
       {result.violations.length > 0 && (
         <>
-          <p className={styles.subHeading}>Violations</p>
-          <ul className={styles.list}>
+          <p className="wap-subheading">Violations</p>
+          <ul className="wap-list">
             {result.violations.map((v, i) => (
-              <li key={i} className={styles.violation}>
+              <li key={i} className="wap-violation">
                 {v}
               </li>
             ))}
@@ -155,10 +156,10 @@ function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) 
 
       {result.warnings.length > 0 && (
         <>
-          <p className={styles.subHeading}>Warnings</p>
-          <ul className={styles.list}>
+          <p className="wap-subheading">Warnings</p>
+          <ul className="wap-list">
             {result.warnings.map((w, i) => (
-              <li key={i} className={styles.warning}>
+              <li key={i} className="wap-warning">
                 {w}
               </li>
             ))}
@@ -168,12 +169,12 @@ function ValidationResult({ validation }: { validation: WaveAnalysisResponse }) 
 
       {result.analysis && (
         <>
-          <p className={styles.subHeading}>Coach reflection</p>
-          <p className={styles.analysis}>{result.analysis}</p>
+          <p className="wap-subheading">Coach reflection</p>
+          <p className="wap-analysis">{result.analysis}</p>
         </>
       )}
 
-      <p className={styles.usage}>
+      <p className="wap-usage">
         {usage.provider}: {usage.totalTokens} tokens
       </p>
     </section>

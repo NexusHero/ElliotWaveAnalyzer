@@ -252,3 +252,66 @@
 
 /* generic centered loading view */
 .center-view { min-height: 60vh; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+
+/* ── Wave annotation panel (migrated from WaveAnnotationPanel.module.css) ──────── */
+.wap-panel {
+  width: 320px;
+  padding: 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 13px;
+  color: var(--color-text);
+}
+.wap-heading { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.wap-subheading { font-weight: 600; margin-top: 8px; }
+.wap-hint { color: var(--color-text-muted); font-size: 12px; }
+.wap-picker { margin-bottom: 12px; }
+.wap-labels { display: flex; flex-wrap: wrap; gap: 4px; }
+.wap-label-btn {
+  min-width: 28px;
+  padding: 4px 6px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.wap-label-btn:hover { border-color: var(--color-accent); }
+.wap-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wap-list-item { display: flex; align-items: center; gap: 6px; }
+.wap-list-item-label { flex: 1; }
+.wap-select,
+.wap-remove-btn {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.wap-submit {
+  margin-top: 12px;
+  padding: 8px 12px;
+  width: 100%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.wap-submit:disabled { opacity: 0.6; cursor: default; }
+.wap-error { color: var(--color-down); margin-top: 8px; }
+.wap-result { margin-top: 12px; }
+.wap-status-valid { font-weight: 600; color: var(--color-up); }
+.wap-status-invalid { font-weight: 600; color: var(--color-down); }
+.wap-violation { color: var(--color-down); }
+.wap-warning { color: var(--color-warning); }
+.wap-usage { color: var(--color-text-muted); margin-top: 8px; }
+.wap-analysis { margin-top: 8px; }

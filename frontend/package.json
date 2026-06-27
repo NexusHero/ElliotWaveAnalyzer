@@ -13,11 +13,13 @@
     "generate:api": "openapi-typescript http://localhost:5001/swagger/v1/swagger.json -o src/api/generated.ts"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.1",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-query-devtools": "^5.101.1",
     "lightweight-charts": "^4.2.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
