@@ -13,12 +13,24 @@ public sealed class AuthAcceptanceTests
 {
     private AcceptanceWebApplicationFactory _factory = null!;
 
-    // Fresh factory (and in-memory DB) per test so account state never leaks between tests.
+    // Fresh factory (and throwaway PostgreSQL container) per test so account state never
+    // leaks between tests.
     [SetUp]
-    public void SetUp() => _factory = new AcceptanceWebApplicationFactory();
+    public async Task SetUp()
+    {
+        TestDocker.SkipIfUnavailable();
+        _factory = new AcceptanceWebApplicationFactory();
+        await _factory.InitializeAsync();
+    }
 
     [TearDown]
-    public void TearDown() => _factory.Dispose();
+    public async Task TearDown()
+    {
+        if (_factory is not null)
+        {
+            await _factory.DisposeAsync();
+        }
+    }
 
     private static object Credentials => new
     {

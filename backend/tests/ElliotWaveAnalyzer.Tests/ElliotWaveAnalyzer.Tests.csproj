@@ -34,7 +34,17 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
 
     <!-- In-memory EF Core provider so auth/DB-backed tests need no live PostgreSQL. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.9" />
+    <!-- Real PostgreSQL in a throwaway container for DB-backed tests, so the Npgsql
+         provider and the generated migration SQL are exercised exactly as in production.
+         Replaces the EF Core in-memory provider. Tests skip when no Docker daemon is
+         reachable (see TestDocker), keeping local runs green; CI provides Docker. -->
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.4.0" />
+
+    <!-- Architecture rule enforcement (layering + encapsulation) at test time. -->
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
+
+    <!-- Snapshot testing for the wave-analysis result shape. -->
+    <PackageReference Include="Verify.NUnit" Version="28.13.0" />
   </ItemGroup>
 
   <ItemGroup>

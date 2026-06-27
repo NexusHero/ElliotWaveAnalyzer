@@ -1,0 +1,12 @@
+{
+  "stryker-config": {
+    "project": "ElliotWaveAnalyzer.Api.csproj",
+    "test-projects": ["ElliotWaveAnalyzer.Tests.csproj"],
+    "reporters": ["html", "progress"],
+    "mutation-level": "Standard",
+    "threshold-high": 80,
+    "threshold-low": 60,
+    "threshold-break": 0,
+    "excluded-mutations": ["string", "Linq"]
+  }
+}

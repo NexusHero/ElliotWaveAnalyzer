@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Testcontainers.PostgreSql;
 
 namespace ElliotWaveAnalyzer.Tests.Acceptance;
 
@@ -18,20 +19,39 @@ namespace ElliotWaveAnalyzer.Tests.Acceptance;
 /// endpoint and service logic) and only fakes the two external boundaries — the LLM
 /// (<see cref="IChatClient"/>) and the market-data source (<see cref="IMarketDataProvider"/>).
 ///
-/// Everything between the HTTP request and those boundaries is exercised for real, so
-/// these are genuine end-to-end acceptance tests that need no network, secrets, or
-/// live services and run deterministically in CI.
+/// The database is a real, throwaway PostgreSQL container (Testcontainers), so the Npgsql
+/// provider and the generated migration SQL are exercised exactly as in production. Call
+/// <see cref="InitializeAsync"/> before creating a client; it starts the container and
+/// applies migrations. Tests skip when no Docker daemon is reachable (see <see cref="TestDocker"/>).
 /// </summary>
 public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Program>
 {
     public const string TestEmail = "tester@example.com";
     public const string TestPassword = "Str0ng!Passw0rd";
 
-    // Unique store per factory instance so test classes don't share auth/session state.
-    private readonly string _databaseName = $"ewa-tests-{Guid.NewGuid()}";
+    // Throwaway PostgreSQL instance per factory instance — full isolation between fixtures.
+    private readonly PostgreSqlContainer _db = new PostgreSqlBuilder()
+        .WithImage("postgres:17-alpine")
+        .Build();
 
     /// <summary>The faked LLM. Tests can tweak its canned response before calling the API.</summary>
     public FakeChatClient Chat { get; } = new();
+
+    /// <summary>Starts the PostgreSQL container and applies EF migrations against it.</summary>
+    public async Task InitializeAsync()
+    {
+        await _db.StartAsync();
+
+        using var scope = Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await ctx.Database.MigrateAsync();
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await _db.DisposeAsync();
+        await base.DisposeAsync();
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -47,8 +67,8 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
             services.RemoveAll<IMarketDataProvider>();
             services.AddSingleton<IMarketDataProvider, FakeMarketDataProvider>();
 
-            // Replace the PostgreSQL AppDbContext with an in-memory store so auth tests
-            // need no live database. Remove every EF registration tied to AppDbContext first.
+            // Point AppDbContext at the container's PostgreSQL. Remove every EF registration
+            // tied to AppDbContext first so the production Npgsql config is fully replaced.
             var toRemove = services.Where(d =>
                 d.ServiceType == typeof(AppDbContext) ||
                 (d.ServiceType.IsGenericType &&
@@ -60,7 +80,7 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+            services.AddDbContext<AppDbContext>(options => options.UseNpgsql(_db.GetConnectionString()));
         });
     }
 

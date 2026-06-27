@@ -18,16 +18,21 @@ public sealed class MarketDataAcceptanceTests
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
+        TestDocker.SkipIfUnavailable();
         _factory = new AcceptanceWebApplicationFactory();
+        await _factory.InitializeAsync();
         _client = _factory.CreateClient();
         await _factory.AuthenticateAsync(_client);
     }
 
     [OneTimeTearDown]
-    public void OneTimeTearDown()
+    public async Task OneTimeTearDown()
     {
-        _client.Dispose();
-        _factory.Dispose();
+        _client?.Dispose();
+        if (_factory is not null)
+        {
+            await _factory.DisposeAsync();
+        }
     }
 
     [Test]

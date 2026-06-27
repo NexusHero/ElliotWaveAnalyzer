@@ -19,16 +19,21 @@ public sealed class WaveAnalysisAcceptanceTests
     [OneTimeSetUp]
     public async Task OneTimeSetUp()
     {
+        TestDocker.SkipIfUnavailable();
         _factory = new AcceptanceWebApplicationFactory();
+        await _factory.InitializeAsync();
         _client = _factory.CreateClient();
         await _factory.AuthenticateAsync(_client);
     }
 
     [OneTimeTearDown]
-    public void OneTimeTearDown()
+    public async Task OneTimeTearDown()
     {
-        _client.Dispose();
-        _factory.Dispose();
+        _client?.Dispose();
+        if (_factory is not null)
+        {
+            await _factory.DisposeAsync();
+        }
     }
 
     private static object BuildValidRequest() => new
@@ -104,7 +109,8 @@ public sealed class WaveAnalysisAcceptanceTests
     public async Task TokensEndpoint_AfterValidation_ReflectsRecordedUsage()
     {
         // A fresh factory so the singleton token tracker starts empty for this assertion.
-        using var factory = new AcceptanceWebApplicationFactory();
+        await using var factory = new AcceptanceWebApplicationFactory();
+        await factory.InitializeAsync();
         using var client = factory.CreateClient();
         await factory.AuthenticateAsync(client);
 

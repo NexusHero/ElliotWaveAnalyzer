@@ -1,14 +1,17 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Testcontainers.PostgreSql;
 
 namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 
 /// <summary>
-/// Unit tests for <see cref="AuthService"/>, wired against real ASP.NET Core Identity and
-/// an in-memory EF Core store (no PostgreSQL needed).
+/// Unit tests for <see cref="AuthService"/>, wired against real ASP.NET Core Identity and a
+/// throwaway PostgreSQL container (so the Npgsql provider and migration SQL are exercised).
+/// Skipped when no Docker daemon is reachable (see <see cref="TestDocker"/>).
 /// </summary>
 [TestFixture]
 public sealed class AuthServiceTests
@@ -16,17 +19,22 @@ public sealed class AuthServiceTests
     private const string Email = "user@example.com";
     private const string Password = "Str0ng!Passw0rd";
 
+    private PostgreSqlContainer _db = null!;
     private ServiceProvider _provider = null!;
     private IServiceScope _scope = null!;
     private IAuthService _sut = null!;
 
     [SetUp]
-    public void SetUp()
+    public async Task SetUp()
     {
+        TestDocker.SkipIfUnavailable();
+        _db = new PostgreSqlBuilder().WithImage("postgres:17-alpine").Build();
+        await _db.StartAsync();
+
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton(TimeProvider.System);
-        services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase($"authsvc-{Guid.NewGuid()}"));
+        services.AddDbContext<AppDbContext>(o => o.UseNpgsql(_db.GetConnectionString()));
         services.Configure<AuthOptions>(_ => { });
         services
             .AddIdentityCore<AppUser>(o =>
@@ -40,14 +48,23 @@ public sealed class AuthServiceTests
 
         _provider = services.BuildServiceProvider();
         _scope = _provider.CreateScope();
+        await _scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
         _sut = _scope.ServiceProvider.GetRequiredService<IAuthService>();
     }
 
     [TearDown]
-    public void TearDown()
+    public async Task TearDown()
     {
-        _scope.Dispose();
-        _provider.Dispose();
+        _scope?.Dispose();
+        if (_provider is not null)
+        {
+            await _provider.DisposeAsync();
+        }
+
+        if (_db is not null)
+        {
+            await _db.DisposeAsync();
+        }
     }
 
     [Test]
