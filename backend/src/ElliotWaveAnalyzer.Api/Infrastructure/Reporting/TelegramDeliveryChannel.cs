@@ -9,7 +9,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 /// <summary>
 /// Delivers a report as a photo message via the Telegram Bot API (<c>sendPhoto</c>).
 /// </summary>
-public sealed class TelegramDeliveryChannel(
+internal sealed class TelegramDeliveryChannel(
     HttpClient httpClient,
     IOptions<DailyReportOptions> options,
     ILogger<TelegramDeliveryChannel> logger) : IReportDeliveryChannel

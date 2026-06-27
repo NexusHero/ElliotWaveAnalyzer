@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 
 /// <summary>
@@ -9,7 +11,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// Having all options co-located makes it obvious which keys exist and avoids
 /// scattered configuration sections for what is logically one feature.
 /// </summary>
-public sealed class LlmProviderOptions
+internal sealed class LlmProviderOptions
 {
     public const string SectionName = "LlmProvider";
 
@@ -18,6 +20,7 @@ public sealed class LlmProviderOptions
     /// Changed without code deployment via appsettings or environment variable
     /// <c>LlmProvider__Active</c>.
     /// </summary>
+    [Required]
     public string Active { get; init; } = "Gemini";
 
     /// <summary>
@@ -54,7 +57,7 @@ public sealed class LlmProviderOptions
 }
 
 /// <summary>Per-provider API key and model name.</summary>
-public sealed class LlmEndpointOptions
+internal sealed class LlmEndpointOptions
 {
     public string ApiKey { get; init; } = string.Empty;
 

@@ -1,5 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import LoginForm from './LoginForm'
 
 describe('LoginForm', () => {
@@ -21,7 +21,9 @@ describe('LoginForm', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Create account' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } })
-    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'secret123456' } })
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'secret123456' },
+    })
     fireEvent.click(screen.getByRole('checkbox', { name: /learning tool/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
@@ -35,7 +37,9 @@ describe('LoginForm', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Create account' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.com' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } })
-    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different12345' } })
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'different12345' },
+    })
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(onSubmit).not.toHaveBeenCalled()

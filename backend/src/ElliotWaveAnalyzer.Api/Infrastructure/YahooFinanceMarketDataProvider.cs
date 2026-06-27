@@ -15,7 +15,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 /// NOTE: this uses Yahoo's public chart endpoint (no API key). Prices are read straight
 /// to decimal — never through double — to preserve precision for financial data.
 /// </summary>
-public sealed class YahooFinanceMarketDataProvider(
+internal sealed class YahooFinanceMarketDataProvider(
     HttpClient httpClient,
     ILogger<YahooFinanceMarketDataProvider> logger) : IMarketDataProvider
 {

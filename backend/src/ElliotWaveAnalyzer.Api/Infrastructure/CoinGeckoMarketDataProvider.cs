@@ -17,7 +17,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 /// Rate limits (free tier): 10-30 req/min depending on traffic. The daily report
 /// workflow calls this once per symbol so we stay well within limits.
 /// </summary>
-public sealed class CoinGeckoMarketDataProvider(
+internal sealed class CoinGeckoMarketDataProvider(
     HttpClient httpClient,
     ILogger<CoinGeckoMarketDataProvider> logger) : IMarketDataProvider
 {

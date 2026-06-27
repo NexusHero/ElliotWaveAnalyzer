@@ -1,6 +1,12 @@
 import { useState } from 'react'
-import { ChevronLeft, Lock, Shield, Eye, EyeOff } from './Icons'
-import { PROVIDERS, type KeyState, type ProviderId, type ProviderMeta, type SavedKey } from '../hooks/useApiKeys'
+import {
+  type KeyState,
+  PROVIDERS,
+  type ProviderId,
+  type ProviderMeta,
+  type SavedKey,
+} from '../hooks/useApiKeys'
+import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
 
 interface SettingsPageProps {
   keys: KeyState
@@ -15,7 +21,13 @@ interface SettingsPageProps {
  * preferences. Keys are masked, marked "never shown again", and (in this build)
  * only their last four characters are retained client-side.
  */
-export default function SettingsPage({ keys, onSave, onRemove, onSetDefault, onBack }: SettingsPageProps) {
+export default function SettingsPage({
+  keys,
+  onSave,
+  onRemove,
+  onSetDefault,
+  onBack,
+}: SettingsPageProps) {
   return (
     <div className="settings-root">
       <div className="settings-page fade-up">
@@ -39,7 +51,7 @@ export default function SettingsPage({ keys, onSave, onRemove, onSetDefault, onB
           </div>
 
           <div className="provider-list">
-            {PROVIDERS.map(provider => (
+            {PROVIDERS.map((provider) => (
               <ProviderRow
                 key={provider.id}
                 provider={provider}
@@ -54,8 +66,8 @@ export default function SettingsPage({ keys, onSave, onRemove, onSetDefault, onB
           <div className="set-note">
             <Shield size={18} />
             <p>
-              Keys are sent over an encrypted channel and stored encrypted at rest — never in plaintext, never shown
-              again after saving. Remove a key any time to revoke access.
+              Keys are sent over an encrypted channel and stored encrypted at rest — never in
+              plaintext, never shown again after saving. Remove a key any time to revoke access.
             </p>
           </div>
         </section>
@@ -105,7 +117,7 @@ function ProviderRow({
           <input
             type={reveal ? 'text' : 'password'}
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={(e) => setDraft(e.target.value)}
             placeholder={`${provider.name} API key`}
             autoComplete="off"
             spellCheck={false}
@@ -115,7 +127,7 @@ function ProviderRow({
             type="button"
             className="reveal"
             aria-label={reveal ? 'Hide key' : 'Show key'}
-            onClick={() => setReveal(r => !r)}
+            onClick={() => setReveal((r) => !r)}
           >
             {reveal ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
@@ -175,8 +187,13 @@ function CoachingPreferences() {
             <span>How the coach’s result is laid out.</span>
           </div>
           <div className="mini-seg">
-            {STYLES.map(s => (
-              <button key={s} type="button" className={style === s ? 'on' : ''} onClick={() => setStyle(s)}>
+            {STYLES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={style === s ? 'on' : ''}
+                onClick={() => setStyle(s)}
+              >
                 {s}
               </button>
             ))}
@@ -189,8 +206,13 @@ function CoachingPreferences() {
             <span>Gentle nudges or direct critique.</span>
           </div>
           <div className="mini-seg">
-            {TONES.map(t => (
-              <button key={t} type="button" className={tone === t ? 'on' : ''} onClick={() => setTone(t)}>
+            {TONES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={tone === t ? 'on' : ''}
+                onClick={() => setTone(t)}
+              >
                 {t}
               </button>
             ))}
@@ -208,7 +230,7 @@ function CoachingPreferences() {
             role="switch"
             aria-checked={showFib}
             aria-label="Show Fibonacci relationships"
-            onClick={() => setShowFib(v => !v)}
+            onClick={() => setShowFib((v) => !v)}
           >
             <span />
           </button>

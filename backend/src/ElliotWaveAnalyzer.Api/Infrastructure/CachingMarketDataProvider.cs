@@ -18,7 +18,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 /// registration for an <see cref="Microsoft.Extensions.Caching.Distributed.IDistributedCache"/>
 /// based decorator to share the cache across scaled-out instances.
 /// </summary>
-public sealed class CachingMarketDataProvider(
+internal sealed class CachingMarketDataProvider(
     IMarketDataProvider inner,
     IMemoryCache cache,
     ILogger<CachingMarketDataProvider> logger) : IMarketDataProvider

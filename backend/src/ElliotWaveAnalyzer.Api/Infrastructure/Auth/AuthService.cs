@@ -13,7 +13,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// SHA-256 hash is persisted. Login uses Identity's lockout to throttle brute force and
 /// returns a generic error to avoid account enumeration.
 /// </summary>
-public sealed class AuthService(
+internal sealed class AuthService(
     UserManager<AppUser> userManager,
     AppDbContext db,
     IOptions<AuthOptions> options,

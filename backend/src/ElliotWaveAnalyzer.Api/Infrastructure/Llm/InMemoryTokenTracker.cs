@@ -19,7 +19,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// self-consistent snapshot. Recording happens once per LLM call (low frequency), so
 /// lock contention is negligible.
 /// </summary>
-public sealed class InMemoryTokenTracker(IOptions<LlmProviderOptions> options) : ITokenTracker
+internal sealed class InMemoryTokenTracker(IOptions<LlmProviderOptions> options) : ITokenTracker
 {
     private readonly Lock _lock = new();
     private int _sessionTotal;

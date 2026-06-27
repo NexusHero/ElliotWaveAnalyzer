@@ -62,10 +62,28 @@
     <!-- Security hardening (see security-plan.md) -->
     <!-- Google OAuth 2.0 external login -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.9" />
-    <!-- Declarative input validation with symbol allow-lists -->
-    <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
+    <!-- Declarative input validation with symbol allow-lists. Base package (not the heavier
+         .AspNetCore one, which registers MVC model-binding filters a Minimal API never uses)
+         plus the DI-extensions for AddValidatorsFromAssemblyContaining. -->
+    <PackageReference Include="FluentValidation" Version="12.0.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
     <!-- Security response headers (CSP, HSTS, X-Frame-Options, …) -->
     <PackageReference Include="NetEscapades.AspNetCore.SecurityHeaders" Version="1.3.1" />
+
+    <!-- OpenTelemetry: traces + metrics for ASP.NET Core, outbound HTTP and the runtime.
+         Exported via OTLP when OpenTelemetry:Endpoint is configured (no exporter otherwise).
+         Microsoft.Extensions.AI auto-instruments IChatClient calls when tracing is active. -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Infrastructure implementation types are internal (enforced by ArchitectureTests);
+         expose them to the test project so it can wire them directly. -->
+    <InternalsVisibleTo Include="ElliotWaveAnalyzer.Tests" />
   </ItemGroup>
 
 </Project>

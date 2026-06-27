@@ -1,16 +1,12 @@
+import { useMutation } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
-import PriceChart, { type ChartMarker } from './PriceChart'
+import { validateWaveCount } from '../api/client'
+import { generateCandles, TIMEFRAMES, type Timeframe } from '../api/dummyData'
+import { type MarketCandle, WAVE_LABELS, type WaveAnnotation } from '../api/types'
+import type { Theme } from '../hooks/useTheme'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
-import { generateCandles, TIMEFRAMES, type Timeframe } from '../api/dummyData'
-import { validateWaveCount } from '../api/client'
-import type { Theme } from '../hooks/useTheme'
-import {
-  WAVE_LABELS,
-  type MarketCandle,
-  type WaveAnalysisResponse,
-  type WaveAnnotation,
-} from '../api/types'
+import PriceChart, { type ChartMarker } from './PriceChart'
 
 const SYMBOL = 'BTC'
 const IMPULSE: string[] = ['1', '2', '3', '4', '5']
@@ -48,7 +44,10 @@ function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
       lastKind = p.kind
     }
   }
-  const start = Math.max(0, seq.findIndex(p => p.kind === 'L'))
+  const start = Math.max(
+    0,
+    seq.findIndex((p) => p.kind === 'L')
+  )
   return seq.slice(start, start + 5).map((p, idx) => ({
     date: candles[p.i]!.openTime,
     price: p.price,
@@ -69,73 +68,80 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const [aiAnnotations, setAiAnnotations] = useState<WaveAnnotation[]>([])
   const [coachState, setCoachState] = useState<CoachState>('empty')
   const [mode, setMode] = useState<CoachMode>('user')
-  const [result, setResult] = useState<WaveAnalysisResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+
+  const validation = useMutation({
+    mutationFn: (payload: WaveAnnotation[]) =>
+      validateWaveCount({ symbol: SYMBOL, annotations: payload }),
+  })
 
   const nextLabel = IMPULSE[annotations.length] ?? null
 
   const resetCoach = useCallback(() => {
     setCoachState('empty')
-    setResult(null)
-    setError(null)
     setMode('user')
     setAiAnnotations([])
-  }, [])
+    validation.reset()
+  }, [validation])
 
   const handlePointClick = useCallback(
     (time: string, price: number) => {
       const label = IMPULSE[annotations.length]
       if (!label) return // all five impulse labels placed
       const annotation: WaveAnnotation = { date: `${time}T00:00:00Z`, price, label }
-      setAnnotations(prev => [...prev, annotation].sort((a, b) => a.date.localeCompare(b.date)))
+      setAnnotations((prev) => [...prev, annotation].sort((a, b) => a.date.localeCompare(b.date)))
       resetCoach()
     },
-    [annotations.length, resetCoach],
+    [annotations.length, resetCoach]
   )
 
-  const handleRelabel = useCallback((index: number, label: string) => {
-    setAnnotations(prev => prev.map((a, i) => (i === index ? { ...a, label } : a)))
-    resetCoach()
-  }, [resetCoach])
+  const handleRelabel = useCallback(
+    (index: number, label: string) => {
+      setAnnotations((prev) => prev.map((a, i) => (i === index ? { ...a, label } : a)))
+      resetCoach()
+    },
+    [resetCoach]
+  )
 
-  const handleRemove = useCallback((index: number) => {
-    setAnnotations(prev => prev.filter((_, i) => i !== index))
-    resetCoach()
-  }, [resetCoach])
+  const handleRemove = useCallback(
+    (index: number) => {
+      setAnnotations((prev) => prev.filter((_, i) => i !== index))
+      resetCoach()
+    },
+    [resetCoach]
+  )
 
   const handleClear = useCallback(() => {
     setAnnotations([])
     resetCoach()
   }, [resetCoach])
 
-  const handleTimeframe = useCallback((tf: Timeframe) => {
-    setTimeframe(tf)
-    setAnnotations([])
-    resetCoach()
-  }, [resetCoach])
+  const handleTimeframe = useCallback(
+    (tf: Timeframe) => {
+      setTimeframe(tf)
+      setAnnotations([])
+      resetCoach()
+    },
+    [resetCoach]
+  )
 
   const runAnalysis = useCallback(
-    async (which: CoachMode, payload: WaveAnnotation[]) => {
+    (which: CoachMode, payload: WaveAnnotation[]) => {
+      setMode(which)
       if (!hasApiKey) {
-        setMode(which)
         setCoachState('needkey')
         return
       }
-      setMode(which)
       setCoachState('loading')
-      setResult(null)
-      setError(null)
-      try {
-        const validation = await validateWaveCount({ symbol: SYMBOL, annotations: payload })
-        setResult(validation)
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Validation failed')
-      } finally {
-        setCoachState('result')
-      }
+      validation.mutate(payload, { onSettled: () => setCoachState('result') })
     },
-    [hasApiKey],
+    [hasApiKey, validation]
   )
+
+  const analysisError = validation.isError
+    ? validation.error instanceof Error
+      ? validation.error.message
+      : 'Validation failed'
+    : null
 
   const handleValidate = useCallback(() => {
     if (annotations.length < 2) return
@@ -150,8 +156,16 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   }, [candles, runAnalysis])
 
   const markers = useMemo<ChartMarker[]>(() => {
-    const user = annotations.map<ChartMarker>(a => ({ time: a.date.split('T')[0] ?? a.date, label: a.label, kind: 'user' }))
-    const ai = aiAnnotations.map<ChartMarker>(a => ({ time: a.date.split('T')[0] ?? a.date, label: a.label, kind: 'ai' }))
+    const user = annotations.map<ChartMarker>((a) => ({
+      time: a.date.split('T')[0] ?? a.date,
+      label: a.label,
+      kind: 'user',
+    }))
+    const ai = aiAnnotations.map<ChartMarker>((a) => ({
+      time: a.date.split('T')[0] ?? a.date,
+      label: a.label,
+      kind: 'ai',
+    }))
     return [...user, ...ai]
   }, [annotations, aiAnnotations])
 
@@ -166,7 +180,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               <span className="sym-sub mono">Dummy candles · practice set</span>
             </div>
             <div className="tf-select" role="group" aria-label="Timeframe">
-              {TIMEFRAMES.map(tf => (
+              {TIMEFRAMES.map((tf) => (
                 <button
                   key={tf}
                   type="button"
@@ -196,7 +210,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               )}
             </div>
             <div className="chart-stage">
-              <PriceChart candles={candles} annotations={markers} onPointClick={handlePointClick} theme={theme} />
+              <PriceChart
+                candles={candles}
+                annotations={markers}
+                onPointClick={handlePointClick}
+                theme={theme}
+              />
             </div>
           </div>
         </div>
@@ -218,9 +237,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                       className="anno-sel mono"
                       aria-label={`Label for annotation ${i + 1}`}
                       value={a.label}
-                      onChange={e => handleRelabel(i, e.target.value)}
+                      onChange={(e) => handleRelabel(i, e.target.value)}
                     >
-                      {WAVE_LABELS.map(label => (
+                      {WAVE_LABELS.map((label) => (
                         <option key={label} value={label}>
                           {label}
                         </option>
@@ -247,8 +266,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             labelCount={annotations.length}
             state={coachState}
             mode={mode}
-            result={result}
-            error={error}
+            result={validation.data ?? null}
+            error={analysisError}
             onValidate={handleValidate}
             onAnalyze={handleAnalyze}
             onOpenSettings={onOpenSettings}

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
-import PriceChart from './PriceChart'
+import { describe, expect, it, vi } from 'vitest'
 import type { MarketCandle } from '../api/types'
+import PriceChart from './PriceChart'
 
 // Lightweight Charts creates a WebGL/Canvas context that jsdom cannot provide.
 // We mock the module so we can test the React component's contract (renders the

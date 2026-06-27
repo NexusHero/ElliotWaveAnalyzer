@@ -41,3 +41,6 @@ appsettings.*.json
 
 # Local IDE settings (machine-specific paths)
 .vscode/
+
+# Verify snapshot tooling — received files are transient
+*.received.*

@@ -6,4 +6,4 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// Application user. Extends ASP.NET Core Identity's user with a GUID primary key.
 /// Identity owns password hashing, lockout, and normalized-email uniqueness.
 /// </summary>
-public sealed class AppUser : IdentityUser<Guid>;
+internal sealed class AppUser : IdentityUser<Guid>;

@@ -1,0 +1,42 @@
+﻿{
+  Result: {
+    IsValid: true,
+    Warnings: [
+      Wave 2 retracement is shallow
+    ],
+    Analysis: A clean five-wave impulse.,
+    Confidence: high
+  },
+  RuleReport: {
+    BullishAssumed: false,
+    Rules: [
+      {
+        Name: Rule 1 — Wave 2 stays within Wave 1's origin,
+        Status: Fail,
+        Detail: Wave 2 retraced beyond the start of Wave 1.
+      },
+      {
+        Name: Rule 2 — Wave 3 is not the shortest impulse wave,
+        Status: Indeterminate,
+        Detail: Needs all of waves 1, 3 and 5.
+      },
+      {
+        Name: Rule 3 — Wave 4 does not overlap Wave 1,
+        Status: Indeterminate,
+        Detail: Needs pivots up to wave 4.
+      }
+    ],
+    Ratios: [
+      {
+        Name: Wave 2 retracement of Wave 1,
+        Ratio: 5.667
+      }
+    ]
+  },
+  Usage: {
+    Provider: Gemini,
+    PromptTokens: 100,
+    CompletionTokens: 50,
+    TotalTokens: 150
+  }
+}

@@ -5,7 +5,7 @@
  */
 
 export interface MarketCandle {
-  openTime: string  // ISO 8601 UTC
+  openTime: string // ISO 8601 UTC
   open: number
   high: number
   low: number

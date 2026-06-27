@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { WaveLogo, Check, GoogleG } from './Icons'
+import { type FormEvent, useState } from 'react'
+import { Check, GoogleG, WaveLogo } from './Icons'
 
 export type AuthMode = 'login' | 'register'
 
@@ -21,7 +21,12 @@ const POINTS = [
  * Auth screen — a branded two-column layout with a segmented Login/Register
  * switch. Keeps the parent contract: onSubmit(mode, email, password).
  */
-export default function LoginForm({ onSubmit, error, loading, googleEnabled = false }: LoginFormProps) {
+export default function LoginForm({
+  onSubmit,
+  error,
+  loading,
+  googleEnabled = false,
+}: LoginFormProps) {
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,7 +36,10 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
   const isRegister = mode === 'register'
   const mismatch = isRegister && confirm.length > 0 && confirm !== password
   const canSubmit =
-    !loading && email.length > 0 && password.length > 0 && (!isRegister || (!mismatch && agreed && confirm.length > 0))
+    !loading &&
+    email.length > 0 &&
+    password.length > 0 &&
+    (!isRegister || (!mismatch && agreed && confirm.length > 0))
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -52,13 +60,13 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
           <div className="auth-pitch">
             <h1>Master Elliott Waves with an AI coach.</h1>
             <p>
-              Label price the way you read it, get the canonical rules checked instantly, and reflect with a coach
-              that helps you count better over time.
+              Label price the way you read it, get the canonical rules checked instantly, and
+              reflect with a coach that helps you count better over time.
             </p>
           </div>
 
           <ul className="auth-points">
-            {POINTS.map(point => (
+            {POINTS.map((point) => (
               <li key={point}>
                 <span
                   style={{
@@ -83,7 +91,11 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
       </aside>
 
       <main className="auth-main">
-        <form className="auth-card fade-up" onSubmit={handleSubmit} aria-label={isRegister ? 'Create account' : 'Log in'}>
+        <form
+          className="auth-card fade-up"
+          onSubmit={handleSubmit}
+          aria-label={isRegister ? 'Create account' : 'Log in'}
+        >
           <div className="seg" role="tablist">
             <span className={`seg-thumb${isRegister ? ' right' : ''}`} aria-hidden />
             <button
@@ -133,7 +145,7 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
             <input
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
               placeholder="you@example.com"
@@ -145,7 +157,7 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
             <input
               type="password"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete={isRegister ? 'new-password' : 'current-password'}
               placeholder="••••••••"
@@ -161,14 +173,18 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
                 <input
                   type="password"
                   value={confirm}
-                  onChange={e => setConfirm(e.target.value)}
+                  onChange={(e) => setConfirm(e.target.value)}
                   required
                   autoComplete="new-password"
                   placeholder="••••••••"
                 />
               </label>
               <label className="check" style={{ marginBottom: 22 }}>
-                <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
                 I understand this is a learning tool and not financial advice.
               </label>
             </div>
@@ -198,7 +214,11 @@ export default function LoginForm({ onSubmit, error, loading, googleEnabled = fa
 
           <p className="auth-switch">
             {isRegister ? 'Already have an account? ' : 'New to Elliott Wave Analyzer? '}
-            <button type="button" className="link" onClick={() => setMode(isRegister ? 'login' : 'register')}>
+            <button
+              type="button"
+              className="link"
+              onClick={() => setMode(isRegister ? 'login' : 'register')}
+            >
               {isRegister ? 'Log in' : 'Create one'}
             </button>
           </p>

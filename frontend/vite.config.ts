@@ -1,8 +1,9 @@
-import { defineConfig } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     proxy: {
@@ -11,18 +12,18 @@ export default defineConfig({
       '/api': {
         target: 'https://localhost:5001',
         changeOrigin: true,
-        secure: false,  // accept self-signed dev cert
+        secure: false, // accept self-signed dev cert
         // The backend talks to the proxy over HTTPS, so it marks the session cookie
         // `Secure`. The browser, however, sees the dev server over plain http://localhost:5173
         // and silently drops `Secure` cookies on an insecure origin — which would break login
         // locally. Strip the `Secure` attribute from Set-Cookie for the dev proxy only;
         // production is genuinely HTTPS and same-origin, so the cookie stays Secure there.
-        configure: proxy => {
-          proxy.on('proxyRes', proxyRes => {
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
             const setCookie = proxyRes.headers['set-cookie']
             if (setCookie) {
-              proxyRes.headers['set-cookie'] = setCookie.map(cookie =>
-                cookie.replace(/;\s*Secure/gi, ''),
+              proxyRes.headers['set-cookie'] = setCookie.map((cookie) =>
+                cookie.replace(/;\s*Secure/gi, '')
               )
             }
           })
@@ -37,6 +38,20 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 60,
+      },
+      exclude: [
+        'src/api/generated.ts',
+        'src/main.tsx',
+        'src/components/Icons.tsx', // presentational SVG icons
+        'src/test/**',
+        'src/vite-env.d.ts',
+        '**/*.test.{ts,tsx}',
+        '**/*.config.{ts,js}',
+      ],
     },
   },
 })
