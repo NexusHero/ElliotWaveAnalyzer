@@ -1,10 +1,13 @@
 import {
+  CandlestickSeries,
   type CandlestickSeriesOptions,
   ColorType,
   CrosshairMode,
   createChart,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type MouseEventParams,
   type SeriesMarker,
   type Time,
@@ -45,6 +48,8 @@ export default function PriceChart({
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  // v5 moved markers into a separate primitive attached to the series.
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -71,12 +76,14 @@ export default function PriceChart({
       height: container.clientHeight,
     })
 
-    const series = chart.addCandlestickSeries(
+    const series = chart.addSeries(
+      CandlestickSeries,
       candleColors(colors) satisfies Partial<CandlestickSeriesOptions>
     )
 
     chartRef.current = chart
     seriesRef.current = series
+    markersRef.current = createSeriesMarkers(series, [])
 
     const handleClick = (param: MouseEventParams) => {
       const callback = onPointClickRef.current
@@ -101,6 +108,7 @@ export default function PriceChart({
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
+      markersRef.current = null
     }
   }, [])
 
@@ -142,8 +150,8 @@ export default function PriceChart({
 
   // ── Draw wave-label markers when annotations (or theme) change ─────────────
   useEffect(() => {
-    const series = seriesRef.current
-    if (!series) return
+    const markersApi = markersRef.current
+    if (!markersApi) return
 
     const colors = chartColors(theme)
     const markers: SeriesMarker<Time>[] = annotations.map((a) => ({
@@ -153,7 +161,7 @@ export default function PriceChart({
       shape: 'circle',
       text: a.label,
     }))
-    series.setMarkers(markers)
+    markersApi.setMarkers(markers)
   }, [annotations, theme])
 
   return (
