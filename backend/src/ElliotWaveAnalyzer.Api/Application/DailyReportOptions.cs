@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ElliotWaveAnalyzer.Api.Application;
 
 /// <summary>
@@ -13,6 +15,7 @@ public sealed class DailyReportOptions
     public bool Enabled { get; init; }
 
     /// <summary>Standard 5-field cron expression (UTC). Default: 08:00 every day.</summary>
+    [Required]
     public string Cron { get; init; } = "0 8 * * *";
 
     /// <summary>Symbols to include in the report (e.g. BTC, ETH, NASDAQ).</summary>

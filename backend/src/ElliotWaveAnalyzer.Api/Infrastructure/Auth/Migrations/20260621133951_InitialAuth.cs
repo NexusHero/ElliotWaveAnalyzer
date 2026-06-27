@@ -6,7 +6,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth.Migrations;
 
 /// <inheritdoc />
-public partial class InitialAuth : Migration
+internal partial class InitialAuth : Migration
 {
     /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)

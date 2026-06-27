@@ -8,7 +8,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// without starting the app. The connection string is a placeholder — migrations only
 /// need the provider to generate SQL, not a live database.
 /// </summary>
-public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
+internal sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
     public AppDbContext CreateDbContext(string[] args)
     {

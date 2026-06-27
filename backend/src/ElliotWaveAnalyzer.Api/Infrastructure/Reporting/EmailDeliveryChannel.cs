@@ -10,7 +10,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 /// <summary>
 /// Delivers a report via SMTP email with the chart attached as a PNG.
 /// </summary>
-public sealed class EmailDeliveryChannel(
+internal sealed class EmailDeliveryChannel(
     IOptions<DailyReportOptions> options,
     ILogger<EmailDeliveryChannel> logger) : IReportDeliveryChannel
 {

@@ -21,7 +21,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 /// The Skender IQuote interface is bridged via a private adapter —
 /// no Skender type leaks into the domain or application layers.
 /// </summary>
-public sealed class SkenderIndicatorCalculator : IIndicatorCalculator
+internal sealed class SkenderIndicatorCalculator : IIndicatorCalculator
 {
     /// <inheritdoc/>
     public IReadOnlyList<Domain.RsiResult> CalculateRsi(

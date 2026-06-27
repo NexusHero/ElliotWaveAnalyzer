@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ElliotWaveAnalyzer.Api.Application;
 
 /// <summary>
@@ -11,5 +13,6 @@ public sealed class AuthOptions
     public int SessionLifetimeHours { get; init; } = 24;
 
     /// <summary>Name of the session cookie.</summary>
+    [Required]
     public string CookieName { get; init; } = "ewa_session";
 }

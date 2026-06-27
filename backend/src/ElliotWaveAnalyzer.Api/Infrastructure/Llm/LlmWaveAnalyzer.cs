@@ -18,7 +18,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// exactly what <see cref="IChatClient"/> standardizes. We keep only what is genuinely
 /// ours: the prompt (<see cref="WaveValidationPromptBuilder"/>) and the JSON result shape.
 /// </summary>
-public sealed class LlmWaveAnalyzer(
+internal sealed class LlmWaveAnalyzer(
     IChatClient chatClient,
     IOptions<LlmProviderOptions> options,
     ILogger<LlmWaveAnalyzer> logger) : ILlmWaveAnalyzer

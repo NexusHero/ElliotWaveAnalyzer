@@ -8,7 +8,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// EF Core context for authentication: the ASP.NET Core Identity tables plus the
 /// server-side <see cref="UserSession"/> store.
 /// </summary>
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options)
+internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<UserSession> Sessions => Set<UserSession>();

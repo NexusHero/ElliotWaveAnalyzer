@@ -9,7 +9,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 /// price pane, an RSI sub-pane (with 30/70 guides), and a MACD histogram sub-pane.
 /// Pure given its input (no I/O, no state) so it is straightforward to test.
 /// </summary>
-public sealed class SkiaSharpChartRenderer : IChartRenderer
+internal sealed class SkiaSharpChartRenderer : IChartRenderer
 {
     private const int Width = 1000;
     private const int Height = 700;

@@ -10,7 +10,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 /// Only registered when <c>DailyReport:Enabled</c> is true. Each run is executed in its
 /// own DI scope so scoped dependencies resolve correctly.
 /// </summary>
-public sealed class DailyReportBackgroundService(
+internal sealed class DailyReportBackgroundService(
     IServiceProvider services,
     IOptions<DailyReportOptions> options,
     ILogger<DailyReportBackgroundService> logger) : BackgroundService

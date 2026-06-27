@@ -4,7 +4,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// A server-side session. The opaque token handed to the client is never stored —
 /// only its SHA-256 hash, so a database leak does not expose usable tokens.
 /// </summary>
-public sealed class UserSession
+internal sealed class UserSession
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }

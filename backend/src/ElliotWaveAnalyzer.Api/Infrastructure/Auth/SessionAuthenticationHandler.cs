@@ -12,7 +12,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 /// validates the token against the server-side session store, and builds the principal.
 /// Because tokens are server-side and looked up per request, revocation is immediate.
 /// </summary>
-public sealed class SessionAuthenticationHandler(
+internal sealed class SessionAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
