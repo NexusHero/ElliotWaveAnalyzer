@@ -18,7 +18,7 @@
 
     <!-- Cross-platform code-coverage collector for the "XPlat Code Coverage" data collector.
          Without it the named collector emits no coverage.cobertura.xml at all. -->
-    <PackageReference Include="coverlet.collector" Version="6.0.2">
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
