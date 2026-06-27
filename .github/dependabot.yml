@@ -5,9 +5,19 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*"]
+      opentelemetry:
+        patterns: ["OpenTelemetry.*"]
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      tanstack:
+        patterns: ["@tanstack/*"]
+      react:
+        patterns: ["react", "react-dom", "@types/react*"]
