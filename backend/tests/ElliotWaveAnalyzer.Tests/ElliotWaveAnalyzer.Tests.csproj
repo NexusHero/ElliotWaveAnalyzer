@@ -13,7 +13,7 @@
     <!-- NUnit over xUnit: cleaner [SetUp]/[TearDown] lifecycle for stateful test fixtures.
          NSubstitute over Moq: no telemetry controversy, cleaner argument matcher syntax. -->
     <PackageReference Include="NUnit" Version="4.6.1" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
 
     <!-- Cross-platform code-coverage collector for the "XPlat Code Coverage" data collector.
