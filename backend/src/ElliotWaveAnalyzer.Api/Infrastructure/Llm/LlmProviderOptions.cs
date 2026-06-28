@@ -30,6 +30,14 @@ internal sealed class LlmProviderOptions
     /// </summary>
     public int TokenBudget { get; init; }
 
+    /// <summary>
+    /// When true, the full-auto analysis queries EVERY provider that has an API key configured
+    /// and aggregates their rankings (a consensus across models). When false, only the
+    /// <see cref="Active"/> provider is used. Costs roughly n× tokens, so it is opt-in.
+    /// Manual validation always uses the single active provider regardless of this flag.
+    /// </summary>
+    public bool Ensemble { get; init; }
+
     public LlmEndpointOptions Gemini { get; init; } = new()
     {
         Model = "gemini-2.5-flash"

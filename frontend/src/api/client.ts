@@ -1,6 +1,7 @@
 import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
+  TechnicalAnalysisResult,
   WaveAnalysisResponse,
   WaveValidationRequest,
 } from './types'
@@ -50,6 +51,26 @@ export async function autoAnalyzeWaves(
   }
 
   return (await response.json()) as AutoWaveAnalysisResponse
+}
+
+/**
+ * Fetches live OHLCV candles (+ indicators) for a symbol via `GET /api/market-data/{symbol}`.
+ * `days` selects the lookback window (1–365).
+ */
+export async function getMarketData(
+  symbol: string,
+  days: number,
+  signal?: AbortSignal
+): Promise<TechnicalAnalysisResult> {
+  const response = await fetch(`/api/market-data/${encodeURIComponent(symbol)}?days=${days}`, {
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as TechnicalAnalysisResult
 }
 
 /** The authenticated user, as returned by `GET /api/auth/me`. */

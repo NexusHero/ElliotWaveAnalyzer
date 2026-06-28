@@ -12,9 +12,9 @@ interface LoginFormProps {
 }
 
 const POINTS = [
+  'Full-auto wave detection on live market data',
   'Objective rule checks on every count',
-  'A coach that reflects, not just grades',
-  'Practice on 4H · 1D · 1W structure',
+  'An AI analyst that reads the structure',
 ]
 
 /**
@@ -58,10 +58,10 @@ export default function LoginForm({
           </span>
 
           <div className="auth-pitch">
-            <h1>Master Elliott Waves with an AI coach.</h1>
+            <h1>Analyze the market with Elliott Waves.</h1>
             <p>
-              Label price the way you read it, get the canonical rules checked instantly, and
-              reflect with a coach that helps you count better over time.
+              Run a full-auto analysis that detects the wave structure on live data, or label price
+              yourself and get the canonical rules checked instantly with an AI analyst's reading.
             </p>
           </div>
 
@@ -86,7 +86,7 @@ export default function LoginForm({
             ))}
           </ul>
 
-          <p className="auth-foot mono">A study tool — not trading advice.</p>
+          <p className="auth-foot mono">Market analysis — not trading advice.</p>
         </div>
       </aside>
 
@@ -122,8 +122,8 @@ export default function LoginForm({
             <h2>{isRegister ? 'Create your account' : 'Welcome back'}</h2>
             <p>
               {isRegister
-                ? 'Start practising counts and tracking how you improve.'
-                : 'Pick up where you left off and keep refining your eye.'}
+                ? 'Start running wave analyses on live market data.'
+                : 'Pick up where you left off and keep analysing.'}
             </p>
           </div>
 
@@ -185,7 +185,7 @@ export default function LoginForm({
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
                 />
-                I understand this is a learning tool and not financial advice.
+                I understand this is a market-analysis tool and not financial advice.
               </label>
             </div>
           )}

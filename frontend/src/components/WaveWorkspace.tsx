@@ -1,7 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
-import { autoAnalyzeWaves, validateWaveCount } from '../api/client'
-import { generateCandles, TIMEFRAMES, type Timeframe } from '../api/dummyData'
+import { autoAnalyzeWaves, getMarketData, validateWaveCount } from '../api/client'
 import { type MarketCandle, WAVE_LABELS, type WaveAnnotation } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
@@ -11,6 +10,14 @@ import PriceChart, { type ChartMarker } from './PriceChart'
 
 const SYMBOL = 'BTC'
 const IMPULSE: string[] = ['1', '2', '3', '4', '5']
+
+/** Lookback windows for the live chart, mapped to the market-data `days` parameter. */
+const RANGES = [
+  { label: '3M', days: 90 },
+  { label: '6M', days: 180 },
+  { label: '1Y', days: 365 },
+] as const
+type Range = (typeof RANGES)[number]
 
 interface WaveWorkspaceProps {
   theme: Theme
@@ -62,8 +69,13 @@ function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
  * their own count or ask the AI to count for them.
  */
 export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: WaveWorkspaceProps) {
-  const [timeframe, setTimeframe] = useState<Timeframe>('1D')
-  const candles = useMemo(() => generateCandles(timeframe), [timeframe])
+  const [range, setRange] = useState<Range>(RANGES[2])
+  const marketQuery = useQuery({
+    queryKey: ['market-data', SYMBOL, range.days],
+    queryFn: ({ signal }) => getMarketData(SYMBOL, range.days, signal),
+    staleTime: 5 * 60_000,
+  })
+  const candles = useMemo<MarketCandle[]>(() => marketQuery.data?.candles ?? [], [marketQuery.data])
 
   const [annotations, setAnnotations] = useState<WaveAnnotation[]>([])
   const [aiAnnotations, setAiAnnotations] = useState<WaveAnnotation[]>([])
@@ -144,9 +156,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     resetCoach()
   }, [resetCoach])
 
-  const handleTimeframe = useCallback(
-    (tf: Timeframe) => {
-      setTimeframe(tf)
+  const handleRange = useCallback(
+    (next: Range) => {
+      setRange(next)
       setAnnotations([])
       resetCoach()
     },
@@ -206,18 +218,24 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
           <div className="chart-head">
             <div className="symbol">
               <span className="sym-name">BTC / USD</span>
-              <span className="sym-sub mono">Dummy candles · practice set</span>
+              <span className="sym-sub mono">
+                {marketQuery.isError
+                  ? 'Live data unavailable'
+                  : marketQuery.isPending
+                    ? 'Loading live data…'
+                    : 'Live · CoinGecko'}
+              </span>
             </div>
-            <div className="tf-select" role="group" aria-label="Timeframe">
-              {TIMEFRAMES.map((tf) => (
+            <div className="tf-select" role="group" aria-label="Range">
+              {RANGES.map((r) => (
                 <button
-                  key={tf}
+                  key={r.label}
                   type="button"
-                  className={timeframe === tf ? 'on' : ''}
-                  aria-pressed={timeframe === tf}
-                  onClick={() => handleTimeframe(tf)}
+                  className={range.label === r.label ? 'on' : ''}
+                  aria-pressed={range.label === r.label}
+                  onClick={() => handleRange(r)}
                 >
-                  {tf}
+                  {r.label}
                 </button>
               ))}
             </div>
