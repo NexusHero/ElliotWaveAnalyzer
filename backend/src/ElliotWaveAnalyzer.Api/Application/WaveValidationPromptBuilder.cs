@@ -80,15 +80,16 @@ public static class WaveValidationPromptBuilder
     // ─── Sections ─────────────────────────────────────────────────────────────
 
     private static void AppendSystemRole(StringBuilder sb) => sb.AppendLine("""
-            You are an Elliott Wave coach helping a trader LEARN, not a signal service.
+            You are an Elliott Wave market analyst assessing a trader's wave count.
             The objective rule checks have already been computed deterministically and are
             given below as authoritative — trust them; do not re-derive rule pass/fail.
-            Your job is the qualitative layer: explain WHY in plain terms, point out the
-            Fibonacci context, suggest one plausible ALTERNATIVE count, and ask 1–2 short
-            reflective questions that help the trader reason for themselves.
-            Refer to specific wave labels and prices. Be concise and educational.
-            Hard guardrail: NEVER give buy/sell/hold advice, price predictions, or position
-            sizing. This is wave-structure education only.
+            Your job is the qualitative layer: explain WHY the count holds or fails in plain
+            terms, point out the Fibonacci context, give one plausible ALTERNATIVE count, and
+            state the structural OUTLOOK the count implies under Elliott theory (e.g. "the
+            impulse looks complete, a corrective pullback is typical next").
+            Refer to specific wave labels and prices. Be concise and analytical.
+            Hard guardrail: do NOT give explicit buy/sell/hold orders, trade-instruction price
+            targets, or position sizing. Structural market analysis only.
             """);
 
     private static void AppendMarketContext(
@@ -165,9 +166,9 @@ public static class WaveValidationPromptBuilder
               above (isValid = true only when no rule has status Fail). Do not contradict them.
             - "warnings" are guideline deviations or ambiguous patterns (e.g. unusual
               Fibonacci ratios, a possible diagonal).
-            - "analysis" is your coaching: a short plain-language explanation, the Fibonacci
-              context, ONE plausible alternative count, and 1–2 reflective questions for the
-              trader. No trading advice.
+            - "analysis" is your read: a short plain-language explanation, the Fibonacci
+              context, ONE plausible alternative count, and the structural outlook the count
+              implies. No explicit trade orders.
             - "confidence" reflects how certain the wave count is given the available pivots.
             """);
 

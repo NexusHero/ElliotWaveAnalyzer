@@ -24,7 +24,7 @@ describe('LoginForm', () => {
     fireEvent.change(screen.getByLabelText('Confirm password'), {
       target: { value: 'secret123456' },
     })
-    fireEvent.click(screen.getByRole('checkbox', { name: /learning tool/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /market-analysis tool/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
     expect(onSubmit).toHaveBeenCalledWith('register', 'a@b.com', 'secret123456')

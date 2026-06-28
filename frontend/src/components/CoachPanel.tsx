@@ -101,7 +101,7 @@ function LoadingState({ mode }: { mode: CoachMode }) {
     <div className="state-card fade-up">
       <span className="spinner" aria-hidden />
       <h4>{mode === 'ai' ? 'Counting the waves…' : 'Checking your count…'}</h4>
-      <p>Running the canonical rules and asking the coach to reflect.</p>
+      <p>Running the canonical rules and asking the analyst for a reading.</p>
       <div className="skeleton-rows" aria-hidden>
         <span />
         <span />
@@ -177,8 +177,8 @@ function Report({
         <div className="ai-note">
           <Spark size={16} />
           <span>
-            This is the AI’s own count, drawn in amber on the chart. Compare it with yours and
-            notice where they differ.
+            This is the AI’s own count, drawn in amber on the chart. Compare it with yours and see
+            where the reads diverge.
           </span>
         </div>
       )}
@@ -238,8 +238,8 @@ function Report({
       <div className="sec-title">
         <span className="sec-n mono">03</span>
         <div className="sec-tt">
-          <h3>AI coach reflection</h3>
-          <p>A reading to reflect on — not a verdict to obey.</p>
+          <h3>AI analyst reading</h3>
+          <p>A structural interpretation — not financial advice.</p>
         </div>
       </div>
       <div className="reflection">
@@ -248,8 +248,8 @@ function Report({
             <Spark size={17} />
           </span>
           <div>
-            <strong>Coach reflection</strong>
-            <em>AI · reflective, not prescriptive</em>
+            <strong>Analyst reading</strong>
+            <em>AI · structural analysis, not advice</em>
           </div>
           <span className={`verdict-badge ${meta.cls}`} style={{ marginLeft: 'auto' }}>
             {meta.label}
@@ -289,10 +289,7 @@ function Report({
 
         {assessment.confidence && (
           <div className="reflection-block q">
-            <p>
-              Coach confidence in this read: {assessment.confidence}. Where does your own conviction
-              differ?
-            </p>
+            <p>Analyst confidence in this read: {assessment.confidence}.</p>
           </div>
         )}
       </div>

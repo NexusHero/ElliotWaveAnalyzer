@@ -1,8 +1,9 @@
 # Elliott Wave Analyzer
 
-A **learning & reflection tool for Elliott Wave analysis** — not a trading terminal. Place wave
-labels (1–5, A/B/C, W/X/Y) on price, get the canonical rules checked instantly, and reflect with
-an AI coach that helps you count better over time.
+A **market-analysis tool built on the Elliott Wave Principle.** Run a full-auto analysis that
+detects the wave structure for you and reads the market, or place wave labels (1–5, A/B/C, W/X/Y)
+yourself and get the canonical rules checked instantly with an AI analyst's interpretation. Not
+financial advice.
 
 [![CI](https://github.com/NexusHero/ElliotWaveAnalyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/NexusHero/ElliotWaveAnalyzer/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/NexusHero/ElliotWaveAnalyzer/actions/workflows/security.yml/badge.svg)](https://github.com/NexusHero/ElliotWaveAnalyzer/actions/workflows/security.yml)
@@ -19,9 +20,10 @@ an AI coach that helps you count better over time.
 |:---:|:---:|
 | ![Workspace light](docs/screenshots/05-workspace-light.png) | ![Settings](docs/screenshots/06-settings.png) |
 
-The hero of every screen is the **wave-annotation + coaching loop**: place a count, validate it
-against the three canonical impulse rules, or let the AI count for you and compare. Dark and light
-themes are both first-class.
+The hero of every screen is the **wave-analysis loop**: run the full-auto analysis to detect and
+rank wave counts on live market data, or place a count yourself, validate it against the three
+canonical impulse rules, and compare with the AI's reading. Dark and light themes are both
+first-class.
 
 ## Overview
 
