@@ -95,3 +95,35 @@ export interface WaveValidationRequest {
   symbol: string
   annotations: WaveAnnotation[]
 }
+
+/** Request body for `POST /api/wave-analysis/auto` (full-auto "magic button"). */
+export interface AutoWaveAnalysisRequest {
+  symbol: string
+  /** Days of history to analyse (default 365, clamped server-side). */
+  lookbackDays?: number
+  /** ZigZag reversal sensitivity in percent (default 3, clamped server-side). */
+  thresholdPercent?: number
+}
+
+/**
+ * One ranked, machine-detected wave count. The geometry (`origin` + `waves` + `ruleReport`)
+ * is deterministic; `confidence`, `rationale` and `outlook` come from the LLM.
+ * Mirrors the backend `RankedWaveCount`.
+ */
+export interface RankedWaveCount {
+  structure: string
+  origin: WaveAnnotation
+  waves: WaveAnnotation[]
+  ruleReport: WaveRuleReport
+  confidence: string
+  rationale: string
+  outlook: string
+  isBest: boolean
+}
+
+/** Response of `POST /api/wave-analysis/auto` — mirrors the backend `AutoWaveAnalysisResponse`. */
+export interface AutoWaveAnalysisResponse {
+  rankings: RankedWaveCount[]
+  marketSummary: string
+  usage: TokenUsage
+}

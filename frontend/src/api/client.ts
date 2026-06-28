@@ -1,4 +1,9 @@
-import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
+import type {
+  AutoWaveAnalysisRequest,
+  AutoWaveAnalysisResponse,
+  WaveAnalysisResponse,
+  WaveValidationRequest,
+} from './types'
 
 /**
  * Thin API client. Uses same-origin relative paths: in dev the Vite proxy forwards
@@ -23,6 +28,28 @@ export async function validateWaveCount(
   }
 
   return (await response.json()) as WaveAnalysisResponse
+}
+
+/**
+ * Full-auto wave analysis via `POST /api/wave-analysis/auto` (the "magic button"): the
+ * backend detects swing pivots, builds rule-valid candidate counts, and the LLM ranks them.
+ */
+export async function autoAnalyzeWaves(
+  request: AutoWaveAnalysisRequest,
+  signal?: AbortSignal
+): Promise<AutoWaveAnalysisResponse> {
+  const response = await fetch('/api/wave-analysis/auto', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as AutoWaveAnalysisResponse
 }
 
 /** The authenticated user, as returned by `GET /api/auth/me`. */

@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
-import { validateWaveCount } from '../api/client'
+import { autoAnalyzeWaves, validateWaveCount } from '../api/client'
 import { generateCandles, TIMEFRAMES, type Timeframe } from '../api/dummyData'
 import { type MarketCandle, WAVE_LABELS, type WaveAnnotation } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
+import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import PriceChart, { type ChartMarker } from './PriceChart'
@@ -73,6 +74,34 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     mutationFn: (payload: WaveAnnotation[]) =>
       validateWaveCount({ symbol: SYMBOL, annotations: payload }),
   })
+
+  // Full-auto ("magic button"): hits the live server-side analysis endpoint.
+  const [autoNeedKey, setAutoNeedKey] = useState(false)
+  const auto = useMutation({
+    mutationFn: () => autoAnalyzeWaves({ symbol: SYMBOL }),
+  })
+
+  const handleAutoAnalyze = useCallback(() => {
+    if (!hasApiKey) {
+      setAutoNeedKey(true)
+      return
+    }
+    setAutoNeedKey(false)
+    auto.mutate()
+  }, [auto, hasApiKey])
+
+  const autoState: AutoState = autoNeedKey
+    ? 'needkey'
+    : auto.isPending
+      ? 'loading'
+      : auto.isError
+        ? 'error'
+        : auto.isSuccess
+          ? 'result'
+          : 'idle'
+
+  const autoError =
+    auto.error instanceof Error ? auto.error.message : auto.isError ? 'Analysis failed' : null
 
   const nextLabel = IMPULSE[annotations.length] ?? null
 
@@ -270,6 +299,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             error={analysisError}
             onValidate={handleValidate}
             onAnalyze={handleAnalyze}
+            onOpenSettings={onOpenSettings}
+          />
+
+          <AutoAnalysisPanel
+            state={autoState}
+            data={auto.data ?? null}
+            error={autoError}
+            onRun={handleAutoAnalyze}
             onOpenSettings={onOpenSettings}
           />
         </div>

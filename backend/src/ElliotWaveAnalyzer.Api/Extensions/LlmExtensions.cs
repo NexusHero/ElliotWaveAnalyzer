@@ -72,6 +72,7 @@ internal static class LlmExtensions
         });
 
         services.AddTransient<ILlmWaveAnalyzer, LlmWaveAnalyzer>();
+        services.AddTransient<IAutoWaveAnalyzer, LlmAutoWaveAnalyzer>();
 
         // Token tracking (singleton — accumulates across requests).
         // In-memory per instance; see InMemoryTokenTracker for the distributed seam.
