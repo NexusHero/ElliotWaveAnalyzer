@@ -18,7 +18,7 @@
     <!-- Structured logging. Serilog over Microsoft.Extensions.Logging abstraction
          so we can swap sinks (Console → File → Seq) without code changes. -->
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
 
     <!-- Built-in ASP.NET Core 10 OpenAPI support.
          Replaces Swashbuckle (not .NET 10 compatible).
