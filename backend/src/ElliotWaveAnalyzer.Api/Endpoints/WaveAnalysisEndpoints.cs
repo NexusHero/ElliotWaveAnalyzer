@@ -33,6 +33,25 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
 
+        // ── POST /api/wave-analysis/auto ──────────────────────────────────────
+        // Full-auto ("magic button"): the system detects swing pivots, generates
+        // rule-valid candidate counts, and the LLM ranks + explains them. Same strict
+        // throttle as manual analysis since it makes an LLM call.
+        group.MapPost("/wave-analysis/auto", AutoAnalyze)
+            .WithName("AutoAnalyzeWaves")
+            .WithSummary("Detect and rank Elliott Wave counts automatically")
+            .WithDescription("""
+                Full-auto market analysis. Provide a symbol (and optionally a lookback window
+                and ZigZag sensitivity); the system detects swing pivots, builds rule-valid
+                candidate wave counts, and the active LLM provider ranks them and reads the
+                market structure. Returns the ranked counts (best first), a market summary,
+                and token usage. Rankings is empty when no valid structure is found.
+                """)
+            .Produces<AutoWaveAnalysisResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
+
         // ── GET /api/tokens ───────────────────────────────────────────────────
         group.MapGet("/tokens", GetTokenUsage)
             .WithName("GetTokenUsage")
@@ -85,6 +104,45 @@ public static class WaveAnalysisEndpoints
         }
     }
 
+    private static async Task<IResult> AutoAnalyze(
+        AutoWaveAnalysisRequest request,
+        IAutoWaveAnalysisService autoWaveAnalysisService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        // Clamp inputs to sane bounds so a bad request can't blow up history fetches or the
+        // pivot detector. Defaults give ~1y of daily context at 3% reversal sensitivity.
+        var lookbackDays = Math.Clamp(request.LookbackDays ?? 365, 30, 1825);
+        var threshold = Math.Clamp(request.ThresholdPercent ?? 3m, 0.5m, 25m);
+
+        try
+        {
+            var result = await autoWaveAnalysisService.AnalyzeAsync(
+                request.Symbol.ToUpperInvariant(),
+                lookbackDays,
+                threshold,
+                cancellationToken);
+
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (InvalidOperationException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Auto wave analysis failed for {Symbol}", request.Symbol);
+            return Results.Problem(
+                title: "Analysis unavailable",
+                detail: "The analysis service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
     private static IResult GetTokenUsage(ITokenTracker tokenTracker)
         => Results.Ok(tokenTracker.GetReport());
 }
@@ -93,3 +151,12 @@ public static class WaveAnalysisEndpoints
 public sealed record WaveValidationRequest(
     string Symbol,
     IReadOnlyList<WaveAnnotation> Annotations);
+
+/// <summary>
+/// Request body for <c>POST /api/wave-analysis/auto</c>. Only <see cref="Symbol"/> is
+/// required; the rest fall back to sensible, clamped defaults server-side.
+/// </summary>
+public sealed record AutoWaveAnalysisRequest(
+    string Symbol,
+    int? LookbackDays = null,
+    decimal? ThresholdPercent = null);
