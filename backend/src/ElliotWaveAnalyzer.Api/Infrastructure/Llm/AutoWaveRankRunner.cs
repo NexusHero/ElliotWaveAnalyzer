@@ -13,7 +13,10 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// </summary>
 internal static class AutoWaveRankRunner
 {
-    private const int MaxOutputTokens = 2048;
+    // Generous cap: ranking several candidates (summary + per-candidate rationale & outlook)
+    // is verbose, and Gemini 2.5 models spend "thinking" tokens against this same budget —
+    // too small a cap truncates the JSON mid-string. 8192 leaves ample room.
+    private const int MaxOutputTokens = 8192;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

@@ -23,7 +23,9 @@ internal sealed class LlmWaveAnalyzer(
     IOptions<LlmProviderOptions> options,
     ILogger<LlmWaveAnalyzer> logger) : ILlmWaveAnalyzer
 {
-    private const int MaxOutputTokens = 2048;
+    // Gemini 2.5 models spend "thinking" tokens against this budget, so a small cap can
+    // truncate the JSON before it completes. Keep it generous.
+    private const int MaxOutputTokens = 8192;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
