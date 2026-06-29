@@ -53,7 +53,7 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
 
     <!-- Daily report: SkiaSharp renders the chart PNG; Cronos parses the cron schedule. -->
-    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp" Version="4.148.0" />
     <!-- Linux native libSkiaSharp for CI/containers (Windows/macOS ship with SkiaSharp).
          NoDependencies = self-contained build that needs no system fontconfig. -->
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
