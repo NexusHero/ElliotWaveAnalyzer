@@ -6,8 +6,10 @@ import {
   createChart,
   createSeriesMarkers,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  LineStyle,
   type MouseEventParams,
   type SeriesMarker,
   type Time,
@@ -24,10 +26,23 @@ export interface ChartMarker {
   kind?: 'user' | 'ai'
 }
 
+/** Semantic kind of a horizontal level line. */
+export type LevelKind = 'invalid' | 'support' | 'target'
+
+/** A horizontal price line to overlay (invalidation, support- or target-zone bound). */
+export interface PriceLineSpec {
+  price: number
+  kind: LevelKind
+  /** Axis label text; empty string draws the line without a label (e.g. a zone's far bound). */
+  title: string
+}
+
 interface PriceChartProps {
   candles: MarketCandle[]
   /** Wave labels to draw above the candles. */
   annotations?: ChartMarker[]
+  /** Horizontal level lines (invalidation / fib zones) to overlay. */
+  priceLines?: PriceLineSpec[]
   /** Called when the user clicks a point on the chart (date + price at the click). */
   onPointClick?: (time: string, price: number) => void
   /** Current theme — drives the chart colours, which are read from the CSS variables. */
@@ -42,6 +57,7 @@ interface PriceChartProps {
 export default function PriceChart({
   candles,
   annotations = [],
+  priceLines = [],
   onPointClick,
   theme = 'dark',
 }: PriceChartProps) {
@@ -50,6 +66,8 @@ export default function PriceChart({
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   // v5 moved markers into a separate primitive attached to the series.
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
+  // Track created price lines so we can clear them before redrawing.
+  const priceLinesRef = useRef<IPriceLine[]>([])
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -164,6 +182,37 @@ export default function PriceChart({
     markersApi.setMarkers(markers)
   }, [annotations, theme])
 
+  // ── Draw level lines (invalidation / fib zones) when they (or theme) change ──
+  useEffect(() => {
+    const series = seriesRef.current
+    if (!series) return
+
+    for (const line of priceLinesRef.current) {
+      series.removePriceLine(line)
+    }
+    priceLinesRef.current = []
+
+    const colors = chartColors(theme)
+    for (const spec of priceLines) {
+      priceLinesRef.current.push(
+        series.createPriceLine({
+          price: spec.price,
+          color: levelColor(colors, spec.kind),
+          lineWidth: 1,
+          // Invalidation reads as "danger" (dashed); targets dotted; support solid.
+          lineStyle:
+            spec.kind === 'invalid'
+              ? LineStyle.Dashed
+              : spec.kind === 'target'
+                ? LineStyle.Dotted
+                : LineStyle.Solid,
+          axisLabelVisible: spec.title !== '',
+          title: spec.title,
+        })
+      )
+    }
+  }, [priceLines, theme])
+
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="price-chart" />
   )
@@ -178,6 +227,13 @@ interface ChartColors {
   down: string
   marker: string
   aiMarker: string
+  invalid: string
+  support: string
+  target: string
+}
+
+function levelColor(colors: ChartColors, kind: LevelKind): string {
+  return kind === 'invalid' ? colors.invalid : kind === 'support' ? colors.support : colors.target
 }
 
 // Palettes mirror the oklch theme tokens in index.css (approximated to hex so the
@@ -192,6 +248,9 @@ const DARK_COLORS: ChartColors = {
   down: '#e0655c', // --down
   marker: '#e8eaed', // --text (user labels)
   aiMarker: '#e0b34e', // --acc (AI labels)
+  invalid: '#e0655c', // --down: danger / count-dead line
+  support: '#e0b34e', // --acc amber: expected support zone
+  target: '#5b9bd5', // blue: forward target zone (never collides with candles)
 }
 
 const LIGHT_COLORS: ChartColors = {
@@ -203,6 +262,9 @@ const LIGHT_COLORS: ChartColors = {
   down: '#d6473d', // --down
   marker: '#2b2f38', // --text (user labels)
   aiMarker: '#cf9438', // --acc (AI labels)
+  invalid: '#d6473d', // --down
+  support: '#cf9438', // --acc amber
+  target: '#2f6fb0', // blue
 }
 
 function chartColors(theme: Theme): ChartColors {

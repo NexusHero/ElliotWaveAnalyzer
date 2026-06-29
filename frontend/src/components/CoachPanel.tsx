@@ -1,5 +1,6 @@
 import type { RuleResult, RuleStatus, WaveAnalysisResponse } from '../api/types'
 import { Alert, CheckCircle, Lock, Seal, Spark, Target, XMark } from './Icons'
+import LevelsSummary from './LevelsSummary'
 
 export type CoachState = 'empty' | 'needkey' | 'loading' | 'result'
 export type CoachMode = 'user' | 'ai'
@@ -9,6 +10,8 @@ interface CoachPanelProps {
   state: CoachState
   mode: CoachMode
   result: WaveAnalysisResponse | null
+  /** Latest price, for the live distance to the invalidation line. */
+  currentPrice: number | null
   error: string | null
   onValidate: () => void
   onAnalyze: () => void
@@ -26,6 +29,7 @@ export default function CoachPanel({
   state,
   mode,
   result,
+  currentPrice,
   error,
   onValidate,
   onAnalyze,
@@ -51,7 +55,9 @@ export default function CoachPanel({
         {state === 'empty' && <EmptyState labelCount={labelCount} />}
         {state === 'needkey' && <NeedKeyState onOpenSettings={onOpenSettings} />}
         {state === 'loading' && <LoadingState mode={mode} />}
-        {state === 'result' && result && <Report result={result} mode={mode} error={error} />}
+        {state === 'result' && result && (
+          <Report result={result} mode={mode} error={error} currentPrice={currentPrice} />
+        )}
         {state === 'result' && !result && error && <ErrorState error={error} />}
       </div>
     </section>
@@ -162,10 +168,12 @@ function Report({
   result,
   mode,
   error,
+  currentPrice,
 }: {
   result: WaveAnalysisResponse
   mode: CoachMode
   error: string | null
+  currentPrice: number | null
 }) {
   const { ruleReport, result: assessment } = result
   const verdict = computeVerdict(ruleReport.rules)
@@ -231,6 +239,20 @@ function Report({
               </div>
             ))}
           </div>
+        </>
+      )}
+
+      {/* Forward levels — invalidation, support/target zones, alternative */}
+      {result.levels && (
+        <>
+          <div className="sec-title">
+            <span className="sec-n mono">◆</span>
+            <div className="sec-tt">
+              <h3>Forward levels</h3>
+              <p>Invalidation and Fibonacci zones for the unfolding wave.</p>
+            </div>
+          </div>
+          <LevelsSummary levels={result.levels} currentPrice={currentPrice} />
         </>
       )}
 
