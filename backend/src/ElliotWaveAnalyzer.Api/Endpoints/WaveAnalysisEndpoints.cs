@@ -114,7 +114,7 @@ public static class WaveAnalysisEndpoints
         // Clamp inputs to sane bounds so a bad request can't blow up history fetches or the
         // pivot detector. Defaults give ~1y of daily context at 3% reversal sensitivity.
         var lookbackDays = Math.Clamp(request.LookbackDays ?? 365, 30, 1825);
-        var threshold = Math.Clamp(request.ThresholdPercent ?? 3m, 0.5m, 25m);
+        var threshold = Math.Clamp(request.ThresholdPercent ?? 2.5m, 0.5m, 25m);
 
         try
         {

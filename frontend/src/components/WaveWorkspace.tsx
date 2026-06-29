@@ -26,6 +26,13 @@ const RANGES = [
 ] as const
 type Range = (typeof RANGES)[number]
 
+/**
+ * Auto-analysis sensitivity = the ZigZag reversal threshold in percent. Lower = more swings
+ * detected = more candidate counts (but noisier). Default sits in the 2–3% sweet spot.
+ */
+const SENSITIVITIES = [1.5, 2, 2.5, 3, 4] as const
+const DEFAULT_SENSITIVITY = 2.5
+
 interface WaveWorkspaceProps {
   theme: Theme
   hasApiKey: boolean
@@ -96,9 +103,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   // Full-auto ("magic button"): hits the live server-side analysis endpoint.
   const [autoNeedKey, setAutoNeedKey] = useState(false)
+  const [sensitivity, setSensitivity] = useState<number>(DEFAULT_SENSITIVITY)
   const auto = useMutation({
-    mutationFn: () => autoAnalyzeWaves({ symbol }),
+    mutationFn: () => autoAnalyzeWaves({ symbol, thresholdPercent: sensitivity }),
   })
+
+  const handleSensitivity = useCallback(
+    (value: number) => {
+      setSensitivity(value)
+      auto.reset() // the shown result is for the old sensitivity
+    },
+    [auto]
+  )
 
   const handleAutoAnalyze = useCallback(() => {
     if (!hasApiKey) {
@@ -353,6 +369,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             state={autoState}
             data={auto.data ?? null}
             error={autoError}
+            sensitivity={sensitivity}
+            sensitivities={SENSITIVITIES}
+            onSensitivityChange={handleSensitivity}
             onRun={handleAutoAnalyze}
             onOpenSettings={onOpenSettings}
           />
