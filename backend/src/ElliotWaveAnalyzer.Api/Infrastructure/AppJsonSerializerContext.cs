@@ -15,6 +15,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 [JsonSerializable(typeof(WaveAnalysisResponse))]
 [JsonSerializable(typeof(TokenUsageReport))]
 [JsonSerializable(typeof(AutoWaveAnalysisResponse))]
+[JsonSerializable(typeof(WaveLevels))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

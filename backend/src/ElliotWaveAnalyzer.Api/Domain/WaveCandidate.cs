@@ -17,12 +17,14 @@ namespace ElliotWaveAnalyzer.Api.Domain;
 /// </param>
 /// <param name="Waves">The labelled wave terminals: "1".."5" for an impulse.</param>
 /// <param name="RuleReport">Deterministic rule + Fibonacci report for origin + waves.</param>
+/// <param name="Levels">Deterministic forward levels (invalidation, support/target zones); null if undeterminable.</param>
 public sealed record WaveCandidate(
     int Id,
     string Structure,
     WaveAnnotation Origin,
     IReadOnlyList<WaveAnnotation> Waves,
-    WaveRuleReport RuleReport);
+    WaveRuleReport RuleReport,
+    WaveLevels? Levels);
 
 /// <summary>
 /// The LLM's pure ranking of the candidates (ids + prose only — no geometry). Paired with
@@ -59,6 +61,7 @@ public sealed record RankedWaveCount(
     WaveAnnotation Origin,
     IReadOnlyList<WaveAnnotation> Waves,
     WaveRuleReport RuleReport,
+    WaveLevels? Levels,
     string Confidence,
     string Rationale,
     string Outlook,

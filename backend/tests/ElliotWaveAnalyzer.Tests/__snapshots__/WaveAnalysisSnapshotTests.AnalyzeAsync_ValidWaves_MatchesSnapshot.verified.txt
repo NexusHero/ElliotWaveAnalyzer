@@ -33,6 +33,28 @@
       }
     ]
   },
+  Levels: {
+    UnfoldingWave: Wave 3,
+    Bullish: false,
+    Invalidation: {
+      Price: 52000.0,
+      Side: Above,
+      Label: Invalidation — Wave 3 must hold Wave 2's start,
+      Basis: End of Wave 2
+    },
+    TargetZones: [
+      {
+        Low: 47146.000,
+        High: 49000.0,
+        Label: Wave 3 target (1.0–1.618× Wave 1),
+        Basis: Fibonacci extension of Wave 1
+      }
+    ],
+    Alternative: {
+      Name: Corrective B-wave,
+      Note: If price reverses below Wave 2, the move up may be a corrective B-wave rather than Wave 3.
+    }
+  },
   Usage: {
     Provider: Gemini,
     PromptTokens: 100,

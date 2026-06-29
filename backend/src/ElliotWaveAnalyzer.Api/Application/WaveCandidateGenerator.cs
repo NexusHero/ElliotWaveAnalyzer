@@ -59,13 +59,17 @@ public static class WaveCandidateGenerator
 
             // Labels are positional placeholders here; ElliottRuleChecker reads pivots by
             // position (origin first), not by label, so the check is geometric.
-            var report = ElliottRuleChecker.Check([origin, .. waves]);
+            var countPivots = new List<WaveAnnotation> { origin };
+            countPivots.AddRange(waves);
+
+            var report = ElliottRuleChecker.Check(countPivots);
             if (report.Rules.Any(r => r.Status == RuleStatus.Fail))
             {
                 continue;
             }
 
-            candidates.Add(new WaveCandidate(0, "Impulse", origin, waves, report));
+            var levels = ProjectionService.Project(countPivots);
+            candidates.Add(new WaveCandidate(0, "Impulse", origin, waves, report, levels));
         }
 
         return candidates

@@ -37,6 +37,7 @@ const sampleResponse: WaveAnalysisResponse = {
     rules: [{ name: 'Rule 1', status: 'Pass', detail: '' }],
     ratios: [],
   },
+  levels: null,
   usage: { provider: 'Gemini', promptTokens: 100, completionTokens: 50, totalTokens: 150 },
 }
 
