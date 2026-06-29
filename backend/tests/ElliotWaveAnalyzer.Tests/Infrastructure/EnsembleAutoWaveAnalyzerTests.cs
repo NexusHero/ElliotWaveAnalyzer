@@ -29,7 +29,8 @@ public sealed class EnsembleAutoWaveAnalyzerTests
                 new WaveAnnotation(Day.AddDays(4), 130m, "4"),
                 new WaveAnnotation(Day.AddDays(5), 170m, "5"),
             ],
-            new WaveRuleReport(true, [], []));
+            new WaveRuleReport(true, [], []),
+            null);
 
     private static string Ranking(int best, string tag) =>
         $$"""

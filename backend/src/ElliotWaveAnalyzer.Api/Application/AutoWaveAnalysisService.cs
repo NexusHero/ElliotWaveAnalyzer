@@ -112,5 +112,5 @@ public sealed class AutoWaveAnalysisService(
 
     private static RankedWaveCount ToRanked(
         WaveCandidate c, string confidence, string rationale, string outlook, bool isBest)
-        => new(c.Structure, c.Origin, c.Waves, c.RuleReport, confidence, rationale, outlook, isBest);
+        => new(c.Structure, c.Origin, c.Waves, c.RuleReport, c.Levels, confidence, rationale, outlook, isBest);
 }

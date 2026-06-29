@@ -83,10 +83,46 @@ export interface WaveRuleReport {
   ratios: FibRatio[]
 }
 
+/** Which side of current price a level sits on. */
+export type LevelSide = 'Below' | 'Above'
+
+/** A single horizontal price level (mirrors backend `PriceLevel`). */
+export interface PriceLevel {
+  price: number
+  side: LevelSide
+  label: string
+  basis: string
+}
+
+/** A price band, e.g. a Fibonacci support/target zone (mirrors backend `PriceZone`). */
+export interface PriceZone {
+  low: number
+  high: number
+  label: string
+  basis: string
+}
+
+/** The count that applies if the primary invalidation breaks (mirrors backend `AlternativeScenario`). */
+export interface AlternativeScenario {
+  name: string
+  note: string
+}
+
+/** Deterministic forward levels for the unfolding wave (mirrors backend `WaveLevels`). */
+export interface WaveLevels {
+  unfoldingWave: string
+  bullish: boolean
+  invalidation: PriceLevel | null
+  supportZone: PriceZone | null
+  targetZones: PriceZone[]
+  alternative: AlternativeScenario | null
+}
+
 /** Response of `POST /api/wave-analysis` — mirrors the backend `WaveAnalysisResponse`. */
 export interface WaveAnalysisResponse {
   result: WaveValidationResult
   ruleReport: WaveRuleReport
+  levels: WaveLevels | null
   usage: TokenUsage
 }
 
@@ -115,6 +151,7 @@ export interface RankedWaveCount {
   origin: WaveAnnotation
   waves: WaveAnnotation[]
   ruleReport: WaveRuleReport
+  levels: WaveLevels | null
   confidence: string
   rationale: string
   outlook: string

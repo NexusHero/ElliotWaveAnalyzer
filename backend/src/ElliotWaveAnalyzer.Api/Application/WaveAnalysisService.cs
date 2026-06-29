@@ -69,7 +69,9 @@ public sealed class WaveAnalysisService(
             "Token usage — provider: {Provider}, prompt: {P}, completion: {C}, total: {T}",
             usage.Provider, usage.PromptTokens, usage.CompletionTokens, usage.TotalTokens);
 
-        return new WaveAnalysisResponse(validation.Result, ruleReport, usage);
+        var levels = ProjectionService.Project(annotations);
+
+        return new WaveAnalysisResponse(validation.Result, ruleReport, levels, usage);
     }
 
     // ─── Input validation (pure, no I/O, no cost) ─────────────────────────────

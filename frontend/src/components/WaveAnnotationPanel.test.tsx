@@ -82,6 +82,7 @@ describe('WaveAnnotationPanel', () => {
         ],
         ratios: [{ name: 'Wave 2 retracement of Wave 1', ratio: 0.5 }],
       },
+      levels: null,
       usage: { provider: 'Gemini', promptTokens: 100, completionTokens: 50, totalTokens: 150 },
     }
     renderPanel({ annotations: twoAnnotations, result })

@@ -13,6 +13,7 @@ const request: WaveValidationRequest = {
 const okResponse: WaveAnalysisResponse = {
   result: { isValid: true, violations: [], warnings: [], analysis: 'ok', confidence: 'high' },
   ruleReport: { bullishAssumed: true, rules: [], ratios: [] },
+  levels: null,
   usage: { provider: 'Gemini', promptTokens: 100, completionTokens: 50, totalTokens: 150 },
 }
 
