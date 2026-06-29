@@ -91,10 +91,11 @@ public static class WaveAnalysisEndpoints
                 detail: ex.Message,
                 statusCode: StatusCodes.Status400BadRequest);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
         {
-            // The exception may carry provider details or the raw model output — log it
-            // server-side and return a generic message so nothing internal leaks.
+            // InvalidOperationException may carry provider details or raw model output;
+            // HttpRequestException is an upstream market-data failure. Log server-side and
+            // return a generic message so nothing internal leaks.
             loggerFactory.CreateLogger("WaveAnalysisEndpoints")
                 .LogError(ex, "Wave analysis failed for {Symbol}", request.Symbol);
             return Results.Problem(
@@ -132,8 +133,11 @@ public static class WaveAnalysisEndpoints
                 detail: ex.Message,
                 statusCode: StatusCodes.Status400BadRequest);
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
         {
+            // InvalidOperationException = LLM/budget failure; HttpRequestException = upstream
+            // market-data provider failure. Both are transient/external — log server-side and
+            // return a generic 502 so nothing internal leaks.
             loggerFactory.CreateLogger("WaveAnalysisEndpoints")
                 .LogError(ex, "Auto wave analysis failed for {Symbol}", request.Symbol);
             return Results.Problem(

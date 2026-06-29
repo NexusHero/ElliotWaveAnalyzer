@@ -100,17 +100,8 @@ internal sealed class LlmWaveAnalyzer(
 
     private WaveValidationResult ParseValidationJson(string text)
     {
-        // Defensive fence stripping — some models wrap JSON in ```json … ``` despite instructions.
-        var cleaned = text.Trim();
-        if (cleaned.StartsWith("```", StringComparison.Ordinal))
-        {
-            var start = cleaned.IndexOf('\n');
-            var end = cleaned.LastIndexOf("```", StringComparison.Ordinal);
-            if (start >= 0 && end > start)
-            {
-                cleaned = cleaned[(start + 1)..end].Trim();
-            }
-        }
+        // Models sometimes wrap JSON in ```fences``` or add prose — extract the object robustly.
+        var cleaned = LlmJson.ExtractObject(text);
 
         WaveValidationDto dto;
         try

@@ -8,7 +8,14 @@ import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import PriceChart, { type ChartMarker } from './PriceChart'
 
-const SYMBOL = 'BTC'
+/**
+ * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
+ * BTC / ETH come from CoinGecko (which currently rate-limits keyless requests, so they
+ * may be unavailable). Default to a Yahoo symbol so the workspace works out of the box.
+ */
+const SYMBOLS = ['SP500', 'NASDAQ', 'BTC', 'ETH'] as const
+type TickerSymbol = (typeof SYMBOLS)[number]
+
 const IMPULSE: string[] = ['1', '2', '3', '4', '5']
 
 /** Lookback windows for the live chart, mapped to the market-data `days` parameter. */
@@ -69,10 +76,11 @@ function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
  * their own count or ask the AI to count for them.
  */
 export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: WaveWorkspaceProps) {
+  const [symbol, setSymbol] = useState<TickerSymbol>('SP500')
   const [range, setRange] = useState<Range>(RANGES[2])
   const marketQuery = useQuery({
-    queryKey: ['market-data', SYMBOL, range.days],
-    queryFn: ({ signal }) => getMarketData(SYMBOL, range.days, signal),
+    queryKey: ['market-data', symbol, range.days],
+    queryFn: ({ signal }) => getMarketData(symbol, range.days, signal),
     staleTime: 5 * 60_000,
   })
   const candles = useMemo<MarketCandle[]>(() => marketQuery.data?.candles ?? [], [marketQuery.data])
@@ -83,14 +91,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const [mode, setMode] = useState<CoachMode>('user')
 
   const validation = useMutation({
-    mutationFn: (payload: WaveAnnotation[]) =>
-      validateWaveCount({ symbol: SYMBOL, annotations: payload }),
+    mutationFn: (payload: WaveAnnotation[]) => validateWaveCount({ symbol, annotations: payload }),
   })
 
   // Full-auto ("magic button"): hits the live server-side analysis endpoint.
   const [autoNeedKey, setAutoNeedKey] = useState(false)
   const auto = useMutation({
-    mutationFn: () => autoAnalyzeWaves({ symbol: SYMBOL }),
+    mutationFn: () => autoAnalyzeWaves({ symbol }),
   })
 
   const handleAutoAnalyze = useCallback(() => {
@@ -165,6 +172,17 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     [resetCoach]
   )
 
+  const handleSymbol = useCallback(
+    (next: TickerSymbol) => {
+      setSymbol(next)
+      setAnnotations([])
+      setAutoNeedKey(false)
+      auto.reset()
+      resetCoach()
+    },
+    [auto, resetCoach]
+  )
+
   const runAnalysis = useCallback(
     (which: CoachMode, payload: WaveAnnotation[]) => {
       setMode(which)
@@ -217,13 +235,24 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
         <div className="chart-col">
           <div className="chart-head">
             <div className="symbol">
-              <span className="sym-name">BTC / USD</span>
+              <select
+                className="sym-select mono"
+                aria-label="Symbol"
+                value={symbol}
+                onChange={(e) => handleSymbol(e.target.value as TickerSymbol)}
+              >
+                {SYMBOLS.map((s) => (
+                  <option key={s} value={s}>
+                    {s} / USD
+                  </option>
+                ))}
+              </select>
               <span className="sym-sub mono">
                 {marketQuery.isError
                   ? 'Live data unavailable'
                   : marketQuery.isPending
                     ? 'Loading live data…'
-                    : 'Live · CoinGecko'}
+                    : 'Live market data'}
               </span>
             </div>
             <div className="tf-select" role="group" aria-label="Range">

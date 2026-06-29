@@ -76,7 +76,7 @@ describe('WaveWorkspace', () => {
 
     expect(await screen.findByText('A clean five-wave impulse.')).toBeInTheDocument()
     expect(mockClient.validateWaveCount).toHaveBeenCalledWith({
-      symbol: 'BTC',
+      symbol: 'SP500',
       annotations: [
         { date: '2024-01-05T00:00:00Z', price: 38000, label: '1' },
         { date: '2024-01-15T00:00:00Z', price: 35000, label: '2' },
