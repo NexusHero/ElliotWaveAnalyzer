@@ -1,5 +1,6 @@
 import type { AutoWaveAnalysisResponse, RankedWaveCount, RuleStatus } from '../api/types'
 import { Alert, CheckCircle, Lock, Spark, XMark } from './Icons'
+import LevelsSummary from './LevelsSummary'
 
 export type AutoState = 'idle' | 'needkey' | 'loading' | 'result' | 'error'
 
@@ -12,6 +13,13 @@ interface AutoAnalysisPanelProps {
   /** Selectable sensitivity presets (%). */
   sensitivities: readonly number[]
   onSensitivityChange: (value: number) => void
+  /** Pro mode reveals the count tabs (otherwise only the best count's levels show). */
+  pro: boolean
+  /** Index of the count whose levels are on the chart. */
+  activeCount: number
+  onSelectCount: (index: number) => void
+  /** Latest price, for live distance to the invalidation line. */
+  currentPrice: number | null
   onRun: () => void
   onOpenSettings: () => void
 }
@@ -36,8 +44,8 @@ function RuleMark({ status }: { status: RuleStatus }) {
  * the backend detects swing pivots, builds rule-valid candidate counts, and the LLM ranks
  * and explains them. This panel renders the overall market read plus each ranked count.
  *
- * NOTE: this analyses LIVE market data for the symbol (independent of the dummy practice
- * candles drawn on the chart), so the prices below are real and need not match the chart.
+ * Analyses LIVE market data for the selected symbol. The active count's levels are drawn on
+ * the chart; in Pro mode the count tabs let you switch which count is active.
  */
 export default function AutoAnalysisPanel({
   state,
@@ -46,6 +54,10 @@ export default function AutoAnalysisPanel({
   sensitivity,
   sensitivities,
   onSensitivityChange,
+  pro,
+  activeCount,
+  onSelectCount,
+  currentPrice,
   onRun,
   onOpenSettings,
 }: AutoAnalysisPanelProps) {
@@ -117,12 +129,32 @@ export default function AutoAnalysisPanel({
         </div>
       )}
 
-      {state === 'result' && data && <AutoResult data={data} />}
+      {state === 'result' && data && (
+        <AutoResult
+          data={data}
+          pro={pro}
+          activeCount={activeCount}
+          onSelectCount={onSelectCount}
+          currentPrice={currentPrice}
+        />
+      )}
     </section>
   )
 }
 
-function AutoResult({ data }: { data: AutoWaveAnalysisResponse }) {
+function AutoResult({
+  data,
+  pro,
+  activeCount,
+  onSelectCount,
+  currentPrice,
+}: {
+  data: AutoWaveAnalysisResponse
+  pro: boolean
+  activeCount: number
+  onSelectCount: (index: number) => void
+  currentPrice: number | null
+}) {
   if (data.rankings.length === 0) {
     return (
       <div className="state-card fade-up">
@@ -132,6 +164,9 @@ function AutoResult({ data }: { data: AutoWaveAnalysisResponse }) {
     )
   }
 
+  const active = data.rankings[activeCount] ?? data.rankings[0]
+  const showTabs = pro && data.rankings.length > 1
+
   return (
     <div className="auto-result fade-up">
       <div className="reflection-block">
@@ -139,23 +174,55 @@ function AutoResult({ data }: { data: AutoWaveAnalysisResponse }) {
         <p>{data.marketSummary}</p>
       </div>
 
+      {showTabs && (
+        <div className="count-tabs" role="group" aria-label="Wave counts">
+          {data.rankings.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              className={i === activeCount ? 'on' : ''}
+              aria-pressed={i === activeCount}
+              onClick={() => onSelectCount(i)}
+            >
+              {i === 0 ? 'Primary' : `Alt ${i}`}
+              {c.isBest && i !== 0 ? ' ★' : ''}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {active?.levels && <LevelsSummary levels={active.levels} currentPrice={currentPrice} />}
+
       <ul className="auto-counts">
         {data.rankings.map((count, i) => (
-          <RankedCount key={i} count={count} />
+          <RankedCount
+            key={i}
+            count={count}
+            active={i === activeCount}
+            onSelect={() => onSelectCount(i)}
+          />
         ))}
       </ul>
     </div>
   )
 }
 
-function RankedCount({ count }: { count: RankedWaveCount }) {
+function RankedCount({
+  count,
+  active,
+  onSelect,
+}: {
+  count: RankedWaveCount
+  active: boolean
+  onSelect: () => void
+}) {
   return (
-    <li className={`auto-count${count.isBest ? ' best' : ''}`}>
+    <li className={`auto-count${count.isBest ? ' best' : ''}${active ? ' active' : ''}`}>
       <div className="auto-count-head">
-        <strong>
+        <button type="button" className="auto-count-pick" onClick={onSelect}>
           {count.structure}
           {count.isBest && <span className="best-tag">Most likely</span>}
-        </strong>
+        </button>
         <span
           className={`verdict-badge ${count.confidence === 'high' ? 'ok' : count.confidence === 'low' ? 'bad' : 'neutral'}`}
         >

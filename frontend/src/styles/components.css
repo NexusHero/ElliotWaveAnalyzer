@@ -1213,3 +1213,51 @@
 .wap-analysis {
   margin-top: 8px;
 }
+
+/* chart head: range + Pro toggle */
+.chart-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pro-toggle {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--inset);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.pro-toggle.on {
+  background: var(--acc-soft);
+  border-color: var(--acc-line);
+  color: var(--acc-strong);
+}
+
+/* chart layer toggles (Pro) */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 2px 2px;
+  flex-wrap: wrap;
+}
+.layer-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.layer-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}

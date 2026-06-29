@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { autoAnalyzeWaves, getMarketData, validateWaveCount } from '../api/client'
-import { type MarketCandle, WAVE_LABELS, type WaveAnnotation } from '../api/types'
+import { type MarketCandle, WAVE_LABELS, type WaveAnnotation, type WaveLevels } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
-import PriceChart, { type ChartMarker } from './PriceChart'
+import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
+import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
 
 /**
  * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
@@ -111,6 +112,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const handleSensitivity = useCallback(
     (value: number) => {
       setSensitivity(value)
+      setActiveCount(0)
       auto.reset() // the shown result is for the old sensitivity
     },
     [auto]
@@ -122,6 +124,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       return
     }
     setAutoNeedKey(false)
+    setActiveCount(0)
     auto.mutate()
   }, [auto, hasApiKey])
 
@@ -137,6 +140,45 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const autoError =
     auto.error instanceof Error ? auto.error.message : auto.isError ? 'Analysis failed' : null
+
+  // ── Level overlay + Clean/Pro UX ───────────────────────────────────────────
+  const [pro, setPro] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('ewa.pro') === '1'
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem('ewa.pro', pro ? '1' : '0')
+    } catch {
+      /* localStorage unavailable — non-fatal */
+    }
+  }, [pro])
+
+  const [layers, setLayers] = useState<LevelLayers>(CLEAN_LAYERS)
+  const [activeCount, setActiveCount] = useState(0)
+
+  const rankings = auto.data?.rankings ?? []
+  const activeRanked = rankings[activeCount] ?? rankings[0] ?? null
+
+  // The chart overlays the selected auto count's levels, else the manual result's.
+  const activeLevels: WaveLevels | null =
+    auto.isSuccess && activeRanked ? activeRanked.levels : (validation.data?.levels ?? null)
+
+  const lastPrice = candles.length > 0 ? (candles[candles.length - 1]?.close ?? null) : null
+
+  // Clean mode forces invalidation-only; Pro honours the layer toggles.
+  const effectiveLayers = pro ? layers : CLEAN_LAYERS
+  const priceLines = useMemo<PriceLineSpec[]>(
+    () => levelsToPriceLines(activeLevels, effectiveLayers),
+    [activeLevels, effectiveLayers]
+  )
+
+  const toggleLayer = useCallback((key: keyof LevelLayers) => {
+    setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
+  }, [])
 
   const nextLabel = IMPULSE[annotations.length] ?? null
 
@@ -193,6 +235,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       setSymbol(next)
       setAnnotations([])
       setAutoNeedKey(false)
+      setActiveCount(0)
       auto.reset()
       resetCoach()
     },
@@ -271,18 +314,29 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                     : 'Live market data'}
               </span>
             </div>
-            <div className="tf-select" role="group" aria-label="Range">
-              {RANGES.map((r) => (
-                <button
-                  key={r.label}
-                  type="button"
-                  className={range.label === r.label ? 'on' : ''}
-                  aria-pressed={range.label === r.label}
-                  onClick={() => handleRange(r)}
-                >
-                  {r.label}
-                </button>
-              ))}
+            <div className="chart-head-right">
+              <div className="tf-select" role="group" aria-label="Range">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.label}
+                    type="button"
+                    className={range.label === r.label ? 'on' : ''}
+                    aria-pressed={range.label === r.label}
+                    onClick={() => handleRange(r)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={`pro-toggle${pro ? ' on' : ''}`}
+                aria-pressed={pro}
+                onClick={() => setPro((v) => !v)}
+                title="Pro: show Fibonacci/target layers and alternate counts"
+              >
+                Pro
+              </button>
             </div>
           </div>
 
@@ -301,10 +355,30 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 </button>
               )}
             </div>
+            {pro && activeLevels && (
+              <div className="layer-row" role="group" aria-label="Chart layers">
+                <span className="layer-lbl">Layers</span>
+                {(['invalidation', 'support', 'targets'] as const).map((key) => (
+                  <label key={key} className="layer-chk">
+                    <input
+                      type="checkbox"
+                      checked={layers[key]}
+                      onChange={() => toggleLayer(key)}
+                    />
+                    {key === 'invalidation'
+                      ? 'Invalidation'
+                      : key === 'support'
+                        ? 'Fib support'
+                        : 'Targets'}
+                  </label>
+                ))}
+              </div>
+            )}
             <div className="chart-stage">
               <PriceChart
                 candles={candles}
                 annotations={markers}
+                priceLines={priceLines}
                 onPointClick={handlePointClick}
                 theme={theme}
               />
@@ -359,6 +433,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             state={coachState}
             mode={mode}
             result={validation.data ?? null}
+            currentPrice={lastPrice}
             error={analysisError}
             onValidate={handleValidate}
             onAnalyze={handleAnalyze}
@@ -372,6 +447,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             sensitivity={sensitivity}
             sensitivities={SENSITIVITIES}
             onSensitivityChange={handleSensitivity}
+            pro={pro}
+            activeCount={activeCount}
+            onSelectCount={setActiveCount}
+            currentPrice={lastPrice}
             onRun={handleAutoAnalyze}
             onOpenSettings={onOpenSettings}
           />
