@@ -13,7 +13,7 @@
     <!-- Technical indicator calculations (RSI, MACD, EMA).
          Do NOT implement these yourself — Skender handles edge cases like
          Wilder's Smoothing for RSI and avoids precision pitfalls. -->
-    <PackageReference Include="Skender.Stock.Indicators" Version="2.6.1" />
+    <PackageReference Include="Skender.Stock.Indicators" Version="2.7.3" />
 
     <!-- Structured logging. Serilog over Microsoft.Extensions.Logging abstraction
          so we can swap sinks (Console → File → Seq) without code changes. -->
