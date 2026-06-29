@@ -7,6 +7,11 @@ interface AutoAnalysisPanelProps {
   state: AutoState
   data: AutoWaveAnalysisResponse | null
   error: string | null
+  /** Current ZigZag sensitivity (reversal threshold, %). */
+  sensitivity: number
+  /** Selectable sensitivity presets (%). */
+  sensitivities: readonly number[]
+  onSensitivityChange: (value: number) => void
   onRun: () => void
   onOpenSettings: () => void
 }
@@ -38,6 +43,9 @@ export default function AutoAnalysisPanel({
   state,
   data,
   error,
+  sensitivity,
+  sensitivities,
+  onSensitivityChange,
   onRun,
   onOpenSettings,
 }: AutoAnalysisPanelProps) {
@@ -50,14 +58,32 @@ export default function AutoAnalysisPanel({
           </h3>
           <p>Detect and rank Elliott Wave counts on live market data — no manual labels.</p>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={state === 'loading'}
-          onClick={onRun}
-        >
-          <Spark size={16} /> {state === 'loading' ? 'Analyzing…' : 'Auto-analyze'}
-        </button>
+        <div className="auto-actions">
+          <label className="auto-sens">
+            <span>Sensitivity</span>
+            <select
+              className="mono"
+              aria-label="Detection sensitivity (reversal threshold, percent)"
+              value={sensitivity}
+              disabled={state === 'loading'}
+              onChange={(e) => onSensitivityChange(Number(e.target.value))}
+            >
+              {sensitivities.map((s) => (
+                <option key={s} value={s}>
+                  {s}%
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={state === 'loading'}
+            onClick={onRun}
+          >
+            <Spark size={16} /> {state === 'loading' ? 'Analyzing…' : 'Auto-analyze'}
+          </button>
+        </div>
       </div>
 
       {state === 'needkey' && (

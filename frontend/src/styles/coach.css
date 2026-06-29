@@ -611,3 +611,37 @@
 .auto-rules li.neutral {
   color: var(--muted);
 }
+
+/* full-auto: action row (sensitivity + run button) */
+.auto-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: none;
+}
+.auto-sens {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.auto-sens select {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text);
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+.auto-sens select:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
