@@ -24,7 +24,18 @@ public sealed record WaveCandidate(
     WaveAnnotation Origin,
     IReadOnlyList<WaveAnnotation> Waves,
     WaveRuleReport RuleReport,
-    WaveLevels? Levels);
+    WaveLevels? Levels)
+{
+    /// <summary>
+    /// Nested parse tree behind this count (additive — null for candidates from the legacy
+    /// flat generator). The top-level geometry in <see cref="Waves"/> is the tree's first
+    /// level; the tree adds sub-wave structure, degrees and per-node rule reports.
+    /// </summary>
+    public WaveNode? Tree { get; init; }
+
+    /// <summary>Deterministic guideline score in [0, 1]; null for legacy candidates.</summary>
+    public decimal? Score { get; init; }
+}
 
 /// <summary>
 /// The LLM's pure ranking of the candidates (ids + prose only — no geometry). Paired with

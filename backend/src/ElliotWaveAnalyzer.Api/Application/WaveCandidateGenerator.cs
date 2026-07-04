@@ -79,6 +79,56 @@ public static class WaveCandidateGenerator
             .ToList();
     }
 
+    /// <summary>
+    /// Grammar-parser-backed candidate generation: nested, multi-structure counts (impulses,
+    /// diagonals, zigzags, flats, triangles with subdivided waves) instead of the flat
+    /// six-pivot impulse window of <see cref="Generate"/>. Candidates keep the same flat
+    /// top-level shape (origin + labelled waves + rule report) for contract compatibility and
+    /// additionally carry the parse tree and its deterministic score.
+    /// </summary>
+    /// <param name="pivots">Alternating pivots, finest scale, chronological.</param>
+    /// <param name="options">Scoring weights and search bounds; null for defaults.</param>
+    /// <param name="rootDegree">Degree assigned to top-level structures.</param>
+    /// <param name="cancellationToken">Cancellation for the search budget.</param>
+    /// <returns>The parsed candidates (best score first) and whether the search was
+    /// truncated by the evaluation budget.</returns>
+    public static (IReadOnlyList<WaveCandidate> Candidates, bool SearchTruncated) GenerateParsed(
+        IReadOnlyList<SwingPivot> pivots,
+        WaveScoringOptions? options = null,
+        WaveDegree rootDegree = WaveDegree.Primary,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pivots);
+
+        var parse = WaveGrammarParser.Parse(pivots, options, rootDegree, cancellationToken);
+        var candidates = new List<WaveCandidate>(parse.Trees.Count);
+
+        foreach (var (tree, index) in parse.Trees.Select((t, idx) => (t, idx)))
+        {
+            var root = tree.Root;
+            var origin = root.Start with { Label = "1" };
+            var waves = root.Children
+                .Select(c => new WaveAnnotation(c.End.Date, c.End.Price, c.Label))
+                .ToList();
+
+            // Forward levels are only defined for motive roots today; corrective projections
+            // arrive with the corrective ProjectionService support.
+            var isMotive = root.Kind is StructureKind.Impulse or StructureKind.Diagonal;
+            var levels = isMotive
+                ? ProjectionService.Project([origin, .. waves])
+                : null;
+
+            candidates.Add(new WaveCandidate(
+                index, root.Kind!.Value.ToString(), origin, waves, root.RuleReport!, levels)
+            {
+                Tree = root,
+                Score = tree.Score,
+            });
+        }
+
+        return (candidates, parse.SearchTruncated);
+    }
+
     private static bool Alternates(IReadOnlyList<SwingPivot> window)
     {
         for (var i = 1; i < window.Count; i++)
