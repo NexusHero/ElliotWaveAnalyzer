@@ -1,4 +1,5 @@
 using ElliotWaveAnalyzer.Api.Application;
+using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 using ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -35,6 +36,27 @@ internal static class ReportingExtensions
             services.AddHostedService<DailyReportBackgroundService>();
         }
 
+        AddAlertServices(services, configuration);
+
         return services;
+    }
+
+    /// <summary>
+    /// Price alerts (opt-in via Alerts:Enabled). Re-evaluates saved analyses and notifies on
+    /// invalidation/target through the same delivery channels as the daily report.
+    /// </summary>
+    private static void AddAlertServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<AlertOptions>()
+            .BindConfiguration(AlertOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddScoped<IAlertService, AlertService>();
+
+        if (configuration.GetValue<bool>($"{AlertOptions.SectionName}:Enabled"))
+        {
+            services.AddHostedService<AlertBackgroundService>();
+        }
     }
 }

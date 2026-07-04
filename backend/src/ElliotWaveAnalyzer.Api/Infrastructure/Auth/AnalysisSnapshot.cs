@@ -1,3 +1,5 @@
+using ElliotWaveAnalyzer.Api.Domain;
+
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 
 /// <summary>
@@ -29,4 +31,10 @@ internal sealed class AnalysisSnapshot
 
     public string Confidence { get; set; } = string.Empty;
     public decimal? Score { get; set; }
+
+    /// <summary>
+    /// The outcome this analysis was last alerted on. Starts at <see cref="AnalysisOutcome.Pending"/>;
+    /// advanced to a terminal outcome once an alert has fired, so a transition alerts exactly once.
+    /// </summary>
+    public AnalysisOutcome AlertedOutcome { get; set; } = AnalysisOutcome.Pending;
 }
