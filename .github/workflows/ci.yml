@@ -75,7 +75,9 @@ jobs:
           badge: true
           format: markdown
           output: both
-          thresholds: '60 80'
+          # Target is 90% line coverage (ADR-007). Still advisory (continue-on-error)
+          # until the CI-measured baseline confirms ≥90%, then flip to blocking.
+          thresholds: '90 90'
         continue-on-error: true
 
       - name: Upload coverage

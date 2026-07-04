@@ -32,8 +32,9 @@ Closes #
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
 - [ ] New tests use the `Subject_StateUnderTest_ExpectedBehaviour` naming convention
 - [ ] New backend services depend on interfaces, not concrete types (SOLID)
+- [ ] Line coverage stays ≥ 90% (business logic in pure, testable classes)
 - [ ] No API keys or secrets are committed
-- [ ] Docs/ADRs updated if behavior or architecture changed
+- [ ] **Architecture Governance** (for architecturally-relevant changes): ADR added to `docs/architecture.md` §9 · Requirements Register (§1) updated · sequence diagram added/updated in the Runtime View (§6) for a fulfilled requirement · affected §5/§6/§8 prose corrected
 - [ ] I have read and agree to the [Code of Conduct](../CODE_OF_CONDUCT.md)
 
 ## Screenshots / notes

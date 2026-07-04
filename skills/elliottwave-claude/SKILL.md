@@ -81,6 +81,10 @@ A task is done only when the PR exists and **all** CI checks are green:
 
 Never consider a task finished from a green local run alone — CI builds the committed tree.
 
+For any architecturally-relevant change, the PR is not done without its documentation — see
+`elliottwave-agents` → **Architecture Governance**: an ADR, the Requirements Register, a Runtime-View
+sequence diagram for the fulfilled requirement, and ≥90% coverage are Quality Gates, not extras.
+
 ---
 
 ## Slash Commands
