@@ -63,9 +63,9 @@ public static class WaveCandidateGenerator
             countPivots.AddRange(waves);
 
             var report = ElliottRuleChecker.Check(countPivots);
-            if (report.Rules.Any(r => r.Status == RuleStatus.Fail))
+            if (report.Rules.Any(r => r is { Status: RuleStatus.Fail, IsGuideline: false }))
             {
-                continue;
+                continue; // hard-rule violations disqualify; failed guidelines only flavor
             }
 
             var levels = ProjectionService.Project(countPivots);
