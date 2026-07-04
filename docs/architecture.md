@@ -56,7 +56,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 (PR #82) · ADR-007 | Fulfilled |
 | REQ-006 | Track-record history UI + save action in the auto-analysis panel | #83 (PR #84) · §6 Scenario 5 | Fulfilled |
 | REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | #89 · ADR-012 · §6 Scenario 6 | Fulfilled |
-| REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
+| REQ-008 | LLM-confidence calibration against recorded track-record outcomes | #91 · §6 Scenario 7 | Fulfilled |
 | REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
@@ -464,6 +464,26 @@ sequenceDiagram
     end
     AS->>DB: SaveChanges (advanced outcomes)
     AS-->>Cron: alerts delivered (count)
+```
+
+## Scenario 7 — Confidence Calibration (REQ-008) {#_runtime_scenario_7}
+
+Whether the AI's confidence has held up. The endpoint reuses the track record's live-evaluated
+outcomes and aggregates them with the pure calculator — a thin handler, no new state.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as /api/analyses/calibration
+    participant TRS as ITrackRecordService
+    participant Calc as CalibrationCalculator (pure)
+
+    Browser->>API: GET /api/analyses/calibration
+    API->>TRS: ListAsync(userId) → TrackedAnalysis[] (outcomes evaluated live)
+    TRS-->>API: analyses
+    API->>Calc: Calculate((confidence, outcome) pairs)
+    Calc-->>API: buckets (per confidence: total/concluded/targetReached/hitRate) + overall
+    API-->>Browser: 200 ConfidenceCalibration
 ```
 
 ---

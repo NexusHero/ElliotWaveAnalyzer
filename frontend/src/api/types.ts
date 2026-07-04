@@ -237,3 +237,21 @@ export interface TrackedAnalysis {
 export interface SavedAnalysisResponse {
   id: string
 }
+
+/** One confidence level's calibration against recorded outcomes (mirrors `CalibrationBucket`). */
+export interface CalibrationBucket {
+  confidence: string
+  total: number
+  concluded: number
+  targetReached: number
+  invalidated: number
+  /** targetReached ÷ concluded, in [0, 1]; null when none have concluded. */
+  hitRate: number | null
+}
+
+/** Response of `GET /api/analyses/calibration` — mirrors the backend `ConfidenceCalibration`. */
+export interface ConfidenceCalibration {
+  buckets: CalibrationBucket[]
+  totalConcluded: number
+  overallHitRate: number | null
+}
