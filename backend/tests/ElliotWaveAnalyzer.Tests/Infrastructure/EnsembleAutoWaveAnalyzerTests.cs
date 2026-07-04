@@ -2,7 +2,6 @@ using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -10,11 +9,41 @@ namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 
 /// <summary>
 /// Tests the multi-provider <see cref="EnsembleAutoWaveAnalyzer"/>: only key-configured
-/// providers participate, token usage is summed, and rankings are merged into a consensus.
+/// providers participate, a provider whose client fails is skipped, token usage is summed, and
+/// rankings are merged into a consensus. Uses a fake <see cref="IChatClientResolver"/> so no
+/// service provider is needed.
 /// </summary>
 [TestFixture]
 public sealed class EnsembleAutoWaveAnalyzerTests
 {
+    /// <summary>Fake resolver: returns a client per key, or throws for keys marked as failing.</summary>
+    private sealed class FakeChatClientResolver : IChatClientResolver
+    {
+        private readonly Dictionary<string, IChatClient> _clients = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _failing = new(StringComparer.OrdinalIgnoreCase);
+
+        public FakeChatClientResolver Add(string key, IChatClient client)
+        {
+            _clients[key] = client;
+            return this;
+        }
+
+        public FakeChatClientResolver Fail(string key)
+        {
+            _failing.Add(key);
+            return this;
+        }
+
+        public IChatClient Resolve(string providerKey)
+        {
+            if (_failing.Contains(providerKey))
+            {
+                throw new InvalidOperationException($"{providerKey} client unavailable");
+            }
+            return _clients[providerKey];
+        }
+    }
+
     private static readonly DateTime Day = new(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static WaveCandidate Candidate(int id) =>
@@ -46,13 +75,9 @@ public sealed class EnsembleAutoWaveAnalyzerTests
 
     private static EnsembleAutoWaveAnalyzer Build(out LlmProviderOptions opts, string geminiBest, string claudeBest)
     {
-        var gemini = new FakeChatClient { ResponseJson = geminiBest };
-        var claude = new FakeChatClient { ResponseJson = claudeBest };
-
-        var sp = new ServiceCollection()
-            .AddKeyedSingleton<IChatClient>("gemini", gemini)
-            .AddKeyedSingleton<IChatClient>("claude", claude)
-            .BuildServiceProvider();
+        var resolver = new FakeChatClientResolver()
+            .Add("gemini", new FakeChatClient { ResponseJson = geminiBest })
+            .Add("claude", new FakeChatClient { ResponseJson = claudeBest });
 
         // Gemini + Claude have keys; OpenAI is left empty so it must be excluded.
         opts = new LlmProviderOptions
@@ -63,7 +88,7 @@ public sealed class EnsembleAutoWaveAnalyzerTests
         };
 
         return new EnsembleAutoWaveAnalyzer(
-            sp, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
     }
 
     [Test]
@@ -104,12 +129,56 @@ public sealed class EnsembleAutoWaveAnalyzerTests
     }
 
     [Test]
+    public async Task OneProviderClientFails_ItIsSkipped_TheOtherStillRanks()
+    {
+        // Claude's client throws on resolve; Gemini succeeds. The ensemble tolerates the
+        // failure and returns Gemini's ranking alone.
+        var resolver = new FakeChatClientResolver()
+            .Add("gemini", new FakeChatClient { ResponseJson = Ranking(0, "Gemini") })
+            .Fail("claude");
+        var opts = new LlmProviderOptions
+        {
+            Active = "Gemini",
+            Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gm" },
+            Claude = new LlmEndpointOptions { ApiKey = "c-key", Model = "cm" },
+        };
+        var analyzer = new EnsembleAutoWaveAnalyzer(
+            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+
+        var result = await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Ranking.BestCandidateId, Is.EqualTo(0));
+            Assert.That(result.Usage.Provider, Does.Contain("Gemini").And.Not.Contains("Claude"));
+            Assert.That(result.Usage.TotalTokens, Is.EqualTo(150)); // only Gemini ran
+        });
+    }
+
+    [Test]
+    public void AllProvidersFail_Throws()
+    {
+        var resolver = new FakeChatClientResolver().Fail("gemini").Fail("claude");
+        var opts = new LlmProviderOptions
+        {
+            Active = "Gemini",
+            Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gm" },
+            Claude = new LlmEndpointOptions { ApiKey = "c-key", Model = "cm" },
+        };
+        var analyzer = new EnsembleAutoWaveAnalyzer(
+            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => analyzer.RankAsync("BTC", [], [Candidate(0)]));
+    }
+
+    [Test]
     public void NoProviderHasKey_Throws()
     {
-        var sp = new ServiceCollection().BuildServiceProvider();
+        var resolver = new FakeChatClientResolver(); // no clients registered
         var opts = new LlmProviderOptions { Active = "Gemini" }; // all keys empty
         var analyzer = new EnsembleAutoWaveAnalyzer(
-            sp, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
 
         Assert.ThrowsAsync<InvalidOperationException>(
             () => analyzer.RankAsync("BTC", [], [Candidate(0)]));
