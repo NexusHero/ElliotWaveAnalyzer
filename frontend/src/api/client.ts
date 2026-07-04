@@ -1,7 +1,10 @@
 import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
+  SavedAnalysisResponse,
   TechnicalAnalysisResult,
+  TrackAnalysisRequest,
+  TrackedAnalysis,
   WaveAnalysisResponse,
   WaveValidationRequest,
 } from './types'
@@ -71,6 +74,48 @@ export async function getMarketData(
   }
 
   return (await response.json()) as TechnicalAnalysisResult
+}
+
+/** Saves an analysis to the track record via `POST /api/analyses`. */
+export async function saveAnalysis(
+  request: TrackAnalysisRequest,
+  signal?: AbortSignal
+): Promise<SavedAnalysisResponse> {
+  const response = await fetch('/api/analyses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as SavedAnalysisResponse
+}
+
+/** Lists the user's saved analyses (newest first, each with its evaluated outcome). */
+export async function listAnalyses(signal?: AbortSignal): Promise<TrackedAnalysis[]> {
+  const response = await fetch('/api/analyses', { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as TrackedAnalysis[]
+}
+
+/** Deletes a saved analysis via `DELETE /api/analyses/{id}`. */
+export async function deleteAnalysis(id: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`/api/analyses/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    signal,
+  })
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorDetail(response))
+  }
 }
 
 /** The authenticated user, as returned by `GET /api/auth/me`. */

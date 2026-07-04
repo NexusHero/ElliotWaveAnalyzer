@@ -632,6 +632,101 @@
   gap: 6px;
   flex: none;
 }
+
+/* "Save to track record" action on a ranked count */
+.save-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: 99px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+.save-count:hover:not(:disabled) {
+  color: var(--acc-strong);
+  border-color: var(--acc-line);
+}
+.save-count:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ---------- track record ---------- */
+.track-record {
+  margin-top: 14px;
+}
+.tr-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin: 0;
+}
+.tr-head p {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 3px 0 10px;
+}
+.tr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tr-item {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  padding: 11px 12px;
+  background: var(--card-2);
+}
+.tr-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tr-symbol {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.tr-structure {
+  font-size: 12.5px;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+.tr-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 6px;
+}
+.tr-delete:hover:not(:disabled) {
+  color: var(--fail);
+}
+.tr-delete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tr-item-meta {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 6px;
+  line-height: 1.6;
+}
 .score-badge {
   font-size: 10.5px;
   font-weight: 700;
