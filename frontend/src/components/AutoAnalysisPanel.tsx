@@ -1,4 +1,10 @@
-import type { AutoWaveAnalysisResponse, RankedWaveCount, RuleStatus } from '../api/types'
+import type {
+  AutoWaveAnalysisResponse,
+  RankedWaveCount,
+  RuleResult,
+  RuleStatus,
+  WaveNode,
+} from '../api/types'
 import { Alert, CheckCircle, Lock, Spark, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
 
@@ -29,14 +35,25 @@ function fmtMoney(value: number): string {
   return '$' + Math.round(value).toLocaleString('en-US')
 }
 
-function ruleClass(status: RuleStatus): string {
-  return status === 'Pass' ? 'ok' : status === 'Fail' ? 'bad' : 'neutral'
+/**
+ * Colour class for a rule row. A failed *guideline* is amber (neutral), not red — it flavors
+ * the count but does not invalidate it, so it must not read like a hard-rule violation.
+ */
+function ruleClass(rule: RuleResult): string {
+  if (rule.status === 'Pass') return 'ok'
+  if (rule.status === 'Fail') return rule.isGuideline ? 'neutral' : 'bad'
+  return 'neutral'
 }
 
 function RuleMark({ status }: { status: RuleStatus }) {
   if (status === 'Pass') return <CheckCircle size={14} />
   if (status === 'Fail') return <XMark size={14} />
   return <span style={{ width: 8, height: 2, background: 'currentColor', borderRadius: 2 }} />
+}
+
+/** Formats a deterministic 0–1 score to two decimals, e.g. 0.82. */
+function fmtScore(value: number): string {
+  return value.toFixed(2)
 }
 
 /**
@@ -174,6 +191,13 @@ function AutoResult({
         <p>{data.marketSummary}</p>
       </div>
 
+      {data.searchTruncated && (
+        <p className="auto-truncated">
+          The structure search was large, so coverage was bounded — these counts are valid, but
+          rarer alternatives may not have been explored.
+        </p>
+      )}
+
       {showTabs && (
         <div className="count-tabs" role="group" aria-label="Wave counts">
           {data.rankings.map((c, i) => (
@@ -223,10 +247,20 @@ function RankedCount({
           {count.structure}
           {count.isBest && <span className="best-tag">Most likely</span>}
         </button>
-        <span
-          className={`verdict-badge ${count.confidence === 'high' ? 'ok' : count.confidence === 'low' ? 'bad' : 'neutral'}`}
-        >
-          {count.confidence} confidence
+        <span className="auto-count-badges">
+          {count.score != null && (
+            <span
+              className="score-badge mono"
+              title="Deterministic guideline score (0–1): Fibonacci fit, alternation, channel, timing"
+            >
+              score {fmtScore(count.score)}
+            </span>
+          )}
+          <span
+            className={`verdict-badge ${count.confidence === 'high' ? 'ok' : count.confidence === 'low' ? 'bad' : 'neutral'}`}
+          >
+            {count.confidence} confidence
+          </span>
         </span>
       </div>
 
@@ -242,11 +276,14 @@ function RankedCount({
 
       <ul className="auto-rules">
         {count.ruleReport.rules.map((rule, i) => (
-          <li key={i} className={ruleClass(rule.status)}>
+          <li key={i} className={ruleClass(rule)}>
             <RuleMark status={rule.status} /> {rule.name}
+            {rule.isGuideline && <span className="guideline-tag">guideline</span>}
           </li>
         ))}
       </ul>
+
+      {count.tree && <WaveTree root={count.tree} />}
 
       {count.rationale && (
         <div className="reflection-block">
@@ -259,6 +296,49 @@ function RankedCount({
           <span className="rb-label">Outlook</span>
           <p>{count.outlook}</p>
         </div>
+      )}
+    </li>
+  )
+}
+
+/**
+ * The nested subdivision of a count: each wave rendered with the structure it breaks down
+ * into (or "terminal" for an unsubdivided leg), its Elliott degree, and its per-node score.
+ * Only shown when at least one wave actually subdivides — a flat impulse of five terminal
+ * legs adds no information and is omitted. Recursion is indented via nested lists.
+ */
+function WaveTree({ root }: { root: WaveNode }) {
+  const hasSubdivision = root.children.some((child) => child.children.length > 0)
+  if (!hasSubdivision) return null
+
+  return (
+    <div className="wave-tree" data-testid="wave-tree">
+      <span className="rb-label">Internal structure</span>
+      <ul className="wave-tree-list">
+        {root.children.map((child, i) => (
+          <WaveTreeNode key={i} node={child} />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function WaveTreeNode({ node }: { node: WaveNode }) {
+  const isTerminal = node.children.length === 0
+  return (
+    <li className="wave-tree-node">
+      <div className="wave-tree-row">
+        <b className="wave-tree-label">{node.label}</b>
+        <span className="wave-tree-kind">{isTerminal ? 'terminal leg' : node.kind}</span>
+        <span className="wave-tree-degree">{node.degree}</span>
+        {!isTerminal && <span className="wave-tree-score mono">{fmtScore(node.score)}</span>}
+      </div>
+      {!isTerminal && (
+        <ul className="wave-tree-list">
+          {node.children.map((child, i) => (
+            <WaveTreeNode key={i} node={child} />
+          ))}
+        </ul>
       )}
     </li>
   )

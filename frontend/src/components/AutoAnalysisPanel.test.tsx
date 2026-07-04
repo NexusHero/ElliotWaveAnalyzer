@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { AutoWaveAnalysisResponse, RankedWaveCount, WaveLevels } from '../api/types'
+import type { AutoWaveAnalysisResponse, RankedWaveCount, WaveLevels, WaveNode } from '../api/types'
 import AutoAnalysisPanel from './AutoAnalysisPanel'
 
 // Stub LevelsSummary so we don't need real WaveLevels geometry in every test.
@@ -35,6 +35,51 @@ const sampleData: AutoWaveAnalysisResponse = {
   rankings: [bestCount],
   marketSummary: 'Strong bullish impulse in progress',
   usage: { provider: 'Gemini', promptTokens: 200, completionTokens: 100, totalTokens: 300 },
+}
+
+/** An impulse whose Wave 2 subdivides into a zigzag and Wave 4 into a terminal leg. */
+const nestedTree: WaveNode = {
+  label: 'Impulse',
+  kind: 'Impulse',
+  degree: 'Primary',
+  start: { date: '2024-01-01T00:00:00Z', price: 40000, label: '0' },
+  end: { date: '2024-03-01T00:00:00Z', price: 52000, label: '5' },
+  score: 0.82,
+  children: [
+    {
+      label: '1',
+      degree: 'Intermediate',
+      start: { date: '2024-01-01T00:00:00Z', price: 40000, label: '1' },
+      end: { date: '2024-01-10T00:00:00Z', price: 45000, label: '1' },
+      score: 0.5,
+      children: [],
+    },
+    {
+      label: '2',
+      kind: 'Zigzag',
+      degree: 'Intermediate',
+      start: { date: '2024-01-10T00:00:00Z', price: 45000, label: '2' },
+      end: { date: '2024-01-20T00:00:00Z', price: 42000, label: '2' },
+      score: 0.71,
+      children: [
+        {
+          label: 'A',
+          degree: 'Minor',
+          start: { date: '2024-01-10T00:00:00Z', price: 45000, label: 'A' },
+          end: { date: '2024-01-14T00:00:00Z', price: 43000, label: 'A' },
+          score: 0.5,
+          children: [],
+        },
+      ],
+    },
+  ],
+}
+
+const nestedCount: RankedWaveCount = {
+  ...bestCount,
+  structure: 'Impulse',
+  score: 0.82,
+  tree: nestedTree,
 }
 
 function renderPanel(overrides: Partial<Parameters<typeof AutoAnalysisPanel>[0]> = {}) {
@@ -196,6 +241,73 @@ describe('AutoAnalysisPanel', () => {
       })
       await user.click(screen.getByRole('button', { name: /alt 1/i }))
       expect(props.onSelectCount).toHaveBeenCalledWith(1)
+    })
+  })
+
+  describe('deterministic score (AC1)', () => {
+    it('shows the guideline score when the count carries one', () => {
+      renderPanel({ state: 'result', data: { ...sampleData, rankings: [nestedCount] } })
+      expect(screen.getByText(/score 0\.82/i)).toBeInTheDocument()
+    })
+
+    it('does not show a score for legacy counts without one', () => {
+      renderPanel({ state: 'result', data: sampleData })
+      expect(screen.queryByText(/score/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('nested subdivision (AC2)', () => {
+    it('renders each subdivided wave with its structure and degree', () => {
+      renderPanel({ state: 'result', data: { ...sampleData, rankings: [nestedCount] } })
+      // Wave 2 subdivides into a Zigzag at Intermediate degree.
+      const subdivision = screen.getByTestId('wave-tree')
+      expect(subdivision).toHaveTextContent(/Zigzag/i)
+      expect(subdivision).toHaveTextContent(/Intermediate/i)
+    })
+
+    it('marks terminal (unsubdivided) legs as such', () => {
+      renderPanel({ state: 'result', data: { ...sampleData, rankings: [nestedCount] } })
+      // Wave 1 has no children — it should read as a terminal leg.
+      expect(screen.getByTestId('wave-tree')).toHaveTextContent(/terminal/i)
+    })
+
+    it('renders no tree for legacy counts without one', () => {
+      renderPanel({ state: 'result', data: sampleData })
+      expect(screen.queryByTestId('wave-tree')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('guideline vs hard rule (AC3)', () => {
+    it('labels a failed guideline distinctly from a failed hard rule', () => {
+      const withGuideline: RankedWaveCount = {
+        ...bestCount,
+        ruleReport: {
+          bullishAssumed: true,
+          rules: [
+            { name: 'Wave 4 must not overlap Wave 1', status: 'Fail', detail: '' },
+            { name: 'Zigzag C extends beyond A', status: 'Fail', detail: '', isGuideline: true },
+          ],
+          ratios: [],
+        },
+      }
+      renderPanel({ state: 'result', data: { ...sampleData, rankings: [withGuideline] } })
+      // The guideline failure is tagged as a guideline, not an invalidation.
+      expect(screen.getByText(/guideline/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('search truncation note (AC4)', () => {
+    it('shows a note when the search was truncated', () => {
+      renderPanel({
+        state: 'result',
+        data: { ...sampleData, rankings: [nestedCount], searchTruncated: true },
+      })
+      expect(screen.getByText(/coverage was bounded|partial|truncated/i)).toBeInTheDocument()
+    })
+
+    it('shows no note when the search completed', () => {
+      renderPanel({ state: 'result', data: { ...sampleData, rankings: [nestedCount] } })
+      expect(screen.queryByText(/coverage was bounded|truncated/i)).not.toBeInTheDocument()
     })
   })
 
