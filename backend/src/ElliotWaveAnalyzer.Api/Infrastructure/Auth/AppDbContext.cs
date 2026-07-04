@@ -12,6 +12,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
 {
     public DbSet<UserSession> Sessions => Set<UserSession>();
+    public DbSet<AnalysisSnapshot> AnalysisSnapshots => Set<AnalysisSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -23,6 +24,16 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(s => s.TokenHash).HasMaxLength(64).IsRequired();
             entity.HasIndex(s => s.TokenHash).IsUnique();
             entity.HasIndex(s => s.UserId);
+        });
+
+        builder.Entity<AnalysisSnapshot>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Symbol).HasMaxLength(32).IsRequired();
+            entity.Property(s => s.Structure).HasMaxLength(64).IsRequired();
+            entity.Property(s => s.Confidence).HasMaxLength(16).IsRequired();
+            // List the newest first per user — the history's natural order.
+            entity.HasIndex(s => new { s.UserId, s.CreatedAt });
         });
     }
 }

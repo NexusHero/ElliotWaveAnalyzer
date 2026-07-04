@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Endpoints;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure;
@@ -16,6 +17,9 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 [JsonSerializable(typeof(TokenUsageReport))]
 [JsonSerializable(typeof(AutoWaveAnalysisResponse))]
 [JsonSerializable(typeof(WaveLevels))]
+[JsonSerializable(typeof(IReadOnlyList<TrackedAnalysis>))]
+[JsonSerializable(typeof(TrackAnalysisRequest))]
+[JsonSerializable(typeof(SavedAnalysisResponse))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

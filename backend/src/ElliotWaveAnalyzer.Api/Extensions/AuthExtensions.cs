@@ -40,6 +40,7 @@ internal static class AuthExtensions
             .AddEntityFrameworkStores<AppDbContext>();
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ITrackRecordService, TrackRecordService>();
 
         var authBuilder = services
             .AddAuthentication(SessionAuthenticationHandler.SchemeName)
