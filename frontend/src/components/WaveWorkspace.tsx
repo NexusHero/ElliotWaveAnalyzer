@@ -1,13 +1,28 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { autoAnalyzeWaves, getMarketData, validateWaveCount } from '../api/client'
-import { type MarketCandle, WAVE_LABELS, type WaveAnnotation, type WaveLevels } from '../api/types'
+import {
+  autoAnalyzeWaves,
+  deleteAnalysis,
+  getMarketData,
+  listAnalyses,
+  saveAnalysis,
+  validateWaveCount,
+} from '../api/client'
+import {
+  type MarketCandle,
+  type RankedWaveCount,
+  WAVE_LABELS,
+  type WaveAnnotation,
+  type WaveLevels,
+} from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
 import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
+import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
+import { toTrackAnalysisRequest } from './trackRecord'
 
 /**
  * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
@@ -108,6 +123,38 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const auto = useMutation({
     mutationFn: () => autoAnalyzeWaves({ symbol, thresholdPercent: sensitivity }),
   })
+
+  // ── Track record: save a ranked count, list saved ones with their outcome ──
+  const queryClient = useQueryClient()
+  const trackRecordQuery = useQuery({
+    queryKey: ['analyses'],
+    queryFn: ({ signal }) => listAnalyses(signal),
+  })
+  const saveMutation = useMutation({
+    mutationFn: (count: RankedWaveCount) => saveAnalysis(toTrackAnalysisRequest(symbol, count)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteAnalysis(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+  })
+
+  const handleSaveCount = useCallback(
+    (count: RankedWaveCount) => saveMutation.mutate(count),
+    [saveMutation]
+  )
+  const handleDeleteAnalysis = useCallback(
+    (id: string) => deleteMutation.mutate(id),
+    [deleteMutation]
+  )
+
+  const trackRecordState: TrackRecordState = trackRecordQuery.isLoading
+    ? 'loading'
+    : trackRecordQuery.isError
+      ? 'error'
+      : 'result'
+  const trackRecordError =
+    trackRecordQuery.error instanceof Error ? trackRecordQuery.error.message : null
 
   const handleSensitivity = useCallback(
     (value: number) => {
@@ -453,6 +500,16 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             currentPrice={lastPrice}
             onRun={handleAutoAnalyze}
             onOpenSettings={onOpenSettings}
+            onSaveCount={handleSaveCount}
+            savePending={saveMutation.isPending}
+          />
+
+          <TrackRecordPanel
+            state={trackRecordState}
+            analyses={trackRecordQuery.data ?? []}
+            error={trackRecordError}
+            deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
+            onDelete={handleDeleteAnalysis}
           />
         </div>
       </div>

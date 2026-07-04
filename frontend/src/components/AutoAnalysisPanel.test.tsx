@@ -296,6 +296,31 @@ describe('AutoAnalysisPanel', () => {
     })
   })
 
+  describe('save to track record', () => {
+    it('renders a Save button per count when onSaveCount is provided', () => {
+      renderPanel({ state: 'result', data: sampleData, onSaveCount: vi.fn() })
+      expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    })
+
+    it('does not render a Save button when onSaveCount is omitted', () => {
+      renderPanel({ state: 'result', data: sampleData })
+      expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument()
+    })
+
+    it('calls onSaveCount with the count when Save is clicked', async () => {
+      const user = userEvent.setup()
+      const onSaveCount = vi.fn()
+      renderPanel({ state: 'result', data: sampleData, onSaveCount })
+      await user.click(screen.getByRole('button', { name: /save/i }))
+      expect(onSaveCount).toHaveBeenCalledWith(bestCount)
+    })
+
+    it('disables the Save button while a save is pending', () => {
+      renderPanel({ state: 'result', data: sampleData, onSaveCount: vi.fn(), savePending: true })
+      expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
+    })
+  })
+
   describe('search truncation note (AC4)', () => {
     it('shows a note when the search was truncated', () => {
       renderPanel({

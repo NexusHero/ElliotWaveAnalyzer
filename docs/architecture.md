@@ -54,7 +54,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-003 | Surface the nested count (subdivisions, degree, score) in the auto-analysis UI | #77 (PR #78) | Fulfilled |
 | REQ-004 | Persist analyses per user and evaluate each outcome (held / invalidated / target reached) against real price action | #79 (PR #80) · ADR-010 · §6 Scenario 4 | Fulfilled |
 | REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 (PR #82) · ADR-007 | Fulfilled |
-| REQ-006 | Track-record history UI + save action in the auto-analysis panel | planned | Proposed |
+| REQ-006 | Track-record history UI + save action in the auto-analysis panel | #83 · §6 Scenario 5 | Fulfilled |
 | REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | planned | Proposed |
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
 
@@ -397,6 +397,38 @@ sequenceDiagram
     end
     TRS-->>API: TrackedAnalysis[] (geometry + evaluated outcome)
     API-->>Browser: 200 TrackedAnalysis[]
+```
+
+## Scenario 5 — Track Record UI: Save a Count, Review Outcomes (REQ-006) {#_runtime_scenario_5}
+
+The frontend side of the track record. `AutoAnalysisPanel` raises a save with the ranked count;
+`WaveWorkspace` maps it to the API payload (`toTrackAnalysisRequest`) and drives the mutation, then
+invalidates the `['analyses']` query so `TrackRecordPanel` re-renders with the fresh list and its
+outcome badges. No new backend — this consumes the Scenario-4 endpoints (hence no ADR).
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant AAP as AutoAnalysisPanel
+    participant WW as WaveWorkspace
+    participant Query as TanStack Query
+    participant API as /api/analyses
+    participant TRP as TrackRecordPanel
+
+    User->>AAP: click "Save" on a ranked count
+    AAP->>WW: onSaveCount(count)
+    WW->>WW: toTrackAnalysisRequest(symbol, count)
+    WW->>Query: saveMutation.mutate(request)
+    Query->>API: POST /api/analyses
+    API-->>Query: 201 { id }
+    Query->>Query: invalidateQueries(['analyses'])
+    Query->>API: GET /api/analyses
+    API-->>Query: TrackedAnalysis[] (with evaluated outcome)
+    Query-->>TRP: analyses
+    TRP-->>User: list with Pending / Invalidated / Target-reached badges
+    User->>TRP: click delete on a row
+    TRP->>WW: onDelete(id)
+    WW->>Query: deleteMutation.mutate(id) → DELETE, then invalidate ['analyses']
 ```
 
 ---

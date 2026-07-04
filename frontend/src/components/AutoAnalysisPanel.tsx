@@ -5,7 +5,7 @@ import type {
   RuleStatus,
   WaveNode,
 } from '../api/types'
-import { Alert, CheckCircle, Lock, Spark, XMark } from './Icons'
+import { Alert, CheckCircle, Lock, Seal, Spark, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
 
 export type AutoState = 'idle' | 'needkey' | 'loading' | 'result' | 'error'
@@ -28,6 +28,10 @@ interface AutoAnalysisPanelProps {
   currentPrice: number | null
   onRun: () => void
   onOpenSettings: () => void
+  /** Saves a ranked count to the track record. Omit to hide the Save action. */
+  onSaveCount?: (count: RankedWaveCount) => void
+  /** True while a save is in flight (disables the Save buttons). */
+  savePending?: boolean
 }
 
 /** Formats a price as a whole-dollar amount with thousands separators. */
@@ -77,6 +81,8 @@ export default function AutoAnalysisPanel({
   currentPrice,
   onRun,
   onOpenSettings,
+  onSaveCount,
+  savePending,
 }: AutoAnalysisPanelProps) {
   return (
     <section className="auto-panel" aria-label="Full-auto analysis">
@@ -153,6 +159,8 @@ export default function AutoAnalysisPanel({
           activeCount={activeCount}
           onSelectCount={onSelectCount}
           currentPrice={currentPrice}
+          onSaveCount={onSaveCount}
+          savePending={savePending}
         />
       )}
     </section>
@@ -165,12 +173,16 @@ function AutoResult({
   activeCount,
   onSelectCount,
   currentPrice,
+  onSaveCount,
+  savePending,
 }: {
   data: AutoWaveAnalysisResponse
   pro: boolean
   activeCount: number
   onSelectCount: (index: number) => void
   currentPrice: number | null
+  onSaveCount?: (count: RankedWaveCount) => void
+  savePending?: boolean
 }) {
   if (data.rankings.length === 0) {
     return (
@@ -224,6 +236,8 @@ function AutoResult({
             count={count}
             active={i === activeCount}
             onSelect={() => onSelectCount(i)}
+            onSaveCount={onSaveCount}
+            savePending={savePending}
           />
         ))}
       </ul>
@@ -235,10 +249,14 @@ function RankedCount({
   count,
   active,
   onSelect,
+  onSaveCount,
+  savePending,
 }: {
   count: RankedWaveCount
   active: boolean
   onSelect: () => void
+  onSaveCount?: (count: RankedWaveCount) => void
+  savePending?: boolean
 }) {
   return (
     <li className={`auto-count${count.isBest ? ' best' : ''}${active ? ' active' : ''}`}>
@@ -261,6 +279,16 @@ function RankedCount({
           >
             {count.confidence} confidence
           </span>
+          {onSaveCount && (
+            <button
+              type="button"
+              className="save-count"
+              disabled={savePending}
+              onClick={() => onSaveCount(count)}
+            >
+              <Seal size={13} /> Save
+            </button>
+          )}
         </span>
       </div>
 
