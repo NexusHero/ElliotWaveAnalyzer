@@ -24,6 +24,7 @@ public sealed class TechnicalAnalysisService(
     public async Task<TechnicalAnalysisResult> GetAnalysisAsync(
         string symbol,
         int days = 90,
+        CandleInterval interval = CandleInterval.OneDay,
         CancellationToken cancellationToken = default)
     {
         var provider = _providers.FirstOrDefault(p => p.Supports(symbol))
@@ -33,12 +34,13 @@ public sealed class TechnicalAnalysisService(
                 nameof(symbol));
 
         logger.LogInformation(
-            "Analysing {Symbol} ({Days} days) using {Provider}",
-            symbol, days, provider.GetType().Name);
+            "Analysing {Symbol} ({Days} days, {Interval}) using {Provider}",
+            symbol, days, interval, provider.GetType().Name);
 
-        var candles = await provider.GetCandlesAsync(symbol, days, cancellationToken);
+        var daily = await provider.GetCandlesAsync(symbol, days, cancellationToken);
+        var candles = CandleResampler.Resample(daily, interval);
 
-        // Run RSI and MACD on the same candle set — the calculator is stateless.
+        // Run RSI and MACD on the presented (resampled) series — the calculator is stateless.
         var rsi = calculator.CalculateRsi(candles);
         var macd = calculator.CalculateMacd(candles);
 

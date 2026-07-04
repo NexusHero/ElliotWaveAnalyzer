@@ -24,6 +24,9 @@ public static class MarketDataEndpoints
             .WithDescription("""
                 Supported symbols: BTC, ETH (CoinGecko free tier);
                 NASDAQ, SP500 (Yahoo Finance).
+                Optional 'interval' selects the timeframe: '1d' (daily, default) or '1w'
+                (weekly, resampled from the daily candles). Indicators are computed on the
+                selected timeframe.
                 """)
             .Produces<TechnicalAnalysisResult>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -41,6 +44,7 @@ public static class MarketDataEndpoints
         ITechnicalAnalysisService analysisService,
         ILoggerFactory loggerFactory,
         int days = 90,
+        string interval = "1d",
         CancellationToken cancellationToken = default)
     {
         if (days is < 1 or > 365)
@@ -51,10 +55,18 @@ public static class MarketDataEndpoints
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
+        if (!TryParseInterval(interval, out var candleInterval))
+        {
+            return Results.Problem(
+                title: "Invalid interval",
+                detail: "interval must be '1d' (daily) or '1w' (weekly).",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         try
         {
             var result = await analysisService.GetAnalysisAsync(
-                symbol.ToUpperInvariant(), days, cancellationToken);
+                symbol.ToUpperInvariant(), days, candleInterval, cancellationToken);
 
             return Results.Ok(result);
         }
@@ -75,6 +87,24 @@ public static class MarketDataEndpoints
                 title: "Upstream market data provider error",
                 detail: "The market data provider is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    /// <summary>Maps the query string to a <see cref="CandleInterval"/>; false on an unknown value.</summary>
+    private static bool TryParseInterval(string interval, out CandleInterval candleInterval)
+    {
+        switch (interval.ToLowerInvariant())
+        {
+            case "1d":
+                candleInterval = CandleInterval.OneDay;
+                return true;
+            case "1w":
+            case "1wk":
+                candleInterval = CandleInterval.OneWeek;
+                return true;
+            default:
+                candleInterval = CandleInterval.OneDay;
+                return false;
         }
     }
 }

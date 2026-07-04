@@ -49,6 +49,13 @@ type Range = (typeof RANGES)[number]
 const SENSITIVITIES = [1.5, 2, 2.5, 3, 4] as const
 const DEFAULT_SENSITIVITY = 2.5
 
+/** Candle timeframe options. 4H needs an intraday data source and is a tracked follow-up. */
+const TIMEFRAMES = [
+  { label: 'Daily', code: '1d' },
+  { label: 'Weekly', code: '1w' },
+] as const
+type Timeframe = (typeof TIMEFRAMES)[number]
+
 interface WaveWorkspaceProps {
   theme: Theme
   hasApiKey: boolean
@@ -101,9 +108,10 @@ function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
 export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: WaveWorkspaceProps) {
   const [symbol, setSymbol] = useState<TickerSymbol>('SP500')
   const [range, setRange] = useState<Range>(RANGES[2])
+  const [timeframe, setTimeframe] = useState<Timeframe>(TIMEFRAMES[0])
   const marketQuery = useQuery({
-    queryKey: ['market-data', symbol, range.days],
-    queryFn: ({ signal }) => getMarketData(symbol, range.days, signal),
+    queryKey: ['market-data', symbol, range.days, timeframe.code],
+    queryFn: ({ signal }) => getMarketData(symbol, range.days, timeframe.code, signal),
     staleTime: 5 * 60_000,
   })
   const candles = useMemo<MarketCandle[]>(() => marketQuery.data?.candles ?? [], [marketQuery.data])
@@ -277,6 +285,15 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     [resetCoach]
   )
 
+  const handleTimeframe = useCallback(
+    (next: Timeframe) => {
+      setTimeframe(next)
+      setAnnotations([]) // labels placed on daily bars don't map onto weekly bars
+      resetCoach()
+    },
+    [resetCoach]
+  )
+
   const handleSymbol = useCallback(
     (next: TickerSymbol) => {
       setSymbol(next)
@@ -362,6 +379,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               </span>
             </div>
             <div className="chart-head-right">
+              <div className="tf-select" role="group" aria-label="Timeframe">
+                {TIMEFRAMES.map((t) => (
+                  <button
+                    key={t.code}
+                    type="button"
+                    className={timeframe.code === t.code ? 'on' : ''}
+                    aria-pressed={timeframe.code === t.code}
+                    onClick={() => handleTimeframe(t)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
               <div className="tf-select" role="group" aria-label="Range">
                 {RANGES.map((r) => (
                   <button

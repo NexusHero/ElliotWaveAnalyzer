@@ -65,4 +65,28 @@ public sealed class MarketDataAcceptanceTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
+
+    [Test]
+    public async Task GetMarketData_WeeklyInterval_ReturnsFewerCandlesThanDaily()
+    {
+        var daily = await _client.GetFromJsonAsync<JsonElement>("/api/market-data/BTC?days=90&interval=1d");
+        var weekly = await _client.GetFromJsonAsync<JsonElement>("/api/market-data/BTC?days=90&interval=1w");
+
+        var dailyCount = daily.GetProperty("candles").GetArrayLength();
+        var weeklyCount = weekly.GetProperty("candles").GetArrayLength();
+        Assert.Multiple(() =>
+        {
+            Assert.That(weeklyCount, Is.GreaterThan(0));
+            Assert.That(weeklyCount, Is.LessThan(dailyCount), "weekly aggregation yields fewer bars");
+            Assert.That(weeklyCount, Is.InRange(12, 15)); // ~90 days ≈ 13 ISO weeks
+        });
+    }
+
+    [Test]
+    public async Task GetMarketData_UnsupportedInterval_Returns400()
+    {
+        var response = await _client.GetAsync("/api/market-data/BTC?interval=4h");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
 }

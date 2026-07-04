@@ -58,6 +58,8 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | #89 · ADR-012 · §6 Scenario 6 | Fulfilled |
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | #91 · §6 Scenario 7 | Fulfilled |
 | REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
+| REQ-010 | Timeframe selector (Daily/Weekly via resampling; 4H needs an intraday source) | #93 · ADR-013 | Fulfilled |
+| REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #94 (planned) | Proposed |
 
 ## Quality Goals {#_quality_goals}
 
@@ -820,6 +822,22 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | (+) | Reuses the existing scheduler + delivery channels (OCP/DIP); adding a channel still needs no change here |
 | (+) | Exactly-once alerts; the "should we notify?" logic is a pure, exhaustively-tested function |
 | (-) | Delivery is to the operator-configured global channels (same model as the daily report) — **per-user delivery targets are a follow-up** (REQ, not yet built); alerting cadence is bounded by the cron interval |
+
+---
+
+## ADR-013: Timeframe by Resampling Daily Candles (Daily/Weekly now; 4H needs an intraday source)
+
+**Context:** Users want to analyse at different timeframes. The free data sources don't offer a clean multi-timeframe feed — Yahoo's chart API has no native `4h` interval and CoinGecko's free OHLC endpoint sets granularity implicitly from the day range.
+
+**Decision:** Present timeframes by **resampling the daily candles we already fetch**, not by asking the provider for a timeframe. `ITechnicalAnalysisService.GetAnalysisAsync` takes a `CandleInterval`; it fetches daily and passes them through the pure `CandleResampler` (daily = pass-through; weekly = ISO-week OHLCV aggregation), computing RSI/MACD on the resampled series. The endpoint exposes `?interval=1d|1w`. A 4-hour timeframe cannot be **up**-sampled from daily — it needs an intraday-capable provider, so it is deliberately out of scope here and tracked as a follow-up.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Weekly is exact, deterministic and unit-testable offline; no new data source or provider coupling |
+| (+) | Providers stay daily-only and unchanged (OCP); the resampler is pure Application code |
+| (-) | 4H (and finer) is not available until an intraday provider is added; weekly bars inherit any gaps in the daily source |
 
 ---
 
