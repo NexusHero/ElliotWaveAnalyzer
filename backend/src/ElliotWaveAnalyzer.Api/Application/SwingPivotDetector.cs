@@ -20,7 +20,8 @@ namespace ElliotWaveAnalyzer.Api.Application;
 ///
 /// Three modes:
 ///  - <see cref="Detect"/> — fixed percent threshold (the classic ZigZag).
-///  - <see cref="DetectAtrAdaptive"/> — threshold scales with volatility (k × ATR).
+///  - <see cref="DetectAtrAdaptive"/> — threshold scales with volatility (k × ATR, ATR
+///    supplied by the caller via <c>IIndicatorCalculator</c>/Skender).
 ///  - <see cref="DetectMultiScale"/> — several thresholds at once, tagged with Elliott
 ///    degrees, coarse scales guaranteed to be subsets of finer ones.
 ///
@@ -54,30 +55,36 @@ public static class SwingPivotDetector
 
     /// <summary>
     /// Detects swing pivots with a volatility-adaptive threshold: a reversal confirms when
-    /// price moves at least <paramref name="atrMultiplier"/> × ATR(<paramref name="atrPeriod"/>)
-    /// against the running extreme. In quiet regimes this finds swings a fixed percent would
-    /// miss; in volatile regimes it ignores noise a fixed percent would count.
+    /// price moves at least <paramref name="atrMultiplier"/> × ATR against the running extreme.
+    /// In quiet regimes this finds swings a fixed percent would miss; in volatile regimes it
+    /// ignores noise a fixed percent would count.
+    /// <para>
+    /// The ATR series is supplied by the caller (computed via <c>IIndicatorCalculator</c> /
+    /// Skender), so this layer stays pure geometry and free of the Wilder-smoothing math —
+    /// ATR has the same seeding subtleties as RSI/MACD, which we deliberately delegate.
+    /// </para>
     /// </summary>
     /// <param name="candles">OHLCV candles, ascending by time.</param>
+    /// <param name="atr">ATR per candle, aligned 1:1 with <paramref name="candles"/>; entries
+    /// are null during the warm-up window, where reversals are not yet confirmed (extremes are
+    /// still tracked).</param>
     /// <param name="atrMultiplier">How many ATRs of adverse movement confirm a reversal.</param>
-    /// <param name="atrPeriod">ATR lookback (Wilder smoothing). Candles inside the warm-up
-    /// window only track extremes; reversals are confirmed once ATR is available.</param>
     public static IReadOnlyList<SwingPivot> DetectAtrAdaptive(
-        IReadOnlyList<MarketCandle> candles, decimal atrMultiplier = 3m, int atrPeriod = 14)
+        IReadOnlyList<MarketCandle> candles, IReadOnlyList<decimal?> atr, decimal atrMultiplier = 3m)
     {
         ArgumentNullException.ThrowIfNull(candles);
+        ArgumentNullException.ThrowIfNull(atr);
         if (atrMultiplier <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(atrMultiplier), atrMultiplier, "ATR multiplier must be positive.");
         }
-        if (atrPeriod < 1)
+        if (atr.Count != candles.Count)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(atrPeriod), atrPeriod, "ATR period must be at least 1.");
+            throw new ArgumentException(
+                "The ATR series must have exactly one entry per candle.", nameof(atr));
         }
 
-        var atr = WilderAtr(candles, atrPeriod);
         return DetectCore(candles, (i, _) => atr[i] is { } a ? atrMultiplier * a : null);
     }
 
@@ -333,46 +340,5 @@ public static class SwingPivotDetector
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Wilder-smoothed Average True Range per candle (null during the warm-up window).
-    /// Implemented here rather than via Skender because the Application layer stays free of
-    /// third-party contracts (Skender is isolated in Infrastructure by convention) — and ATR,
-    /// unlike RSI/MACD, has no seeding subtleties beyond the documented Wilder recurrence.
-    /// </summary>
-    private static decimal?[] WilderAtr(IReadOnlyList<MarketCandle> candles, int period)
-    {
-        var atr = new decimal?[candles.Count];
-        if (candles.Count <= period)
-        {
-            return atr;
-        }
-
-        var trueRanges = new decimal[candles.Count];
-        for (var i = 1; i < candles.Count; i++)
-        {
-            var c = candles[i];
-            var prevClose = candles[i - 1].Close;
-            trueRanges[i] = Math.Max(
-                c.High - c.Low,
-                Math.Max(Math.Abs(c.High - prevClose), Math.Abs(c.Low - prevClose)));
-        }
-
-        // First ATR = simple average of the first `period` true ranges (indices 1..period);
-        // thereafter Wilder's recurrence.
-        decimal sum = 0;
-        for (var i = 1; i <= period; i++)
-        {
-            sum += trueRanges[i];
-        }
-
-        atr[period] = sum / period;
-        for (var i = period + 1; i < candles.Count; i++)
-        {
-            atr[i] = (atr[i - 1]!.Value * (period - 1) + trueRanges[i]) / period;
-        }
-
-        return atr;
     }
 }

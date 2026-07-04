@@ -51,6 +51,25 @@ internal sealed class SkenderIndicatorCalculator : IIndicatorCalculator
                 SignalLine: r.Signal.HasValue ? (decimal)r.Signal.Value : null,
                 Histogram: r.Histogram.HasValue ? (decimal)r.Histogram.Value : null))];
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<Domain.AtrResult> CalculateAtr(
+        IReadOnlyList<MarketCandle> candles, int period = 14)
+    {
+        ArgumentNullException.ThrowIfNull(candles);
+        if (period < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(period), period, "ATR period must be at least 1.");
+        }
+
+        return [.. candles
+            .AsSkenderQuotes()
+            .GetAtr(period)
+            .Select(r => new Domain.AtrResult(
+                Date: r.Date,
+                Value: r.Atr.HasValue ? (decimal)r.Atr.Value : null))];
+    }
 }
 
 /// <summary>

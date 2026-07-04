@@ -28,4 +28,10 @@ public interface IIndicatorCalculator
         int fastPeriods = 12,
         int slowPeriods = 26,
         int signalPeriods = 9);
+
+    /// <summary>
+    /// Calculates the Wilder-smoothed Average True Range (volatility).
+    /// Returns one entry per input candle; entries within the warm-up period have <c>Value = null</c>.
+    /// </summary>
+    IReadOnlyList<AtrResult> CalculateAtr(IReadOnlyList<MarketCandle> candles, int period = 14);
 }

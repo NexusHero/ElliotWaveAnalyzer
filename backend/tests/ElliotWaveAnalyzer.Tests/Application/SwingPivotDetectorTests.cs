@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Infrastructure;
 
 namespace ElliotWaveAnalyzer.Tests.Application;
 
@@ -14,6 +15,12 @@ public sealed class SwingPivotDetectorTests
     /// <summary>Builds flat candles from close prices (OHLC all = close).</summary>
     private static IReadOnlyList<MarketCandle> Candles(params decimal[] closes)
         => [.. closes.Select((c, i) => new MarketCandle(Start.AddDays(i), c, c, c, c, 0m))];
+
+    /// <summary>ATR per candle via the real Skender calculator — the same series production
+    /// would feed into <see cref="SwingPivotDetector.DetectAtrAdaptive"/>. Exercises the seam
+    /// end-to-end (calculator → detector) with no hand-rolled ATR.</summary>
+    private static IReadOnlyList<decimal?> Atr(IReadOnlyList<MarketCandle> candles, int period = 14)
+        => [.. new SkenderIndicatorCalculator().CalculateAtr(candles, period).Select(r => r.Value)];
 
     /// <summary>Builds candles with distinct highs/lows: (high, low) pairs, open/close mid-range.</summary>
     private static IReadOnlyList<MarketCandle> HlCandles(params (decimal High, decimal Low)[] bars)
@@ -129,12 +136,14 @@ public sealed class SwingPivotDetectorTests
     public void AtrAdaptive_InvalidArguments_Throw()
     {
         var candles = Candles(100m, 110m);
+        var atr = Atr(candles);
         Assert.Multiple(() =>
         {
             Assert.Throws<ArgumentOutOfRangeException>(
-                () => SwingPivotDetector.DetectAtrAdaptive(candles, atrMultiplier: 0m));
-            Assert.Throws<ArgumentOutOfRangeException>(
-                () => SwingPivotDetector.DetectAtrAdaptive(candles, atrPeriod: 0));
+                () => SwingPivotDetector.DetectAtrAdaptive(candles, atr, atrMultiplier: 0m));
+            // ATR series length must match the candle count.
+            Assert.Throws<ArgumentException>(
+                () => SwingPivotDetector.DetectAtrAdaptive(candles, [null], atrMultiplier: 3m));
         });
     }
 
@@ -158,7 +167,7 @@ public sealed class SwingPivotDetectorTests
         var candles = Candles([.. closes]);
 
         var fixedPivots = SwingPivotDetector.Detect(candles, thresholdPercent: 5m);
-        var adaptivePivots = SwingPivotDetector.DetectAtrAdaptive(candles, atrMultiplier: 3m);
+        var adaptivePivots = SwingPivotDetector.DetectAtrAdaptive(candles, Atr(candles), atrMultiplier: 3m);
 
         Assert.Multiple(() =>
         {
@@ -174,7 +183,7 @@ public sealed class SwingPivotDetectorTests
         var candles = Candles(100m, 106m, 99m, 108m, 101m, 112m, 103m, 115m, 104m, 118m,
             106m, 120m, 108m, 124m, 110m, 128m, 112m, 132m, 114m, 136m);
 
-        var pivots = SwingPivotDetector.DetectAtrAdaptive(candles, atrMultiplier: 1m, atrPeriod: 5);
+        var pivots = SwingPivotDetector.DetectAtrAdaptive(candles, Atr(candles, period: 5), atrMultiplier: 1m);
 
         Assert.That(pivots, Is.Not.Empty);
         for (var i = 1; i < pivots.Count; i++)
