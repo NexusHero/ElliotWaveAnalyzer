@@ -194,3 +194,46 @@ export interface AutoWaveAnalysisResponse {
   /** True when the parser's evaluation budget bounded the search (rankings still valid). */
   searchTruncated?: boolean
 }
+
+/** How a saved analysis has played out since it was saved (mirrors backend `AnalysisOutcome`). */
+export type AnalysisOutcome = 'Pending' | 'Invalidated' | 'TargetReached'
+
+/** Request body for `POST /api/analyses` — mirrors the backend `TrackAnalysisRequest`. */
+export interface TrackAnalysisRequest {
+  symbol: string
+  structure: string
+  bullish: boolean
+  invalidationPrice: number | null
+  /** True when the invalidation line sits above price (a move up voids the count). */
+  invalidationAbove: boolean
+  targetLow: number | null
+  targetHigh: number | null
+  confidence: string
+  score: number | null
+}
+
+/**
+ * A saved analysis with its outcome evaluated against price action since it was saved.
+ * Mirrors the backend `TrackedAnalysis`.
+ */
+export interface TrackedAnalysis {
+  id: string
+  symbol: string
+  createdAt: string // ISO 8601 UTC
+  structure: string
+  bullish: boolean
+  invalidationPrice: number | null
+  invalidationAbove: boolean
+  targetLow: number | null
+  targetHigh: number | null
+  confidence: string
+  score: number | null
+  outcome: AnalysisOutcome
+  evaluatedPrice: number | null
+  evaluatedAt: string | null
+}
+
+/** Response of `POST /api/analyses` — mirrors the backend `SavedAnalysisResponse`. */
+export interface SavedAnalysisResponse {
+  id: string
+}
