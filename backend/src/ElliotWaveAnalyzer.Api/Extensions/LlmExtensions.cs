@@ -71,6 +71,10 @@ internal static class LlmExtensions
             return sp.GetRequiredKeyedService<IChatClient>(key);
         });
 
+        // Resolver seam so consumers depend on an abstraction instead of IServiceProvider
+        // (the keyed-service lookup lives only in KeyedChatClientResolver).
+        services.AddSingleton<IChatClientResolver, KeyedChatClientResolver>();
+
         services.AddTransient<ILlmWaveAnalyzer, LlmWaveAnalyzer>();
 
         // Full-auto ranking: a consensus across all keyed providers when LlmProvider:Ensemble

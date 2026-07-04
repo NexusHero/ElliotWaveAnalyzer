@@ -1,7 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
-using Microsoft.Extensions.AI;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
@@ -14,9 +12,13 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// Only providers with a non-empty API key participate (resolving a keyed client with an empty
 /// key would throw). A provider that fails at call time is skipped; the analysis still returns
 /// as long as at least one provider succeeds.
+///
+/// Chat clients are obtained through <see cref="IChatClientResolver"/> (not a raw
+/// <see cref="IServiceProvider"/>), so this class depends on an abstraction rather than
+/// service-locating its collaborators.
 /// </summary>
 internal sealed class EnsembleAutoWaveAnalyzer(
-    IServiceProvider serviceProvider,
+    IChatClientResolver chatClientResolver,
     IOptions<LlmProviderOptions> options,
     ILogger<EnsembleAutoWaveAnalyzer> logger) : IAutoWaveAnalyzer
 {
@@ -58,7 +60,7 @@ internal sealed class EnsembleAutoWaveAnalyzer(
         {
             try
             {
-                var client = serviceProvider.GetRequiredKeyedService<IChatClient>(p.Key);
+                var client = chatClientResolver.Resolve(p.Key);
                 var result = await AutoWaveRankRunner.RunAsync(
                     client, p.Endpoint(opts).Model, p.Display, symbol, candles, candidates, logger, cancellationToken);
                 return (p.Display, Result: result, Ok: true);
