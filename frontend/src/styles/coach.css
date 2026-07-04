@@ -612,6 +612,96 @@
   color: var(--muted);
 }
 
+/* guideline tag on a rule row: a soft, non-alarming pill (failed guidelines are amber) */
+.guideline-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--line-soft);
+  border-radius: 99px;
+  padding: 1px 6px;
+  margin-left: 2px;
+}
+
+/* count-head badge row: deterministic score alongside the LLM confidence */
+.auto-count-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.score-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: 99px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* search-truncation note: informational, not an error */
+.auto-truncated {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--faint);
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: var(--inset);
+  border: 1px dashed var(--line-soft);
+  border-radius: 8px;
+}
+
+/* ---------- nested wave tree (internal subdivision) ---------- */
+.wave-tree {
+  margin: 8px 0 2px;
+}
+.wave-tree > .rb-label {
+  display: block;
+  margin-bottom: 6px;
+}
+.wave-tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wave-tree-node > .wave-tree-list {
+  margin-top: 4px;
+}
+.wave-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.wave-tree-label {
+  color: var(--text);
+  min-width: 14px;
+}
+.wave-tree-kind {
+  color: var(--muted);
+}
+.wave-tree-degree {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.wave-tree-score {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--faint);
+}
+
 /* full-auto: action row (sensitivity + run button) */
 .auto-actions {
   display: flex;
