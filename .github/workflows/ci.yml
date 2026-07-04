@@ -76,10 +76,27 @@ jobs:
           badge: true
           format: markdown
           output: both
-          # Target is 90% line coverage (ADR-007). Still advisory (continue-on-error)
-          # until the CI-measured baseline confirms ≥90%, then flip to blocking.
+          # Advisory PR comment / badge only. The blocking gate is the next step, which
+          # enforces line coverage precisely (this action's fail_below_threshold would also
+          # trip on branch rate, a separate metric we do not gate on — ADR-015).
           thresholds: '90 90'
         continue-on-error: true
+
+      - name: Enforce line-coverage gate (≥90%)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob("backend/TestResults/**/coverage.cobertura.xml", recursive=True)
+          if not files:
+              sys.exit("No cobertura coverage file found")
+          rate = float(ET.parse(files[0]).getroot().get("line-rate"))
+          pct = rate * 100
+          gate = 90.0
+          print(f"Line coverage: {pct:.2f}% (gate {gate:.0f}%)")
+          if pct + 1e-9 < gate:
+              sys.exit(f"::error::Line coverage {pct:.2f}% is below the {gate:.0f}% gate (ADR-007 / ADR-015)")
+          PY
 
       - name: Upload coverage
         uses: actions/upload-artifact@v5

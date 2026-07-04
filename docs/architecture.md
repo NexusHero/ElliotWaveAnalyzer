@@ -62,6 +62,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #94 (planned) | Proposed |
 | REQ-012 | Per-user encrypted API-key vault (replace the localStorage facade) | #96 · ADR-014 | Fulfilled |
 | REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
+| REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -737,7 +738,7 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | (+) | Docs, decisions and requirements stay current by construction — reviewed together with the code |
 | (+) | Every requirement is traceable: issue → REQ id → ADR → sequence diagram → tests |
 | (-) | Slightly more work per architecturally-relevant PR; deliberate, to stop doc rot |
-| (-) | The 90% coverage CI step stays advisory (`continue-on-error`) until the baseline is measured in CI, then flips to blocking (tracked as a follow-up) |
+| (+) | The 90% coverage gate is now **blocking** — CI fails below 90% line coverage (measured baseline ~94%); see ADR-015 for the exclusion policy that makes the percentage meaningful |
 
 ---
 
@@ -860,6 +861,28 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 
 ---
 
+## ADR-015: Coverage Exclusion Policy and a Blocking 90% Line-Coverage Gate
+
+**Context:** ADR-007 raised the target to ≥90% line coverage but the CI step stayed advisory (`continue-on-error`) because the raw, unfiltered number counted startup wiring, EF-generated migrations and cron hosting loops as "untested logic" — which pulled the reported percentage down to a level that did not reflect the code we actually own. A gate is only meaningful if the denominator is honest.
+
+**Decision:** Coverage is filtered to owned logic and the gate is made blocking:
+
+- **Exclusions** (`backend/coverlet.runsettings`, applied in CI via `--settings`): the composition root (`Program`), DI registration (`Extensions.*`), EF migrations + model snapshot (`**/Migrations/*.cs`), compiler-generated / `[ExcludeFromCodeCoverage]` members, auto-properties (`SkipAutoProps`), and the `*BackgroundService` cron hosting loops (scheduling plumbing with no unit-testable branching beyond the cron-parse guard). Real I/O adapters that carry mapping logic (market-data providers, delivery channels) are **not** excluded — they are tested with a mocked `HttpMessageHandler`.
+- **Blocking gate:** a dedicated CI step parses the Cobertura `line-rate` and fails the build below **90%**. It gates **line** coverage only (branch rate is reported but not gated). The `irongut/CodeCoverageSummary` step is kept purely for the PR comment/badge (advisory), because its `fail_below_threshold` also trips on the separate branch metric.
+
+The CI-measured baseline after this ADR is ~94% line coverage.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The 90% number is now both meaningful (owned logic only) and enforced (red build below it) — no more advisory drift |
+| (+) | The exclusion list is explicit and reviewed in-repo, so what "counts" is auditable rather than hidden in tool defaults |
+| (-) | Excluded files still need care: a bug in startup wiring or a background loop won't be caught by the coverage gate (mitigated by acceptance tests exercising the composed app) |
+| (-) | Branch coverage (~81%) is reported but not gated; raising it is future work, not a release blocker |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}
@@ -895,7 +918,7 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 |----|------|----------|--------|-------------|
 | S2 | Daily-report persistence not yet implemented | Medium | Medium | Analyses are now persisted per user (`AnalysisSnapshot`, ADR-010); daily-report history is still not stored |
 | S6 | OpenAPI codegen not yet automated in CI | Low | Low | `npm run generate:api` must be run manually; add to CI after backend stabilizes |
-| S7 | 90% coverage gate is advisory, not blocking | Medium | Low | The CI coverage step is `continue-on-error`; flip to hard-fail once the CI-measured baseline confirms ≥90% (ADR-007) |
+| ~~S7~~ | ~~90% coverage gate is advisory, not blocking~~ | — | — | **Resolved** (REQ-014, ADR-015): the CI-measured baseline reached ~94% line coverage and the gate is now blocking (fails below 90% line) |
 
 Resolved since the last revision: the provider-agnostic LLM abstraction (`IChatClient`, ADR-008), the deterministic wave grammar parser (ADR-009), the nested-count UI, and per-user analysis persistence with outcome evaluation (ADR-010) are now all implemented.
 
