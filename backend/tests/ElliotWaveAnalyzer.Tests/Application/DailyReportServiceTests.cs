@@ -23,7 +23,7 @@ public sealed class DailyReportServiceTests
         _analysis = Substitute.For<ITechnicalAnalysisService>();
         _renderer = Substitute.For<IChartRenderer>();
 
-        _analysis.GetAnalysisAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _analysis.GetAnalysisAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CandleInterval>(), Arg.Any<CancellationToken>())
             .Returns(ci => Task.FromResult(new TechnicalAnalysisResult(
                 (string)ci[0], MarketDataFixtures.CreateCandles(30), [], [])));
         _renderer.RenderPng(Arg.Any<TechnicalAnalysisResult>()).Returns([1, 2, 3]);
@@ -87,7 +87,7 @@ public sealed class DailyReportServiceTests
     [Test]
     public async Task RunAsync_OneSymbolFails_OtherSymbolStillDelivered()
     {
-        _analysis.GetAnalysisAsync("BTC", Arg.Any<int>(), Arg.Any<CancellationToken>())
+        _analysis.GetAnalysisAsync("BTC", Arg.Any<int>(), Arg.Any<CandleInterval>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<TechnicalAnalysisResult>(new InvalidOperationException("no data")));
         var channel = Channel("Telegram", enabled: true);
 

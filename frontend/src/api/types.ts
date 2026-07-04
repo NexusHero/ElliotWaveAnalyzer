@@ -13,6 +13,9 @@ export interface MarketCandle {
   volume: number
 }
 
+/** Candle timeframe code accepted by `GET /api/market-data/{symbol}?interval=`. */
+export type CandleIntervalCode = '1d' | '1w'
+
 export interface RsiResult {
   date: string
   value: number | null

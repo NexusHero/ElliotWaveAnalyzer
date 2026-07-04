@@ -53,7 +53,7 @@ public sealed class DailyReportService(
         ReportArtifact artifact;
         try
         {
-            var analysis = await analysisService.GetAnalysisAsync(symbol, days, cancellationToken);
+            var analysis = await analysisService.GetAnalysisAsync(symbol, days, cancellationToken: cancellationToken);
             var png = chartRenderer.RenderPng(analysis);
             artifact = new ReportArtifact(
                 symbol,

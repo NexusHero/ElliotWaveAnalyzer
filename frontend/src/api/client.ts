@@ -1,6 +1,7 @@
 import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
+  CandleIntervalCode,
   SavedAnalysisResponse,
   TechnicalAnalysisResult,
   TrackAnalysisRequest,
@@ -58,16 +59,18 @@ export async function autoAnalyzeWaves(
 
 /**
  * Fetches live OHLCV candles (+ indicators) for a symbol via `GET /api/market-data/{symbol}`.
- * `days` selects the lookback window (1–365).
+ * `days` selects the lookback window (1–365); `interval` the timeframe ('1d' daily, '1w' weekly).
  */
 export async function getMarketData(
   symbol: string,
   days: number,
+  interval: CandleIntervalCode = '1d',
   signal?: AbortSignal
 ): Promise<TechnicalAnalysisResult> {
-  const response = await fetch(`/api/market-data/${encodeURIComponent(symbol)}?days=${days}`, {
-    signal,
-  })
+  const response = await fetch(
+    `/api/market-data/${encodeURIComponent(symbol)}?days=${days}&interval=${interval}`,
+    { signal }
+  )
 
   if (!response.ok) {
     throw new Error(await extractErrorDetail(response))
