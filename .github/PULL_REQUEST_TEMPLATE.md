@@ -31,7 +31,9 @@ Closes #
 - [ ] `npm run build` succeeds (`tsc --noEmit` + `vite build`)
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
 - [ ] New tests use the `Subject_StateUnderTest_ExpectedBehaviour` naming convention
-- [ ] New backend services depend on interfaces, not concrete types (SOLID)
+- [ ] **SOLID holds**: no god classes (SRP); new services depend on interfaces, not concrete types (DIP); interfaces stay narrow (ISP); extension over modification (OCP)
+- [ ] **TDD**: tests were written before the implementation (Red → Green → Refactor)
+- [ ] **New API endpoints** are exercised by a test **and** carry OpenAPI metadata (`WithSummary`/`WithDescription`/`Produces`/`ProducesProblem`), visible in the Scalar UI
 - [ ] Line coverage stays ≥ 90% (business logic in pure, testable classes)
 - [ ] No API keys or secrets are committed
 - [ ] **Architecture Governance** (for architecturally-relevant changes): ADR added to `docs/architecture.md` §9 · Requirements Register (§1) updated · sequence diagram added/updated in the Runtime View (§6) for a fulfilled requirement · affected §5/§6/§8 prose corrected
