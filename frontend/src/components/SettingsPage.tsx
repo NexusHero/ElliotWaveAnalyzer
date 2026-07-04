@@ -7,6 +7,7 @@ import {
   type SavedKey,
 } from '../hooks/useApiKeys'
 import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
+import DepotImportPanel from './DepotImportPanel'
 
 interface SettingsPageProps {
   keys: KeyState
@@ -71,6 +72,8 @@ export default function SettingsPage({
             </p>
           </div>
         </section>
+
+        <DepotImportPanel />
 
         <CoachingPreferences />
       </div>

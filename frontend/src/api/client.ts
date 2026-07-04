@@ -2,6 +2,7 @@ import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
   CandleIntervalCode,
+  DepotSnapshot,
   SavedAnalysisResponse,
   SavedApiKey,
   TechnicalAnalysisResult,
@@ -123,6 +124,28 @@ export async function deleteAnalysis(id: string, signal?: AbortSignal): Promise<
 }
 
 /** Lists the user's configured API-key providers (metadata only — never the key). */
+/**
+ * Imports a broker depot from an uploaded file via `POST /api/depot/import` (multipart).
+ * The backend detects the broker (currently Smartbroker+ PDF) and returns the parsed holdings.
+ * No `Content-Type` header is set so the browser adds the multipart boundary itself.
+ */
+export async function importDepot(file: File, signal?: AbortSignal): Promise<DepotSnapshot> {
+  const form = new FormData()
+  form.append('file', file)
+
+  const response = await fetch('/api/depot/import', {
+    method: 'POST',
+    body: form,
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as DepotSnapshot
+}
+
 export async function listApiKeys(signal?: AbortSignal): Promise<SavedApiKey[]> {
   const response = await fetch('/api/keys', { signal })
   if (!response.ok) {

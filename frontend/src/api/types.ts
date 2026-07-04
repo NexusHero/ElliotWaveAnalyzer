@@ -265,3 +265,35 @@ export interface ConfidenceCalibration {
   totalConcluded: number
   overallHitRate: number | null
 }
+
+/** One holding in an imported depot (mirrors backend `DepotPosition`). Monetary fields nullable. */
+export interface DepotPosition {
+  isin: string
+  wkn: string | null
+  name: string
+  quantity: number
+  costPrice: number | null
+  costValue: number | null
+  marketPrice: number | null
+  marketValue: number | null
+  gainAbsolute: number | null
+  gainRelativePercent: number | null
+  exchange: string | null
+}
+
+/** Depot-level totals (mirrors backend `DepotTotals`). */
+export interface DepotTotals {
+  totalValue: number | null
+  gainAbsolute: number | null
+  gainRelativePercent: number | null
+}
+
+/** Parsed depot snapshot returned by `POST /api/depot/import` (mirrors backend `DepotSnapshot`). */
+export interface DepotSnapshot {
+  source: string
+  importedAt: string
+  exportedAt: string | null
+  currency: string
+  positions: DepotPosition[]
+  totals: DepotTotals | null
+}

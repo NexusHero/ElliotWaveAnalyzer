@@ -64,6 +64,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
 | REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
 | REQ-015 | Route ATR through `IIndicatorCalculator`/Skender instead of a hand-rolled Wilder recurrence | #101 · ADR-016 | Fulfilled |
+| REQ-016 | Import a broker depot from a file via pluggable per-broker importers (Smartbroker+ PDF first) | #103 · ADR-017 · §6 Scenario 8 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -494,6 +495,32 @@ sequenceDiagram
 
 ---
 
+## Scenario 8 — Depot Import (REQ-016) {#_runtime_scenario_8}
+
+A user uploads a broker statement; the router picks the importer that recognises it and returns
+the parsed holdings. Each broker is one `IDepotImporter`; the router never changes (OCP).
+
+```mermaid
+sequenceDiagram
+    participant Browser as Browser (DepotImportPanel)
+    participant API as POST /api/depot/import
+    participant Svc as IDepotImportService
+    participant Imp as SmartbrokerPlusPdfImporter
+    participant Pig as PdfPig (isolated)
+
+    Browser->>API: multipart upload (file)
+    API->>Svc: ImportAsync(DepotImportFile)
+    Svc->>Imp: first importer where CanHandle(file)
+    Imp->>Pig: extract words + bounding boxes
+    Pig-->>Imp: positioned tokens
+    Imp->>Imp: rows→columns, anchor on ISIN, parse German numbers
+    Imp-->>Svc: DepotImportResult.Ok(DepotSnapshot)
+    Svc-->>API: result
+    API-->>Browser: 200 DepotSnapshot (holdings + totals)
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -898,6 +925,24 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | `SwingPivotDetector` is still a pure static component (numbers in, pivots out) — the ATR dependency is passed in, not computed, so DIP holds without the Application layer touching Skender |
 | (+) | The seam is exercised end-to-end in tests (real `SkenderIndicatorCalculator` output feeds the detector) |
 | (-) | The volatility-adaptive strategy is a library capability exercised by tests; the default pipeline still uses the fixed-percent `Detect`. Wiring it in as a selectable mode is a separate, behaviour-changing follow-up |
+
+---
+
+## ADR-017: Depot Import via Pluggable `IDepotImporter` Files (PdfPig for Smartbroker+)
+
+**Context:** Users want to load their broker depot (holdings) into the app to feed portfolio/wave analysis. Three brokers were requested: Smartbroker+, Scalable Capital, Trade Republic. **None offers an official public portfolio API** — Trade Republic only has unofficial reverse-engineered endpoints (phone+PIN+2FA, credential storage; ToS/fragility risk), Scalable Capital offers an official CSV export, Smartbroker+ a PDF export. Baking in unofficial APIs would mean storing broker credentials and tracking undocumented endpoints.
+
+**Decision:** Import from **files**, not live APIs. `IDepotImporter` models one broker/format (`Source`, `CanHandle(file)`, `ImportAsync(file)`); `IDepotImportService` routes an upload to the first importer that accepts it. A new broker is a new importer + one DI line — the router and existing importers never change (OCP/DIP). The first importer, `SmartbrokerPlusPdfImporter`, parses the fixed-layout "Depotübersicht" PDF with **UglyToad.PdfPig** (MIT, pure managed): words are extracted with bounding boxes, grouped into rows, anchored on the ISIN, and read by column band (German number format, € / % suffixes). PdfPig is confined to that one Infrastructure file (same convention as Skender, Risk R3). `POST /api/depot/import` takes a multipart upload and returns the parsed `DepotSnapshot`; it is documented via OpenAPI and consumed by the Settings `DepotImportPanel`. Nothing is persisted yet.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | No broker credentials, no ToS/2FA risk, no undocumented endpoints — file import is robust and sanctioned |
+| (+) | Scalable Capital (CSV) and Trade Republic (document export) slot in as further `IDepotImporter`s with no change to the router, endpoint or UI |
+| (+) | PdfPig is isolated; a parser regression or library swap is a one-file change; tested against a **synthetic** fixture (no real PII committed) |
+| (-) | The PDF parser is calibrated to the current Smartbroker+ column layout; a statement redesign needs re-calibration (mitigated by the anchored, band-based approach and unit tests) |
+| (-) | Live/continuous sync is out of scope — import is a manual file upload; holdings are not yet persisted server-side (a follow-up) |
 
 ---
 
