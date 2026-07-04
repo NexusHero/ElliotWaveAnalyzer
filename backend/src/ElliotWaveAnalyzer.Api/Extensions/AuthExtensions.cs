@@ -42,6 +42,10 @@ internal static class AuthExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITrackRecordService, TrackRecordService>();
 
+        // Encrypt per-user API keys at rest with ASP.NET Core Data Protection (no bespoke crypto).
+        services.AddDataProtection();
+        services.AddScoped<IUserKeyStore, UserKeyStore>();
+
         var authBuilder = services
             .AddAuthentication(SessionAuthenticationHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(

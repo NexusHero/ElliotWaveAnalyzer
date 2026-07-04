@@ -60,6 +60,8 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
 | REQ-010 | Timeframe selector (Daily/Weekly via resampling; 4H needs an intraday source) | #93 · ADR-013 | Fulfilled |
 | REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #94 (planned) | Proposed |
+| REQ-012 | Per-user encrypted API-key vault (replace the localStorage facade) | #96 · ADR-014 | Fulfilled |
+| REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
 
 ## Quality Goals {#_quality_goals}
 
@@ -838,6 +840,23 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | (+) | Weekly is exact, deterministic and unit-testable offline; no new data source or provider coupling |
 | (+) | Providers stay daily-only and unchanged (OCP); the resampler is pure Application code |
 | (-) | 4H (and finer) is not available until an intraday provider is added; weekly bars inherit any gaps in the daily source |
+
+---
+
+## ADR-014: Per-User API-Key Vault with ASP.NET Core Data Protection
+
+**Context:** The Settings page claimed keys were "stored encrypted at rest, never shown again", but only kept `last4` in `localStorage` and sent the key nowhere — a real trust gap. Keys must be stored encrypted, server-side, and never returned.
+
+**Decision:** A per-user `UserApiKey` table on the existing PostgreSQL context stores each key encrypted with **ASP.NET Core Data Protection** (a purpose-scoped `IDataProtector` — no bespoke crypto) plus its `last4` and a default flag. `IUserKeyStore` (Infrastructure) does encrypt/decrypt + default management; `/api/keys` exposes only the safe `SavedApiKey` view (provider + last4 + default) — the plaintext is accepted once over HTTPS and never returned. The frontend `useApiKeys` hook now reads/writes the vault instead of `localStorage`, so the Settings copy is finally accurate.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The security promise is now true: encrypted at rest, never echoed back; per-user isolation; acceptance-tested (ciphertext ≠ plaintext, key never in any response) |
+| (+) | No hand-rolled crypto — the framework owns key management and rotation |
+| (-) | The stored key is **not yet consumed** by the LLM pipeline (still uses the startup-configured key) — tracked as REQ-013 |
+| (-) | The Data Protection key ring uses the default (local) provider; for multi-instance production it must be persisted to a shared store (DB/Redis) — a deployment follow-up |
 
 ---
 

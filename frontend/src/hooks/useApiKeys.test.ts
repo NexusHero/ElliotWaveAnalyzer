@@ -1,64 +1,64 @@
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
+import { createElement, type ReactNode } from 'react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as client from '../api/client'
 import { useApiKeys } from './useApiKeys'
 
-describe('useApiKeys', () => {
-  beforeEach(() => localStorage.clear())
+vi.mock('../api/client')
 
-  it('starts empty', () => {
-    const { result } = renderHook(() => useApiKeys())
-    expect(result.current.hasAnyKey).toBe(false)
+function wrapper({ children }: { children: ReactNode }) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return createElement(QueryClientProvider, { client: queryClient }, children)
+}
+
+describe('useApiKeys', () => {
+  beforeEach(() => {
+    vi.mocked(client.listApiKeys).mockResolvedValue([])
+    vi.mocked(client.saveApiKey).mockResolvedValue({ provider: 'gemini', last4: 'ABCD', isDefault: true })
+    vi.mocked(client.deleteApiKey).mockResolvedValue()
+    vi.mocked(client.setDefaultApiKey).mockResolvedValue()
+  })
+
+  it('starts empty', async () => {
+    const { result } = renderHook(() => useApiKeys(), { wrapper })
+    await waitFor(() => expect(result.current.hasAnyKey).toBe(false))
     expect(result.current.keys).toEqual({})
   })
 
-  it('stores only the last four chars and makes the first key the default', () => {
-    const { result } = renderHook(() => useApiKeys())
+  it('derives key metadata from the server list (never a plaintext key)', async () => {
+    vi.mocked(client.listApiKeys).mockResolvedValue([
+      { provider: 'gemini', last4: 'ABCD', isDefault: true },
+      { provider: 'claude', last4: '2222', isDefault: false },
+    ])
 
-    act(() => result.current.saveKey('gemini', 'sk-secret-ABCD'))
+    const { result } = renderHook(() => useApiKeys(), { wrapper })
 
-    expect(result.current.hasAnyKey).toBe(true)
+    await waitFor(() => expect(result.current.hasAnyKey).toBe(true))
     expect(result.current.keys.gemini).toEqual({ last4: 'ABCD', isDefault: true })
-    // The plaintext key is never persisted.
+    expect(result.current.keys.claude).toEqual({ last4: '2222', isDefault: false })
     expect(JSON.stringify(result.current.keys)).not.toContain('secret')
   })
 
-  it('does not steal the default from an existing key', () => {
-    const { result } = renderHook(() => useApiKeys())
+  it('saveKey sends the trimmed plaintext to the backend', async () => {
+    const { result } = renderHook(() => useApiKeys(), { wrapper })
+    await waitFor(() => expect(result.current).toBeTruthy())
 
-    act(() => result.current.saveKey('gemini', 'aaaa1111'))
-    act(() => result.current.saveKey('claude', 'bbbb2222'))
+    result.current.saveKey('gemini', '  sk-secret-ABCD  ')
 
-    expect(result.current.keys.gemini?.isDefault).toBe(true)
-    expect(result.current.keys.claude?.isDefault).toBe(false)
+    await waitFor(() => expect(client.saveApiKey).toHaveBeenCalledWith('gemini', 'sk-secret-ABCD'))
   })
 
-  it('promotes a remaining key when the default is removed', () => {
-    const { result } = renderHook(() => useApiKeys())
-    act(() => result.current.saveKey('gemini', 'aaaa1111'))
-    act(() => result.current.saveKey('claude', 'bbbb2222'))
+  it('removeKey and setDefault call the backend', async () => {
+    const { result } = renderHook(() => useApiKeys(), { wrapper })
+    await waitFor(() => expect(result.current).toBeTruthy())
 
-    act(() => result.current.removeKey('gemini'))
+    result.current.removeKey('gemini')
+    result.current.setDefault('claude')
 
-    expect(result.current.keys.gemini).toBeUndefined()
-    expect(result.current.keys.claude?.isDefault).toBe(true)
-  })
-
-  it('moves the default with setDefault', () => {
-    const { result } = renderHook(() => useApiKeys())
-    act(() => result.current.saveKey('gemini', 'aaaa1111'))
-    act(() => result.current.saveKey('claude', 'bbbb2222'))
-
-    act(() => result.current.setDefault('claude'))
-
-    expect(result.current.keys.gemini?.isDefault).toBe(false)
-    expect(result.current.keys.claude?.isDefault).toBe(true)
-  })
-
-  it('persists across hook instances via localStorage', () => {
-    const first = renderHook(() => useApiKeys())
-    act(() => first.result.current.saveKey('openai', 'zzzz9999'))
-
-    const second = renderHook(() => useApiKeys())
-    expect(second.result.current.keys.openai).toEqual({ last4: '9999', isDefault: true })
+    await waitFor(() => {
+      expect(client.deleteApiKey).toHaveBeenCalledWith('gemini')
+      expect(client.setDefaultApiKey).toHaveBeenCalledWith('claude')
+    })
   })
 })

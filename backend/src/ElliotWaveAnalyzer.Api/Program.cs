@@ -53,6 +53,7 @@ try
     app.MapMarketDataEndpoints();
     app.MapWaveAnalysisEndpoints();
     app.MapTrackRecordEndpoints();
+    app.MapKeyEndpoints();
 
     app.Run();
 }

@@ -3,6 +3,7 @@ import type {
   AutoWaveAnalysisResponse,
   CandleIntervalCode,
   SavedAnalysisResponse,
+  SavedApiKey,
   TechnicalAnalysisResult,
   TrackAnalysisRequest,
   TrackedAnalysis,
@@ -116,6 +117,44 @@ export async function deleteAnalysis(id: string, signal?: AbortSignal): Promise<
     signal,
   })
 
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Lists the user's configured API-key providers (metadata only — never the key). */
+export async function listApiKeys(signal?: AbortSignal): Promise<SavedApiKey[]> {
+  const response = await fetch('/api/keys', { signal })
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+  return (await response.json()) as SavedApiKey[]
+}
+
+/** Saves/replaces the API key for a provider via `PUT /api/keys/{provider}`. */
+export async function saveApiKey(provider: string, key: string): Promise<SavedApiKey> {
+  const response = await fetch(`/api/keys/${encodeURIComponent(provider)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key }),
+  })
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+  return (await response.json()) as SavedApiKey
+}
+
+/** Deletes the API key for a provider. */
+export async function deleteApiKey(provider: string): Promise<void> {
+  const response = await fetch(`/api/keys/${encodeURIComponent(provider)}`, { method: 'DELETE' })
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Makes a configured provider the user's default. */
+export async function setDefaultApiKey(provider: string): Promise<void> {
+  const response = await fetch(`/api/keys/${encodeURIComponent(provider)}/default`, { method: 'PUT' })
   if (!response.ok && response.status !== 404) {
     throw new Error(await extractErrorDetail(response))
   }
