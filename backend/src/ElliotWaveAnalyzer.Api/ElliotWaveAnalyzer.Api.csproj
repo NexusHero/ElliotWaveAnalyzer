@@ -25,6 +25,11 @@
          Replaces Swashbuckle (not .NET 10 compatible).
          Serves OpenAPI JSON at /openapi/v1.json. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <!-- Direct pin: the transitive Microsoft.OpenApi 2.0.0 pulled in by
+         Microsoft.AspNetCore.OpenApi has a known high-severity advisory
+         (GHSA-v5pm-xwqc-g5wc), which fails restore under TreatWarningsAsErrors.
+         Remove once Microsoft.AspNetCore.OpenApi references a patched version. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
 
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
