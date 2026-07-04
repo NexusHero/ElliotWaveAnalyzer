@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Coverage collector settings. Excludes code that is wiring or generated, not logic, so the
+  reported percentage reflects the code we actually own and test (ADR-007 / ADR-015):
+    - Program            : the top-level composition root (startup wiring).
+    - Extensions.*        : DI registration (service wiring) — no branching logic.
+    - **/Migrations/*.cs  : EF-generated migration + model-snapshot code.
+    - generated members   : compiler-generated / [ExcludeFromCodeCoverage].
+  Real I/O adapters that carry mapping logic (market-data providers, delivery channels) are NOT
+  excluded — they are tested with a mocked HttpMessageHandler instead.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <SkipAutoProps>true</SkipAutoProps>
+          <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverage</ExcludeByAttribute>
+          <ExcludeByFile>**/Migrations/*.cs</ExcludeByFile>
+          <Exclude>[ElliotWaveAnalyzer.Api]Program,[ElliotWaveAnalyzer.Api]ElliotWaveAnalyzer.Api.Extensions.*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

@@ -54,6 +54,7 @@ jobs:
           --configuration Release
           --logger "console;verbosity=detailed"
           --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
           --results-directory ./TestResults
         working-directory: backend
         env:
