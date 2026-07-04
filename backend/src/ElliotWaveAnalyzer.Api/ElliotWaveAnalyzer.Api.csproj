@@ -58,6 +58,11 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
 
+    <!-- Depot import: PdfPig extracts text with word bounding boxes from broker PDF
+         statements (Smartbroker+). MIT, pure managed code, no native deps. Isolated in
+         a single Infrastructure file (SmartbrokerPlusPdfImporter) like Skender. -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+
     <!-- Daily report: SkiaSharp renders the chart PNG; Cronos parses the cron schedule. -->
     <PackageReference Include="SkiaSharp" Version="4.148.0" />
     <!-- Linux native libSkiaSharp for CI/containers (Windows/macOS ship with SkiaSharp).

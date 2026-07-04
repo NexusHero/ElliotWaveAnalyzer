@@ -22,6 +22,7 @@ try
     builder.Services.AddAppAuth(builder.Configuration, out var googleEnabled);
     builder.Services.AddAppRateLimiting();
     builder.Services.AddReportingServices(builder.Configuration);
+    builder.Services.AddDepotImport();
     builder.Services.AddAppTelemetry(builder.Configuration);
     builder.Services.AddProblemDetails(); // RFC 9457 for unhandled exceptions
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -54,6 +55,7 @@ try
     app.MapWaveAnalysisEndpoints();
     app.MapTrackRecordEndpoints();
     app.MapKeyEndpoints();
+    app.MapDepotEndpoints();
 
     app.Run();
 }

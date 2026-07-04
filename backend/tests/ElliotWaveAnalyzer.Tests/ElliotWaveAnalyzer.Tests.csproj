@@ -54,6 +54,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Synthetic broker-statement fixtures (no real PII) copied next to the test assembly. -->
+    <None Update="TestData/Depot/*.pdf" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\ElliotWaveAnalyzer.Api\ElliotWaveAnalyzer.Api.csproj" />
   </ItemGroup>
 

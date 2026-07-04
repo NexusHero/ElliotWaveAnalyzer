@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getAuthProviders, getCurrentUser, login, validateWaveCount } from './client'
-import type { WaveAnalysisResponse, WaveValidationRequest } from './types'
+import {
+  getAuthProviders,
+  getCurrentUser,
+  importDepot,
+  login,
+  validateWaveCount,
+} from './client'
+import type { DepotSnapshot, WaveAnalysisResponse, WaveValidationRequest } from './types'
 
 const request: WaveValidationRequest = {
   symbol: 'BTC',
@@ -95,6 +101,61 @@ describe('getAuthProviders', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
 
     expect(await getAuthProviders()).toEqual({ google: false })
+  })
+})
+
+describe('importDepot', () => {
+  const snapshot: DepotSnapshot = {
+    source: 'SmartbrokerPlus',
+    importedAt: '2026-01-01T00:00:00Z',
+    exportedAt: '2026-01-01T12:00:00Z',
+    currency: 'EUR',
+    positions: [
+      {
+        isin: 'US0000000001',
+        wkn: null,
+        name: 'ACME Robotics Inc.',
+        quantity: 10,
+        costPrice: 100,
+        costValue: 1000,
+        marketPrice: 120.5,
+        marketValue: 1205,
+        gainAbsolute: 205,
+        gainRelativePercent: 20.5,
+        exchange: 'XETRA',
+      },
+    ],
+    totals: { totalValue: 1205, gainAbsolute: 205, gainRelativePercent: 20.5 },
+  }
+
+  it('POSTs the file as multipart form-data and returns the parsed snapshot', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(snapshot) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const file = new File([new Uint8Array([1, 2, 3])], 'depot.pdf', { type: 'application/pdf' })
+    const result = await importDepot(file)
+
+    expect(result).toEqual(snapshot)
+    const [url, init] = fetchMock.mock.calls[0]! as [string, RequestInit]
+    expect(url).toBe('/api/depot/import')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeInstanceOf(FormData)
+    expect((init.body as FormData).get('file')).toBe(file)
+    // The browser must set the multipart boundary itself — we must not force a Content-Type.
+    expect(init.headers).toBeUndefined()
+  })
+
+  it('throws the server error detail on a non-ok response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ detail: 'This PDF is not a Smartbroker+ depot export.' }),
+      })
+    )
+
+    const file = new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' })
+    await expect(importDepot(file)).rejects.toThrow('Smartbroker+')
   })
 })
 
