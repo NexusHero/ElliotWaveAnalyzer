@@ -54,9 +54,10 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-003 | Surface the nested count (subdivisions, degree, score) in the auto-analysis UI | #77 (PR #78) | Fulfilled |
 | REQ-004 | Persist analyses per user and evaluate each outcome (held / invalidated / target reached) against real price action | #79 (PR #80) · ADR-010 · §6 Scenario 4 | Fulfilled |
 | REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 (PR #82) · ADR-007 | Fulfilled |
-| REQ-006 | Track-record history UI + save action in the auto-analysis panel | #83 · §6 Scenario 5 | Fulfilled |
+| REQ-006 | Track-record history UI + save action in the auto-analysis panel | #83 (PR #84) · §6 Scenario 5 | Fulfilled |
 | REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | planned | Proposed |
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
+| REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -730,6 +731,25 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | (+) | The outcome always reflects the latest price; no stale/duplicated state to reconcile |
 | (+) | The decision logic is pure and exhaustively unit-tested; a provider failure degrades one symbol to `Pending` rather than blanking the history |
 | (-) | Listing re-fetches candles per distinct symbol (mitigated by the caching provider); a future scheduled re-evaluation will be needed to drive alerts |
+
+---
+
+## ADR-011: SOLID, TDD and Documented+Tested Endpoints as Enforced Quality Gates
+
+**Context:** SOLID, TDD and API documentation were described in the skill but not enforced with the same weight as the tests, so drift was possible (god classes, concrete-type dependencies, or an endpoint shipping undocumented/untested).
+
+**Decision:** Promote three rules to non-negotiable Quality Gates (skill + PR template), extending the governance of ADR-007:
+1. **SOLID** — mandatory. The two watched-hardest violations: **no god classes** (SRP — one reason to change; business logic in small pure classes), and **depend on interfaces, not concrete types** across a boundary (DIP; third-party types stay in their implementation files). Enforced by `ArchitectureTests` where possible.
+2. **TDD** — tests before implementation (Red → Green → Refactor), in the same PR.
+3. **Every new API endpoint** is exercised by an acceptance/integration test **and** carries OpenAPI metadata (`WithSummary`/`WithDescription`/`Produces`/`ProducesProblem`) so it appears in the Scalar UI.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Decoupling and testability stay high by construction; no endpoint ships undocumented or unexercised |
+| (+) | Reviewers have concrete, checkable gates rather than vibes |
+| (-) | Slightly more up-front discipline per PR; deliberate |
 
 ---
 

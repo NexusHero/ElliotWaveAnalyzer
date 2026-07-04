@@ -69,17 +69,34 @@ The system replaces an n8n workflow that delivered daily technical analysis repo
 
 ---
 
-## SOLID Principles — Non-Negotiable
+## SOLID Principles — Non-Negotiable (Quality Gate)
 
-Every class in the backend must follow these — do not compromise them for convenience:
+**SOLID compliance is mandatory and reviewed on every PR — it is a Quality Gate, weighted the same
+as the tests.** Do not compromise it for convenience. The `ArchitectureTests` enforce the layering
+and encapsulation parts automatically; the rest is enforced in review.
 
 | Principle | How it is applied in this codebase |
 |-----------|-----------------------------------|
-| **S** (Single Responsibility) | `CoinGeckoMarketDataProvider` only fetches. `SkenderIndicatorCalculator` only calculates. `TechnicalAnalysisService` only orchestrates. Never merge these responsibilities. |
-| **O** (Open/Closed) | New data source = new `IMarketDataProvider` class + one DI line in `Program.cs`. No existing class is modified. |
-| **L** (Liskov Substitution) | All `IMarketDataProvider` implementations must be substitutable. `Supports(symbol)` is the only selection criterion. |
-| **I** (Interface Segregation) | Interfaces are narrow. Do not add unrelated methods to `IMarketDataProvider`, `IIndicatorCalculator`, or `IGeminiWaveAnalyzer`. |
-| **D** (Dependency Inversion) | Services depend on interfaces, never on concrete types. Skender and Google.GenAI types must not appear outside their respective implementation files. |
+| **S** (Single Responsibility) | Each class has exactly one reason to change: a provider only fetches, `SkenderIndicatorCalculator` only calculates, a service only orchestrates, the pure checkers/evaluators only compute. Never merge these responsibilities. |
+| **O** (Open/Closed) | New behaviour = a new class + one DI registration; existing classes are not modified (e.g. a new `IMarketDataProvider`, a new LLM `IChatClient`). |
+| **L** (Liskov Substitution) | All implementations of an interface are substitutable; selection is by an explicit criterion (`Supports(symbol)`), never by type-checking. |
+| **I** (Interface Segregation) | Interfaces are narrow and single-purpose. Do not add unrelated methods to `IMarketDataProvider`, `IIndicatorCalculator`, `ITrackRecordService`, etc. |
+| **D** (Dependency Inversion) | Consumers depend on **interfaces / abstractions, never on concrete implementation types across a boundary**. Third-party types (Skender, the LLM SDKs, EF) stay inside their implementation files and never leak into Domain/Application/Interfaces. |
+
+### The two violations to watch for hardest
+
+- **No god classes (SRP).** A class that fetches *and* calculates *and* orchestrates *and*
+  persists is a god class — split it. If a class has grown several unrelated responsibilities, or
+  you cannot state its single reason to change in one sentence, it is wrong. Business logic belongs
+  in small, pure, dependency-free classes (`ElliottRuleChecker`, `ProjectionService`,
+  `AnalysisOutcomeEvaluator`, `WaveGrammarParser`); glue stays thin.
+- **Depend on interfaces, not concretes (DIP).** A new service is injected and consumed through an
+  **interface** in `Interfaces/`; callers never `new` up a concrete service or reference the
+  concrete type. Infrastructure implementations stay `internal` (the `ArchitectureTests` enforce
+  this). If you find yourself importing an Infrastructure type into Application, stop — invert it.
+
+A PR that introduces a god class, or a direct dependency on a concrete type where an interface
+should stand, is **not done** — the same as a PR with a failing test.
 
 ---
 
@@ -295,6 +312,9 @@ A change is done — and its PR mergeable — only when **all** hold:
 - `npm run build` succeeds in `frontend/`
 - No Skender types outside `SkenderIndicatorCalculator.cs`
 - No API key strings hardcoded in source
+- **SOLID holds** (see that section): no god classes (SRP), dependencies through interfaces not concrete types (DIP); `ArchitectureTests` green.
+- **Test-Driven Development.** Tests are written **before** the implementation (Red → Green → Refactor). New behaviour arrives with the test that specifies it in the same PR — never code first, tests bolted on after (or never).
+- **Every new API endpoint is documented and tested.** It must (a) be exercised by at least one acceptance/integration test, and (b) carry OpenAPI metadata — `WithName`/`WithSummary`/`WithDescription`/`Produces<T>()`/`ProducesProblem()` — so it shows up in the Scalar UI (`/scalar/v1`) and `openapi/v1.json`. An undocumented or untested endpoint is not done.
 - **Line coverage is ≥ 90%.** New application/infrastructure logic must be covered; a change that drops coverage below the 90% target is not done. Put the business logic in pure, static, dependency-free classes (like `ElliottRuleChecker`, `ProjectionService`, `AnalysisOutcomeEvaluator`) so it can be exhaustively unit-tested without mocks — that is how the target is met, not by writing shallow tests.
 - **Architecture Governance satisfied** (see that section): matching ADR added, Requirements Register updated, sequence diagram added/updated for a fulfilled requirement, and any affected §5/§6/§8 prose corrected — whenever the change is architecturally relevant.
 - `git status` is clean — no needed source file left untracked
