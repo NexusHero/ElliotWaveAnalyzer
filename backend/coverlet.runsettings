@@ -18,7 +18,9 @@
           <SkipAutoProps>true</SkipAutoProps>
           <ExcludeByAttribute>GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverage</ExcludeByAttribute>
           <ExcludeByFile>**/Migrations/*.cs</ExcludeByFile>
-          <Exclude>[ElliotWaveAnalyzer.Api]Program,[ElliotWaveAnalyzer.Api]ElliotWaveAnalyzer.Api.Extensions.*</Exclude>
+          <!-- Program/Extensions: startup wiring. *BackgroundService: cron hosting loops
+               (scheduling plumbing, no unit-testable branching beyond the cron-parse guard). -->
+          <Exclude>[ElliotWaveAnalyzer.Api]Program,[ElliotWaveAnalyzer.Api]ElliotWaveAnalyzer.Api.Extensions.*,[ElliotWaveAnalyzer.Api]*BackgroundService</Exclude>
         </Configuration>
       </DataCollector>
     </DataCollectors>

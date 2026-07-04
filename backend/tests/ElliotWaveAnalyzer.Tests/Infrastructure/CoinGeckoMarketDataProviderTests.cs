@@ -62,4 +62,22 @@ public sealed class CoinGeckoMarketDataProviderTests
 
         Assert.That(candles, Is.Empty);
     }
+
+    [Test]
+    public void GetCandlesAsync_NonSuccessStatus_Throws()
+    {
+        var handler = new StubHttpMessageHandler(
+            new HttpResponseMessage(System.Net.HttpStatusCode.TooManyRequests));
+        var client = new HttpClient(handler) { BaseAddress = new Uri("https://api.coingecko.com/api/v3/") };
+        var sut = new CoinGeckoMarketDataProvider(client, NullLogger<CoinGeckoMarketDataProvider>.Instance);
+
+        Assert.ThrowsAsync<HttpRequestException>(() => sut.GetCandlesAsync("BTC", days: 30));
+    }
+
+    [Test]
+    public void GetCandlesAsync_UnsupportedSymbol_Throws()
+    {
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => Build(OhlcJson).GetCandlesAsync("DOGE", days: 30));
+    }
 }
