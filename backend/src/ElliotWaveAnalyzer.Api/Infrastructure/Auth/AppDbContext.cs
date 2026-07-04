@@ -13,6 +13,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<UserSession> Sessions => Set<UserSession>();
     public DbSet<AnalysisSnapshot> AnalysisSnapshots => Set<AnalysisSnapshot>();
+    public DbSet<UserApiKey> UserApiKeys => Set<UserApiKey>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -34,6 +35,16 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(s => s.Confidence).HasMaxLength(16).IsRequired();
             // List the newest first per user — the history's natural order.
             entity.HasIndex(s => new { s.UserId, s.CreatedAt });
+        });
+
+        builder.Entity<UserApiKey>(entity =>
+        {
+            entity.HasKey(k => k.Id);
+            entity.Property(k => k.Provider).HasMaxLength(16).IsRequired();
+            entity.Property(k => k.Last4).HasMaxLength(4).IsRequired();
+            entity.Property(k => k.CipherText).IsRequired();
+            // One key per (user, provider).
+            entity.HasIndex(k => new { k.UserId, k.Provider }).IsUnique();
         });
     }
 }

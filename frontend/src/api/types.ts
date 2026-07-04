@@ -241,6 +241,13 @@ export interface SavedAnalysisResponse {
   id: string
 }
 
+/** The safe view of a stored API key (mirrors backend `SavedApiKey`) — never the key itself. */
+export interface SavedApiKey {
+  provider: string
+  last4: string
+  isDefault: boolean
+}
+
 /** One confidence level's calibration against recorded outcomes (mirrors `CalibrationBucket`). */
 export interface CalibrationBucket {
   confidence: string
