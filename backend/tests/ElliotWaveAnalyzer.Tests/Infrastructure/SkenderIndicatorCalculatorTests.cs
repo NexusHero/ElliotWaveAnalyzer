@@ -183,4 +183,63 @@ public sealed class SkenderIndicatorCalculatorTests
                 $"Histogram on {entry.Date:yyyy-MM-dd} violates invariant: MacdLine - SignalLine");
         }
     }
+
+    // ─── ATR ──────────────────────────────────────────────────────────────────
+
+    [Test]
+    public void CalculateAtr_ResultCount_EqualsInputCount()
+    {
+        var candles = MarketDataFixtures.CreateCandles(30);
+
+        var result = _sut.CalculateAtr(candles);
+
+        Assert.That(result.Count, Is.EqualTo(candles.Count));
+    }
+
+    [Test]
+    public void CalculateAtr_ResultDates_AlignWithInputDates()
+    {
+        var candles = MarketDataFixtures.CreateCandles(30);
+
+        var result = _sut.CalculateAtr(candles);
+
+        Assert.That(
+            result.Select(r => r.Date),
+            Is.EqualTo(candles.Select(c => c.OpenTime)),
+            "ATR dates must map 1:1 to input candle OpenTime");
+    }
+
+    [Test]
+    public void CalculateAtr_WarmUpPeriod_HasNullValues()
+    {
+        // ATR needs `period` true ranges before the first value; earlier entries are null.
+        var candles = MarketDataFixtures.CreateCandles(30);
+        const int period = 14;
+
+        var result = _sut.CalculateAtr(candles, period);
+
+        var warmUpValues = result.Take(period).Select(r => r.Value);
+        Assert.That(warmUpValues, Has.All.Null,
+            $"First {period} ATR values must be null (warm-up period)");
+    }
+
+    [Test]
+    public void CalculateAtr_WithSufficientData_ValuesAreNonNegative()
+    {
+        var candles = MarketDataFixtures.CreateCandles(50);
+
+        var result = _sut.CalculateAtr(candles);
+
+        var computed = result.Where(r => r.Value.HasValue).ToList();
+        Assert.That(computed, Is.Not.Empty, "Should produce at least one non-null ATR value");
+        Assert.That(computed.All(r => r.Value >= 0m), Is.True, "ATR (a range) is never negative");
+    }
+
+    [Test]
+    public void CalculateAtr_InvalidPeriod_Throws()
+    {
+        var candles = MarketDataFixtures.CreateCandles(30);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => _sut.CalculateAtr(candles, period: 0));
+    }
 }

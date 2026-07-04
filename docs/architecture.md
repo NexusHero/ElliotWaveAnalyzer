@@ -63,6 +63,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-012 | Per-user encrypted API-key vault (replace the localStorage facade) | #96 · ADR-014 | Fulfilled |
 | REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
 | REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
+| REQ-015 | Route ATR through `IIndicatorCalculator`/Skender instead of a hand-rolled Wilder recurrence | #101 · ADR-016 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -883,6 +884,23 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 
 ---
 
+## ADR-016: Average True Range via `IIndicatorCalculator`/Skender (no hand-rolled Wilder recurrence)
+
+**Context:** `SwingPivotDetector` (Application) hand-rolled a Wilder-smoothed ATR (`WilderAtr`) to drive its volatility-adaptive swing threshold — the one indicator not delegated to Skender. RSI and MACD go through `SkenderIndicatorCalculator` precisely because Wilder smoothing and warm-up seeding are easy to get subtly wrong (ADR of Risk R3); ATR shares those subtleties. The stated reason for the exception — keeping the Application layer free of third-party contracts — is satisfiable without re-implementing the math.
+
+**Decision:** `IIndicatorCalculator` gains `CalculateAtr(candles, period)` (Domain `AtrResult`), implemented in `SkenderIndicatorCalculator` via Skender's `GetAtr` (Skender types stay confined to that one file — DIP unchanged). `SwingPivotDetector.DetectAtrAdaptive` no longer computes ATR: it **receives** a precomputed `IReadOnlyList<decimal?>` series (one entry per candle, null in warm-up), so the detector stays pure geometry and the volatility math lives behind the interface. `WilderAtr` is deleted.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | One less reinvented wheel: ATR seeding/warm-up is Skender's well-tested code, consistent with RSI/MACD |
+| (+) | `SwingPivotDetector` is still a pure static component (numbers in, pivots out) — the ATR dependency is passed in, not computed, so DIP holds without the Application layer touching Skender |
+| (+) | The seam is exercised end-to-end in tests (real `SkenderIndicatorCalculator` output feeds the detector) |
+| (-) | The volatility-adaptive strategy is a library capability exercised by tests; the default pipeline still uses the fixed-percent `Detect`. Wiring it in as a selectable mode is a separate, behaviour-changing follow-up |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}
@@ -908,7 +926,7 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 |----|------|-------------|--------|------------|
 | R1 | CoinGecko changes OHLC response format without notice (free tier, undocumented SLA) | Medium | High | Catch `JsonException` in provider; return 502; fix `List<List<double>>` mapping |
 | R2 | Google deprecates `gemini-2.5-flash` without warning | Low | Medium | Model name is configurable; update appsettings without deployment |
-| R3 | Skender major version introduces breaking changes to `IQuote` or extension methods | Low | Medium | Skender isolated in single file (`SkenderIndicatorCalculator.cs`); fix in one place |
+| R3 | Skender major version introduces breaking changes to `IQuote` or extension methods | Low | Medium | Skender isolated in single file (`SkenderIndicatorCalculator.cs`) — now covering RSI, MACD **and ATR** (ADR-016); fix in one place |
 | R4 | CoinGecko free-tier rate limits (10–30 req/min) exceeded in multi-user scenario | Low | Low | Short-lived response caching (`CachingMarketDataProvider` over `IMemoryCache`) implemented; per-IP rate limiting also guards the endpoint |
 | R5 | Gemini returns malformed JSON despite `ResponseMimeType` | Low | Low | `GeminiWaveAnalyzer` catches `JsonException` and throws `InvalidOperationException` → 502 |
 
