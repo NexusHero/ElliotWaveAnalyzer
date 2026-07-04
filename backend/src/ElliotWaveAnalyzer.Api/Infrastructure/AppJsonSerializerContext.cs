@@ -20,6 +20,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<TrackedAnalysis>))]
 [JsonSerializable(typeof(TrackAnalysisRequest))]
 [JsonSerializable(typeof(SavedAnalysisResponse))]
+[JsonSerializable(typeof(ConfidenceCalibration))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSourceGenerationOptions(
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,

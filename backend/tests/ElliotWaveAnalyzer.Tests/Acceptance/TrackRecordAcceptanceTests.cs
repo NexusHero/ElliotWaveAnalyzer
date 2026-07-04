@@ -125,4 +125,38 @@ public sealed class TrackRecordAcceptanceTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
+
+    [Test]
+    public async Task Calibration_ReturnsBucketsForSavedAnalyses()
+    {
+        // Two high-confidence saves; fixture candles predate 'now' so both evaluate as Pending
+        // → the bucket exists with Concluded 0 and a null hit rate (the maths is unit-tested).
+        await _client.PostAsJsonAsync("/api/analyses", BuildRequest());
+        await _client.PostAsJsonAsync("/api/analyses", BuildRequest());
+
+        var response = await _client.GetAsync("/api/analyses/calibration");
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+
+        var high = root.GetProperty("buckets").EnumerateArray()
+            .First(b => b.GetProperty("confidence").GetString() == "high");
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(high.GetProperty("total").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(high.GetProperty("concluded").GetInt32(), Is.EqualTo(0));
+            Assert.That(root.GetProperty("totalConcluded").GetInt32(), Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public async Task Calibration_RequiresAuthentication()
+    {
+        using var anon = _factory.CreateClient();
+
+        var response = await anon.GetAsync("/api/analyses/calibration");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
 }

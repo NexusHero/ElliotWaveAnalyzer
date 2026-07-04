@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -35,6 +36,17 @@ public static class TrackRecordEndpoints
             .WithSummary("Delete a saved analysis")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/calibration", GetCalibration)
+            .WithName("GetCalibration")
+            .WithSummary("Confidence calibration over your track record")
+            .WithDescription("""
+                Aggregates your saved analyses by the AI's confidence (high/medium/low) and
+                reports, per level, how many have concluded and how many of those reached their
+                target — plus the hit rate and an overall figure. Shows whether "high confidence"
+                has actually held up. Outcomes are evaluated live against the latest candles.
+                """)
+            .Produces<ConfidenceCalibration>(StatusCodes.Status200OK);
 
         return app;
     }
@@ -75,6 +87,18 @@ public static class TrackRecordEndpoints
     {
         var deleted = await trackRecord.DeleteAsync(GetUserId(user), id, cancellationToken);
         return deleted ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> GetCalibration(
+        ClaimsPrincipal user,
+        ITrackRecordService trackRecord,
+        CancellationToken cancellationToken)
+    {
+        // Reuse the track record's live-evaluated outcomes, then aggregate with the pure calculator.
+        var analyses = await trackRecord.ListAsync(GetUserId(user), cancellationToken);
+        var calibration = CalibrationCalculator.Calculate(
+            analyses.Select(a => (a.Confidence, a.Outcome)));
+        return Results.Ok(calibration);
     }
 
     /// <summary>The authenticated user's id from the session principal (set by the auth handler).</summary>
