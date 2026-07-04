@@ -38,7 +38,25 @@ numbersections: true
 | F6 | Render candlestick charts with synchronized MACD/RSI sub-panes in the browser |
 | F7 | Support interactive annotation: click-to-label, edit, delete, re-assign |
 | F8 | Generate server-side chart images (PNG) for daily report delivery via Telegram/Email |
-| F9 | Model name configurable without code change (Google deprecates Gemini versions regularly) |
+| F9 | Model name configurable without code change (LLM providers deprecate model versions regularly) |
+
+## Requirements Register {#_requirements_register}
+
+Living register of tracked requirements. Every feature/story is entered here with a stable
+`REQ-NNN` id; when it is fulfilled it gains a Runtime-View sequence diagram (§6) showing how it
+was implemented. See the **Architecture Governance** section of the `elliottwave-agents` skill for
+the process. GitHub issues are where a requirement is discussed; this table is where it is tracked.
+
+| ID | Requirement | Delivered by | Status |
+|----|-------------|-------------|--------|
+| REQ-001 | Deterministic, provider-agnostic LLM access so providers can be swapped/added without touching domain logic | #67, #68 · ADR-008 | Fulfilled |
+| REQ-002 | Detect nested, multi-degree Elliott Wave counts (impulses, diagonals, corrective patterns) deterministically; the LLM only ranks & explains | #76 (PR #75) · ADR-009 | Fulfilled |
+| REQ-003 | Surface the nested count (subdivisions, degree, score) in the auto-analysis UI | #77 (PR #78) | Fulfilled |
+| REQ-004 | Persist analyses per user and evaluate each outcome (held / invalidated / target reached) against real price action | #79 (PR #80) · ADR-010 · §6 Scenario 4 | Fulfilled |
+| REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 · ADR-007 | Fulfilled |
+| REQ-006 | Track-record history UI + save action in the auto-analysis panel | #82 (planned) | Proposed |
+| REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | planned | Proposed |
+| REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
 
 ## Quality Goals {#_quality_goals}
 
@@ -46,9 +64,9 @@ numbersections: true
 |----------|------------------|------|
 | 1 | **Correctness** | Technical indicator calculations (RSI, MACD) must match established reference implementations; Skender handles Wilder's Smoothing edge cases that are easy to get wrong manually |
 | 2 | **Extensibility** | New data sources (Yahoo Finance for NASDAQ), new indicators, or new LLM providers must be addable without touching existing classes (OCP) |
-| 3 | **Testability** | All business logic sits behind interfaces; infrastructure (CoinGecko, Gemini) is mockable without network access; >80% branch coverage on domain and application layers |
-| 4 | **Security** | API keys (CoinGecko Pro, Gemini) must never be hardcoded; configurable via environment variables or appsettings |
-| 5 | **Maintainability** | Architecture decisions are documented as ADRs; Gemini model name is a configuration value, not a constant |
+| 3 | **Testability** | Business logic sits in pure, static, dependency-free classes and behind interfaces; infrastructure (market data, LLM) is mockable without network access; **≥90% line coverage** target (see Architecture Governance) |
+| 4 | **Security** | API keys (market data, LLM providers) must never be hardcoded; configurable via environment variables or appsettings |
+| 5 | **Maintainability** | Architecture decisions are documented as ADRs and requirements are traced to sequence diagrams — mandatory, per change; LLM model names are configuration values, not constants |
 
 ## Stakeholders {#_stakeholders}
 
@@ -337,7 +355,48 @@ sequenceDiagram
     WAS->>WAS: ValidateAnnotations() — detects unknown label "INVALID"
     WAS-->>API: throws ArgumentException("Invalid wave label(s): 'INVALID'")
     API-->>Browser: 400 ProblemDetails { title:"Invalid wave annotations", detail:"..." }
-    Note over Browser,API: Gemini is never called — no cost incurred
+    Note over Browser,API: LLM is never called — no cost incurred
+```
+
+## Scenario 4 — Track Record: Save then Evaluate (REQ-004) {#_runtime_scenario_4}
+
+Shows how the persistence-and-evaluation requirement was actually implemented: the deterministic
+geometry of a count is stored, and its outcome is recomputed fresh on every read against the
+candles that formed since the save — the outcome is never persisted, so it always reflects the
+latest price. The pure `AnalysisOutcomeEvaluator` does the decision; the service only orchestrates.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as Backend API
+    participant TRS as TrackRecordService
+    participant DB as PostgreSQL (AppDbContext)
+    participant Provider as IMarketDataProvider
+    participant Eval as AnalysisOutcomeEvaluator (pure)
+
+    Note over Browser,DB: Save — POST /api/analyses
+    Browser->>API: POST /api/analyses { symbol, structure, bullish, invalidation, target, confidence, score }
+    API->>TRS: SaveAsync(userId, request)
+    TRS->>DB: INSERT AnalysisSnapshot (geometry + CreatedAt)
+    DB-->>TRS: id
+    TRS-->>API: id
+    API-->>Browser: 201 Created { id }
+
+    Note over Browser,Eval: List — GET /api/analyses (outcome computed on read)
+    Browser->>API: GET /api/analyses
+    API->>TRS: ListAsync(userId)
+    TRS->>DB: SELECT snapshots WHERE UserId=userId ORDER BY CreatedAt DESC
+    DB-->>TRS: snapshots
+    loop per distinct symbol
+        TRS->>Provider: GetCandlesAsync(symbol, days=sinceSave+2)
+        Provider-->>TRS: candles (provider failure → treated as Pending)
+    end
+    loop per snapshot
+        TRS->>Eval: Evaluate(bullish, invalidation, target, candles after CreatedAt)
+        Eval-->>TRS: Pending | Invalidated | TargetReached (first event wins)
+    end
+    TRS-->>API: TrackedAnalysis[] (geometry + evaluated outcome)
+    API-->>Browser: 200 TrackedAnalysis[]
 ```
 
 ---
@@ -574,6 +633,74 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 
 ---
 
+## ADR-007: Architecture Governance — Mandatory ADRs, Requirements Register, Sequence Diagrams, 90% Coverage
+
+**Context:** The architecture documentation repeatedly fell behind the code — ADRs stopped at ADR-006 while the system gained an LLM abstraction, a grammar parser and persistence, none of which were documented. "Update the docs later" does not happen.
+
+**Decision:** Documentation is part of the change, enforced per PR. Every architecture decision or technology change requires an ADR in this section (same PR). Every feature is entered in the **Requirements Register** (§1) with a `REQ-NNN` id and, once fulfilled, gains a **Mermaid sequence diagram** in the Runtime View (§6) showing how it was implemented. The line-coverage target is raised to **≥90%**. These are Quality Gates, weighted the same as the tests, and are written into the `elliottwave-agents` skill and the PR template. (This ADR is self-demonstrating: it records the decision that mandates ADRs.)
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Docs, decisions and requirements stay current by construction — reviewed together with the code |
+| (+) | Every requirement is traceable: issue → REQ id → ADR → sequence diagram → tests |
+| (-) | Slightly more work per architecturally-relevant PR; deliberate, to stop doc rot |
+| (-) | The 90% coverage CI step stays advisory (`continue-on-error`) until the baseline is measured in CI, then flips to blocking (tracked as a follow-up) |
+
+---
+
+## ADR-008: Provider-Agnostic LLM Access via `Microsoft.Extensions.AI` (supersedes the Gemini-only integration)
+
+**Context:** The original design bound directly to the Google Gemini SDK (`GeminiWaveAnalyzer`). Supporting Claude and OpenAI — and an ensemble across all three — would have meant three bespoke HTTP clients and branching throughout.
+
+**Decision:** All LLM access goes through `Microsoft.Extensions.AI`'s `IChatClient` abstraction. Concrete clients (OpenAI, Gemini via its OpenAI-compatible endpoint, Claude via `Anthropic.SDK`) are registered as keyed singletons and chosen at startup from `LlmProvider:Active`; an `EnsembleAutoWaveAnalyzer` fans out to every configured provider and aggregates a consensus ranking. Token usage comes from the standardized `ChatResponse.Usage`.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | New provider = configuration + a keyed registration; domain code is untouched (OCP) |
+| (+) | Ensemble/multi-model consensus becomes possible; individual provider failures are tolerated |
+| (+) | Native JSON mode (`ChatResponseFormat.Json`) is requested uniformly, with robust extraction as fallback |
+| (-) | Abstraction hides provider-specific features (e.g. uneven structured-schema support — see the deferral in ADR-009's PR); model ids must still be configured per provider |
+
+**Supersedes:** the direct-SDK portion of ADR-003 and ADR-004 (the text-prompt and JSON-mode decisions still hold, now expressed through `IChatClient`).
+
+---
+
+## ADR-009: Deterministic Elliott Wave Grammar Parser (the LLM never does geometry)
+
+**Context:** Picking turning points and counting waves from a numeric series is geometry, at which LLMs are unreliable; but the rulebook is inherently ambiguous (several valid counts). A single flat impulse enumerator could not express corrections, diagonals, or nesting.
+
+**Decision:** Model the Elliott rulebook as a **grammar** (Motive → Impulse\|Diagonal; Corrective → Zigzag\|Flat\|Triangle; each wave a terminal leg or a nested structure) and parse the alternating pivot sequence with memoized dynamic programming over pivot intervals plus beam search. Pure, static rule checkers **prune** on hard-rule violations; tunable guideline scoring (Fibonacci fit, alternation, channel, time — `WaveScoringOptions`) **ranks** survivors. The LLM only ranks and explains the rule-valid candidates it is handed; it never invents or alters prices.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Nested, multi-degree counts with per-node rule reports and a deterministic score; reproducible and testable without mocks |
+| (+) | The trust boundary is explicit: deterministic geometry, LLM judgement on top |
+| (-) | Combinatorial search must be bounded (`MaxEvaluations`, beam width, pivot cap) with a `SearchTruncated` flag; the parser is the most complex pure component in the codebase |
+
+---
+
+## ADR-010: Track-Record Persistence with Outcome Computed on Read
+
+**Context:** Everything but auth was in-memory and lost on symbol change. A credible track record must show whether a saved count later held or failed — and that answer changes as new candles form.
+
+**Decision:** Persist only the deterministic geometry of a saved count (`AnalysisSnapshot` on the existing PostgreSQL `AppDbContext`, EF migration). The **outcome is never stored** — it is recomputed on every read by the pure `AnalysisOutcomeEvaluator` against the candles that formed since the save (first event wins; invalidation breaks a same-candle tie). `TrackRecordService` lives in Infrastructure (it touches EF and market data) behind `ITrackRecordService`; the evaluator stays pure in the Application layer.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The outcome always reflects the latest price; no stale/duplicated state to reconcile |
+| (+) | The decision logic is pure and exhaustively unit-tested; a provider failure degrades one symbol to `Pending` rather than blanking the history |
+| (-) | Listing re-fetches candles per distinct symbol (mitigated by the caching provider); a future scheduled re-evaluation will be needed to drive alerts |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}
@@ -607,10 +734,11 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 
 | ID | Debt | Priority | Effort | Description |
 |----|------|----------|--------|-------------|
-| S2 | Wave-count / daily-report persistence not yet implemented | High | Medium | Auth & sessions are persisted in PostgreSQL (`AppDbContext`), but wave counts and daily reports are not yet stored; planned for the next milestone |
+| S2 | Daily-report persistence not yet implemented | Medium | Medium | Analyses are now persisted per user (`AnalysisSnapshot`, ADR-010); daily-report history is still not stored |
 | S6 | OpenAPI codegen not yet automated in CI | Low | Low | `npm run generate:api` must be run manually; add to CI after backend stabilizes |
+| S7 | 90% coverage gate is advisory, not blocking | Medium | Low | The CI coverage step is `continue-on-error`; flip to hard-fail once the CI-measured baseline confirms ≥90% (ADR-007) |
 
-Resolved since the last revision: Yahoo Finance provider (`YahooFinanceMarketDataProvider`), the frontend wave-annotation layer (`WaveWorkspace` / `WaveAnnotationPanel`), server-side PNG rendering (`SkiaSharpChartRenderer`), and response caching (`CachingMarketDataProvider`) are now all implemented.
+Resolved since the last revision: the provider-agnostic LLM abstraction (`IChatClient`, ADR-008), the deterministic wave grammar parser (ADR-009), the nested-count UI, and per-user analysis persistence with outcome evaluation (ADR-010) are now all implemented.
 
 ---
 

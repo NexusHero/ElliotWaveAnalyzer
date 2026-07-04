@@ -132,9 +132,9 @@ Valid wave labels: `"1"` `"2"` `"3"` `"4"` `"5"` `"A"` `"B"` `"C"` `"W"` `"X"` `
 ### Architecture Documentation & Diagrams
 
 - The architecture is documented in `docs/architecture.md` (arc42, Markdown, Mermaid diagrams).
-- Keep `docs/architecture.md` in sync when you add or rename a building block, change a runtime flow, or make a significant architectural decision (add an ADR to Section 9).
 - Diagrams are Mermaid code blocks embedded in the Markdown — they render natively on GitHub.
 - Do not add PlantUML `.puml` files — use Mermaid for consistency.
+- See **Architecture Governance** below for the *mandatory* rules on when and how the docs must change. Keeping `docs/architecture.md` current is not optional — it is a Quality Gate, weighted the same as the tests.
 
 ### Commit Messages
 
@@ -184,6 +184,53 @@ var result = _sut.CalculateRsi(candles, period: 14);
 // Assert
 Assert.That((double)result.Last(r => r.Value.HasValue).Value!.Value, Is.GreaterThan(99.0));
 ```
+
+---
+
+## Architecture Governance — Non-Negotiable
+
+Architecture documentation is **part of the change, not a follow-up**. The docs have historically
+lagged the code; these rules exist to stop that. Every one of them is enforced in the same PR as
+the change it describes — a PR that changes architecture without the matching documentation is
+**not done**, exactly like a PR with failing tests.
+
+### 1. Requirements first — record them
+
+- Every feature or story starts from a **requirement** with a stable id (`REQ-NNN`), recorded in
+  the **Requirements Register** in `docs/architecture.md` §1 (Introduction and Goals). A GitHub
+  User Story issue is where the requirement is *discussed*; the Register is where it is *tracked*.
+- The Register row carries: id, short statement, the issue/PR that delivers it, and a status
+  (`Proposed` → `In Progress` → `Fulfilled`).
+
+### 2. Fulfilled requirements get a sequence diagram
+
+- When a requirement is fulfilled, add (or update) a **Mermaid sequence diagram** in the
+  **Runtime View** (`docs/architecture.md` §6) that shows *how* it was implemented — the actual
+  call flow across the real building blocks (endpoint → service → deterministic core / provider /
+  LLM → persistence). Link the scenario to its `REQ-NNN`.
+- The diagram documents reality, not intention: it must match the code that ships in the same PR.
+
+### 3. ADR for every architecture decision or technology change — always
+
+- Any of the following **requires an ADR** appended to `docs/architecture.md` §9 (Architecture
+  Decisions), sequentially numbered (`ADR-NNN`), in the **same PR**:
+  - Adding, removing, or swapping a technology / library / external service (e.g. a new LLM
+    provider, a persistence store, a charting lib).
+  - Introducing or changing a cross-layer boundary, an abstraction, or a major algorithm.
+  - Any decision a future maintainer would ask "why was it done this way?" about.
+- ADR format (keep it short): **Context** → **Decision** → **Consequences** (and **Alternatives**
+  considered when the choice was close). Never rewrite history — supersede an old ADR with a new
+  one and mark the old one `Superseded by ADR-NNN`.
+
+### 4. Keep the rest of the doc honest
+
+- Update the **Building Block View** (§5) when you add or rename a building block, and the
+  **Cross-cutting Concepts** (§8) when a shared mechanism changes. If the diagram or prose now
+  describes something that is no longer true, fixing it is part of your PR.
+
+**Definition of done for any architecturally-relevant change:** matching ADR added · Requirements
+Register updated · sequence diagram added/updated for a fulfilled requirement · affected §5/§6/§8
+sections corrected — all in the same PR, all reviewed together with the code.
 
 ---
 
@@ -248,7 +295,8 @@ A change is done — and its PR mergeable — only when **all** hold:
 - `npm run build` succeeds in `frontend/`
 - No Skender types outside `SkenderIndicatorCalculator.cs`
 - No API key strings hardcoded in source
-- New application/infrastructure logic covered by at least one test
+- **Line coverage is ≥ 90%.** New application/infrastructure logic must be covered; a change that drops coverage below the 90% target is not done. Put the business logic in pure, static, dependency-free classes (like `ElliottRuleChecker`, `ProjectionService`, `AnalysisOutcomeEvaluator`) so it can be exhaustively unit-tested without mocks — that is how the target is met, not by writing shallow tests.
+- **Architecture Governance satisfied** (see that section): matching ADR added, Requirements Register updated, sequence diagram added/updated for a fulfilled requirement, and any affected §5/§6/§8 prose corrected — whenever the change is architecturally relevant.
 - `git status` is clean — no needed source file left untracked
 
 ---
@@ -260,9 +308,17 @@ A change is done — and its PR mergeable — only when **all** hold:
 | **Indicator unit tests** | NUnit (no mocks) | RSI/MACD mathematical properties: range, trend direction, histogram invariant, date alignment |
 | **Service unit tests** | NUnit + NSubstitute | Orchestration: provider selection, delegation, result pass-through, input validation |
 | **Prompt builder tests** | NUnit (pure static) | Prompt content and structure: all labels present, prices present, Elliott rules mentioned, JSON schema requested |
-| **Frontend component tests** | Vitest + RTL | PriceChart renders, accepts candles, handles empty array |
+| **Pure-logic unit tests** | NUnit (no mocks) | Deterministic cores: rule checkers, projections, the wave grammar parser, the analysis-outcome evaluator — exhaustive fixtures, no I/O |
+| **Acceptance tests** | NUnit + Testcontainers | Full API in-memory on real PostgreSQL; only the LLM (`IChatClient`) and market data (`IMarketDataProvider`) are faked |
+| **Frontend component tests** | Vitest + RTL | Components render against the real DOM; state, props, and empty/loading/error paths |
 
-**Never call real CoinGecko or Gemini APIs in unit tests.** Use `MarketDataFixtures` for candles, `NSubstitute` for `IMarketDataProvider` and `IGeminiWaveAnalyzer`.
+**Coverage target: ≥ 90% line coverage** (reported in CI). The way to hit it is architectural, not
+brute force: keep business logic in **pure, static, dependency-free** Application classes so it is
+trivially and exhaustively testable; orchestration/glue stays thin. Shallow tests that chase the
+number without exercising real behaviour do not count.
+
+**Never call real market-data or LLM APIs in unit tests.** Use `MarketDataFixtures` for candles and
+`NSubstitute` / the acceptance fakes for `IMarketDataProvider` and the LLM `IChatClient`.
 
 ---
 
