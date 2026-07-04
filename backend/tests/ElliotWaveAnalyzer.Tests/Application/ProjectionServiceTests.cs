@@ -102,4 +102,110 @@ public sealed class ProjectionServiceTests
             Assert.That(levels.Invalidation.Side, Is.EqualTo(LevelSide.Above)); // resistance cap
         });
     }
+
+    // ─── corrective projections ────────────────────────────────────────────────
+
+    [Test]
+    public void CorrectiveZigzag_UnfoldingB_InvalidationIsOriginOfA()
+    {
+        // Bearish zigzag (correcting a bull move): A down 200 → 140, B unfolding.
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m), StructureKind.Zigzag)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Wave B"));
+            Assert.That(levels.Bullish, Is.False);
+            Assert.That(levels.Invalidation!.Price, Is.EqualTo(200m));
+            Assert.That(levels.Invalidation.Side, Is.EqualTo(LevelSide.Above));
+            // 50–61.8% retrace of A (leg -60): 170 and 177.08
+            Assert.That(levels.SupportZone!.Low, Is.EqualTo(170m).Within(0.01m));
+            Assert.That(levels.SupportZone.High, Is.EqualTo(177.08m).Within(0.01m));
+        });
+    }
+
+    [Test]
+    public void CorrectiveFlat_UnfoldingB_HasDeepZoneAndNoHardInvalidation()
+    {
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m), StructureKind.Flat)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.Invalidation, Is.Null, "a flat B may overshoot the origin");
+            // 90–105% retrace of A: 194 and 203
+            Assert.That(levels.SupportZone!.Low, Is.EqualTo(194m).Within(0.01m));
+            Assert.That(levels.SupportZone.High, Is.EqualTo(203m).Within(0.01m));
+        });
+    }
+
+    [Test]
+    public void CorrectiveZigzag_UnfoldingC_TargetsAExtension()
+    {
+        // A: 200→140 (-60), B: back to 176; C projects 1.0–1.618× A down from 176.
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m, 176m), StructureKind.Zigzag)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Wave C"));
+            Assert.That(levels.Invalidation!.Price, Is.EqualTo(176m));
+            Assert.That(levels.Invalidation.Side, Is.EqualTo(LevelSide.Above));
+            Assert.That(levels.TargetZones[0].High, Is.EqualTo(116m).Within(0.01m));  // 1.0×
+            Assert.That(levels.TargetZones[0].Low, Is.EqualTo(78.92m).Within(0.01m)); // 1.618×
+        });
+    }
+
+    [Test]
+    public void CorrectiveComplete_ExpectsRecoveryAndInvalidatesBeyondC()
+    {
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m, 176m, 120m), StructureKind.Zigzag)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Correction complete"));
+            Assert.That(levels.Invalidation!.Price, Is.EqualTo(120m));
+            Assert.That(levels.TargetZones, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Triangle_UnfoldingE_MustStayInsideContractingRange()
+    {
+        // Bearish-opening triangle: A 200→140, B→176, C→150, D→170; E unfolding.
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m, 176m, 150m, 170m), StructureKind.Triangle)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Wave E (triangle)"));
+            // E retraces the D-leg (150→170) downward; barrier is C's end (150).
+            Assert.That(levels.Invalidation!.Price, Is.EqualTo(150m));
+            Assert.That(levels.Invalidation.Side, Is.EqualTo(LevelSide.Below));
+        });
+    }
+
+    [Test]
+    public void Triangle_Complete_ProjectsThrustOfWidestLeg()
+    {
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(200m, 140m, 176m, 150m, 170m, 155m), StructureKind.Triangle)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Triangle thrust"));
+            // Bearish A → thrust up; widest leg = 60 from E at 155: zone 200–215.
+            Assert.That(levels.TargetZones[0].Low, Is.EqualTo(200m).Within(0.01m));
+            Assert.That(levels.TargetZones[0].High, Is.EqualTo(215m).Within(0.01m));
+        });
+    }
+
+    [Test]
+    public void CorrectiveProjection_MotiveKind_ReturnsNull()
+    {
+        Assert.That(
+            ProjectionService.ProjectCorrective(Pivots(100m, 130m), StructureKind.Impulse),
+            Is.Null);
+    }
 }

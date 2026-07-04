@@ -50,6 +50,10 @@ internal static class AutoWaveRankRunner
         {
             ModelId = model,
             MaxOutputTokens = MaxOutputTokens,
+            // Native JSON mode where the provider supports it (OpenAI/Gemini honor it,
+            // others ignore it); LlmJson.ExtractObject stays as the fallback for providers
+            // that still wrap the object in fences or prose.
+            ResponseFormat = ChatResponseFormat.Json,
         };
 
         ChatResponse response;

@@ -68,6 +68,8 @@ export interface RuleResult {
   name: string
   status: RuleStatus
   detail: string
+  /** True for guidelines: a failing guideline flavors a count, only hard rules invalidate. */
+  isGuideline?: boolean
 }
 
 /** A computed Fibonacci ratio between waves. */
@@ -141,6 +143,28 @@ export interface AutoWaveAnalysisRequest {
   thresholdPercent?: number
 }
 
+/** The Elliott structure families the parser can detect (mirrors backend `StructureKind`). */
+export type StructureKind = 'Impulse' | 'Diagonal' | 'Zigzag' | 'Flat' | 'Triangle'
+
+/** Elliott degree ladder used by the nested parser (mirrors backend `WaveDegree`). */
+export type WaveDegree = 'Minute' | 'Minor' | 'Intermediate' | 'Primary' | 'Cycle'
+
+/**
+ * One wave of a nested count: either a terminal leg (`kind` absent, no children) or a wave
+ * that subdivides into the named structure one degree smaller. Mirrors backend `WaveNode`.
+ */
+export interface WaveNode {
+  label: string
+  kind?: StructureKind
+  degree: WaveDegree
+  start: WaveAnnotation
+  end: WaveAnnotation
+  ruleReport?: WaveRuleReport
+  /** Deterministic guideline score in [0, 1]; terminals carry the neutral 0.5. */
+  score: number
+  children: WaveNode[]
+}
+
 /**
  * One ranked, machine-detected wave count. The geometry (`origin` + `waves` + `ruleReport`)
  * is deterministic; `confidence`, `rationale` and `outlook` come from the LLM.
@@ -156,6 +180,10 @@ export interface RankedWaveCount {
   rationale: string
   outlook: string
   isBest: boolean
+  /** Nested parse tree behind this count (absent for legacy flat counts). */
+  tree?: WaveNode
+  /** Deterministic guideline score in [0, 1] (absent for legacy counts). */
+  score?: number
 }
 
 /** Response of `POST /api/wave-analysis/auto` — mirrors the backend `AutoWaveAnalysisResponse`. */
@@ -163,4 +191,6 @@ export interface AutoWaveAnalysisResponse {
   rankings: RankedWaveCount[]
   marketSummary: string
   usage: TokenUsage
+  /** True when the parser's evaluation budget bounded the search (rankings still valid). */
+  searchTruncated?: boolean
 }
