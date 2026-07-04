@@ -227,13 +227,48 @@ public sealed class WaveGrammarParserTests
     }
 
     [Test]
-    public void GenerateParsed_CorrectiveRoot_HasNoLevelsYet()
+    public void GenerateParsed_CorrectiveRoot_CarriesCorrectiveLevels()
     {
         var (candidates, _) = WaveCandidateGenerator.GenerateParsed(
             PivotsFromHigh(200m, 140m, 176m, 120m));
 
         var zigzag = candidates.First(c => c.Structure == "Zigzag");
-        Assert.That(zigzag.Levels, Is.Null,
-            "corrective projections arrive with the corrective ProjectionService support");
+        Assert.Multiple(() =>
+        {
+            Assert.That(zigzag.Levels, Is.Not.Null);
+            Assert.That(zigzag.Levels!.UnfoldingWave, Is.EqualTo("Correction complete"));
+            Assert.That(zigzag.Levels.Invalidation!.Price, Is.EqualTo(120m),
+                "a break beyond Wave C's end reopens the correction");
+        });
+    }
+
+    [Test]
+    [CancelAfter(10_000)]
+    public void Parse_OneYearDailySeries_CompletesWithinBudget()
+    {
+        // Deterministic synthetic year: trend + two sine harmonics ≈ nested swings.
+        var candles = new List<MarketCandle>();
+        for (var i = 0; i < 250; i++)
+        {
+            var price = 100m
+                + 0.15m * i
+                + (decimal)(8 * Math.Sin(i / 9.0) + 4 * Math.Sin(i / 3.5));
+            candles.Add(new MarketCandle(Start.AddDays(i), price, price + 1m, price - 1m, price, 0m));
+        }
+        var pivots = SwingPivotDetector.Detect(candles, thresholdPercent: 2.5m);
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var result = WaveGrammarParser.Parse(pivots);
+        watch.Stop();
+
+        TestContext.Out.WriteLine(
+            $"pivots: {pivots.Count}, trees: {result.Trees.Count}, " +
+            $"truncated: {result.SearchTruncated}, elapsed: {watch.ElapsedMilliseconds} ms");
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Trees, Is.Not.Empty, "a wavy year must yield at least one count");
+            Assert.That(watch.ElapsedMilliseconds, Is.LessThan(5_000),
+                "the default budget must keep a 1-year daily parse well under the endpoint timeout");
+        });
     }
 }

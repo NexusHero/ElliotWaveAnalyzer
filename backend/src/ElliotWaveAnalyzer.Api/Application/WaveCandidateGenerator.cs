@@ -111,12 +111,10 @@ public static class WaveCandidateGenerator
                 .Select(c => new WaveAnnotation(c.End.Date, c.End.Price, c.Label))
                 .ToList();
 
-            // Forward levels are only defined for motive roots today; corrective projections
-            // arrive with the corrective ProjectionService support.
             var isMotive = root.Kind is StructureKind.Impulse or StructureKind.Diagonal;
             var levels = isMotive
                 ? ProjectionService.Project([origin, .. waves])
-                : null;
+                : ProjectionService.ProjectCorrective([origin, .. waves], root.Kind!.Value);
 
             candidates.Add(new WaveCandidate(
                 index, root.Kind!.Value.ToString(), origin, waves, root.RuleReport!, levels)

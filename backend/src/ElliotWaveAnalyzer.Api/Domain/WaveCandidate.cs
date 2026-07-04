@@ -76,7 +76,14 @@ public sealed record RankedWaveCount(
     string Confidence,
     string Rationale,
     string Outlook,
-    bool IsBest);
+    bool IsBest)
+{
+    /// <summary>Nested parse tree behind this count (additive; null for legacy flat counts).</summary>
+    public WaveNode? Tree { get; init; }
+
+    /// <summary>Deterministic guideline score in [0, 1]; null for legacy counts.</summary>
+    public decimal? Score { get; init; }
+}
 
 /// <summary>
 /// Full response of <c>POST /api/wave-analysis/auto</c>: every candidate count the system
@@ -86,4 +93,11 @@ public sealed record RankedWaveCount(
 public sealed record AutoWaveAnalysisResponse(
     IReadOnlyList<RankedWaveCount> Rankings,
     string MarketSummary,
-    TokenUsage Usage);
+    TokenUsage Usage)
+{
+    /// <summary>
+    /// True when the parser's evaluation budget truncated the search — the rankings are
+    /// valid but coverage was bounded (never silently dropped).
+    /// </summary>
+    public bool SearchTruncated { get; init; }
+}

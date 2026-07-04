@@ -81,7 +81,8 @@ public static class AutoWaveAnalysisPromptBuilder
         foreach (var c in candidates)
         {
             sb.AppendLine();
-            sb.AppendLine($"### Candidate {c.Id} — {c.Structure} ({(c.RuleReport.BullishAssumed ? "bullish" : "bearish")})");
+            sb.Append($"### Candidate {c.Id} — {c.Structure} ({(c.RuleReport.BullishAssumed ? "bullish" : "bearish")})");
+            sb.AppendLine(c.Score is { } score ? $" — guideline score {score:0.###}" : string.Empty);
             sb.AppendLine($"- origin: {c.Origin.Date:yyyy-MM-dd} @ ${c.Origin.Price:F2}");
             foreach (var w in c.Waves)
             {
@@ -100,6 +101,33 @@ public static class AutoWaveAnalysisPromptBuilder
                     sb.AppendLine($"- fib: {ratio.Name} = {ratio.Ratio:0.###}");
                 }
             }
+
+            if (c.Tree is { } tree && tree.Children.Any(ch => ch.Children.Count > 0))
+            {
+                sb.AppendLine("- internal subdivision (degree, structure, per-node score):");
+                foreach (var child in tree.Children)
+                {
+                    AppendTree(sb, child, indent: 1);
+                }
+            }
+        }
+    }
+
+    /// <summary>Renders one wave of the nested count, recursing into subdivided waves.
+    /// Terminal legs stay one-line so the tree reads compactly.</summary>
+    private static void AppendTree(StringBuilder sb, WaveNode node, int indent)
+    {
+        var pad = new string(' ', indent * 2);
+        var subdivision = node.Kind is { } kind
+            ? $" — {kind} at {node.Degree} degree, score {node.Score:0.###}"
+            : string.Empty;
+        sb.AppendLine(
+            $"{pad}- wave {node.Label}: {node.Start.Date:yyyy-MM-dd} ${node.Start.Price:F2} → " +
+            $"{node.End.Date:yyyy-MM-dd} ${node.End.Price:F2}{subdivision}");
+
+        foreach (var child in node.Children)
+        {
+            AppendTree(sb, child, indent + 1);
         }
     }
 

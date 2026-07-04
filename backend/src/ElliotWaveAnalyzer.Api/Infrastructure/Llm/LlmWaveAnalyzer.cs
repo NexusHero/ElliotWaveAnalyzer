@@ -62,6 +62,9 @@ internal sealed class LlmWaveAnalyzer(
         {
             ModelId = options.Value.GetActiveEndpoint().Model,
             MaxOutputTokens = MaxOutputTokens,
+            // Native JSON mode where the provider supports it; the robust extraction in
+            // LlmJson stays as the fallback for providers that ignore the hint.
+            ResponseFormat = ChatResponseFormat.Json,
         };
 
         ChatResponse response;

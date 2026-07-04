@@ -46,11 +46,18 @@ public sealed class AutoWaveAnalysisService(
         var candles = await marketProvider.GetCandlesAsync(symbol, lookbackDays, cancellationToken);
 
         var pivots = SwingPivotDetector.Detect(candles, thresholdPercent);
-        var candidates = WaveCandidateGenerator.Generate(pivots);
+        var (candidates, searchTruncated) = WaveCandidateGenerator.GenerateParsed(
+            pivots, cancellationToken: cancellationToken);
 
         logger.LogInformation(
-            "Auto analysis for {Symbol}: {Pivots} pivots → {Candidates} rule-valid candidates",
-            symbol, pivots.Count, candidates.Count);
+            "Auto analysis for {Symbol}: {Pivots} pivots → {Candidates} parsed candidates (truncated: {Truncated})",
+            symbol, pivots.Count, candidates.Count, searchTruncated);
+        if (searchTruncated)
+        {
+            logger.LogWarning(
+                "Wave parse for {Symbol} hit the evaluation budget — rankings are valid but coverage was bounded",
+                symbol);
+        }
 
         if (candidates.Count == 0)
         {
@@ -59,7 +66,8 @@ public sealed class AutoWaveAnalysisService(
                 Rankings: [],
                 MarketSummary: "No rule-valid Elliott Wave structure was detected for the " +
                     "selected period and sensitivity. Try a longer lookback or a different threshold.",
-                Usage: new TokenUsage(llm.ProviderName, 0, 0, 0));
+                Usage: new TokenUsage(llm.ProviderName, 0, 0, 0))
+            { SearchTruncated = searchTruncated };
         }
 
         var analysis = await llm.RankAsync(symbol, candles, candidates, cancellationToken);
@@ -70,7 +78,8 @@ public sealed class AutoWaveAnalysisService(
             analysis.Usage.CompletionTokens, analysis.Usage.TotalTokens);
 
         var rankings = MergeRankings(candidates, analysis.Ranking);
-        return new AutoWaveAnalysisResponse(rankings, analysis.Ranking.MarketSummary, analysis.Usage);
+        return new AutoWaveAnalysisResponse(rankings, analysis.Ranking.MarketSummary, analysis.Usage)
+        { SearchTruncated = searchTruncated };
     }
 
     /// <summary>
@@ -112,5 +121,6 @@ public sealed class AutoWaveAnalysisService(
 
     private static RankedWaveCount ToRanked(
         WaveCandidate c, string confidence, string rationale, string outlook, bool isBest)
-        => new(c.Structure, c.Origin, c.Waves, c.RuleReport, c.Levels, confidence, rationale, outlook, isBest);
+        => new(c.Structure, c.Origin, c.Waves, c.RuleReport, c.Levels, confidence, rationale, outlook, isBest)
+        { Tree = c.Tree, Score = c.Score };
 }

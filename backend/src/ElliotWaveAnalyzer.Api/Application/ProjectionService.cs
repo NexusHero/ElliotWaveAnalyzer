@@ -135,6 +135,154 @@ public static class ProjectionService
                 "If price exceeds the Wave 5 high, Wave 5 may be extending rather than the correction having begun."));
     }
 
+    // ─── corrective structures ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Projects levels for a corrective count (zigzag, flat or triangle). Same positional
+    /// convention: P0 is the origin, each further pivot completes one leg, leg k+1 is
+    /// unfolding. Returns null with fewer than 2 points or for non-corrective kinds
+    /// (motive counts go through <see cref="Project"/>).
+    /// </summary>
+    public static WaveLevels? ProjectCorrective(
+        IReadOnlyList<WaveAnnotation> annotations, StructureKind kind)
+    {
+        ArgumentNullException.ThrowIfNull(annotations);
+
+        var p = annotations.OrderBy(a => a.Date).Select(a => a.Price).ToList();
+        if (p.Count < 2)
+        {
+            return null;
+        }
+
+        var bullish = p[1] > p[0];
+        var unfolding = p.Count; // origin + k completed legs → leg k+1 unfolding
+
+        return kind switch
+        {
+            StructureKind.Zigzag or StructureKind.Flat => unfolding switch
+            {
+                2 => CorrectionWaveB(p, bullish, kind),
+                3 => CorrectionWaveC(p, bullish),
+                _ => CorrectionComplete(p, bullish),
+            },
+            StructureKind.Triangle => unfolding <= 5
+                ? TriangleLeg(p, bullish, unfolding)
+                : TriangleThrust(p, bullish),
+            _ => null,
+        };
+    }
+
+    // Wave B unfolding: retraces A. A zigzag B must hold A's origin (hard); a flat B is
+    // expected to reach at least ~90% of A and may overshoot the origin, so no hard line.
+    private static WaveLevels CorrectionWaveB(IReadOnlyList<decimal> p, bool bull, StructureKind kind)
+    {
+        var legA = p[1] - p[0];
+        var zone = kind == StructureKind.Zigzag
+            ? Zone(
+                Retrace(p[1], legA, 0.5m), Retrace(p[1], legA, 0.618m),
+                "Wave B target (50–61.8% of Wave A)", "Fibonacci retracement of Wave A")
+            : Zone(
+                Retrace(p[1], legA, 0.9m), Retrace(p[1], legA, 1.05m),
+                "Wave B target (90–105% of Wave A)", "Flat: B revisits Wave A's origin");
+
+        return new WaveLevels(
+            "Wave B", bull,
+            kind == StructureKind.Zigzag
+                ? new PriceLevel(p[0], Side(bull), "Invalidation — Wave B must hold Wave A's origin", "Origin (start of Wave A)")
+                : null,
+            zone,
+            [],
+            new AlternativeScenario(
+                kind == StructureKind.Zigzag ? "Flat or new trend" : "Correction already over",
+                kind == StructureKind.Zigzag
+                    ? "A retrace beyond A's origin argues for a flat correction or a trend reversal instead."
+                    : "A shallow B (< 90% of A) argues for a zigzag rather than a flat."));
+    }
+
+    // Wave C unfolding: travels from B's end in A's direction, typically 1.0–1.618× A.
+    private static WaveLevels CorrectionWaveC(IReadOnlyList<decimal> p, bool bull)
+    {
+        var legA = p[1] - p[0];
+        var target = Zone(
+            Project(p[2], legA, 1.0m), Project(p[2], legA, 1.618m),
+            "Wave C target (1.0–1.618× Wave A)", "Fibonacci projection of Wave A from Wave B");
+
+        // C travels in the structure's own direction, so the line that kills the C-wave
+        // reading sits behind it: below price for a rising C, above for a falling one.
+        return new WaveLevels(
+            "Wave C", bull,
+            new PriceLevel(p[2], Side(bull), "Invalidation — Wave C must hold Wave B's end", "End of Wave B"),
+            null,
+            [target],
+            new AlternativeScenario("Correction already complete",
+                "If price reverses through Wave B's end, the correction likely finished at Wave B."));
+    }
+
+    // A-B-C complete: expect the larger trend to resume; a push beyond C reopens the correction.
+    private static WaveLevels CorrectionComplete(IReadOnlyList<decimal> p, bool bull)
+    {
+        var whole = p[3] - p[0];
+        var target = Zone(
+            Retrace(p[3], whole, 0.618m), Retrace(p[3], whole, 1.0m),
+            "Recovery target (61.8–100% of the correction)", "Retracement of Waves A–C");
+
+        return new WaveLevels(
+            "Correction complete", bull,
+            new PriceLevel(p[3], Side(bull), "Invalidation — a break beyond Wave C reopens the correction", "End of Wave C"),
+            null,
+            [target],
+            new AlternativeScenario("Complex correction (W-X-Y)",
+                "If price extends beyond Wave C, the correction may be evolving into a double three."));
+    }
+
+    // Triangle leg k unfolding: legs contract, so the leg must stay short of the terminal of
+    // the leg two before it — that terminal is the hard line.
+    private static WaveLevels TriangleLeg(IReadOnlyList<decimal> p, bool bull, int leg)
+    {
+        var names = new[] { "", "", "Wave B", "Wave C", "Wave D", "Wave E" };
+        var prior = p[leg - 1] - p[leg - 2]; // the leg just completed; the new leg retraces it
+        var zone = Zone(
+            Retrace(p[leg - 1], prior, 0.618m), Retrace(p[leg - 1], prior, 0.786m),
+            $"{names[leg]} target (61.8–78.6% of the prior leg)", "Typical triangle contraction");
+
+        // The unfolding leg travels opposite to the just-completed leg; it must not pass the
+        // terminal of the same-direction leg two back (contraction), which for wave B is the
+        // origin itself.
+        var barrier = p[leg - 2];
+        var legUp = prior < 0; // retracing a down-leg means the new leg points up
+
+        return new WaveLevels(
+            $"{names[leg]} (triangle)", bull,
+            new PriceLevel(
+                barrier, Side(!legUp),
+                $"Invalidation — {names[leg]} must stay inside the contracting range", "Terminal two legs back"),
+            zone,
+            [],
+            new AlternativeScenario("Not a triangle",
+                "A leg that leaves the contracting range voids the triangle count (zigzag or flat instead)."));
+    }
+
+    // Five legs complete: expect the post-triangle thrust, roughly the widest leg's span.
+    private static WaveLevels TriangleThrust(IReadOnlyList<decimal> p, bool bull)
+    {
+        var widest = Math.Abs(p[1] - p[0]);
+        // The thrust breaks opposite to the triangle's own A-leg direction (a wave-4 triangle
+        // in a bull market opens with a down A; the thrust resumes upward).
+        var thrustUp = !bull;
+        var from = p[5];
+        var target = thrustUp
+            ? Zone(from + 0.75m * widest, from + widest, "Thrust target (≈ widest leg)", "Post-triangle thrust")
+            : Zone(from - widest, from - 0.75m * widest, "Thrust target (≈ widest leg)", "Post-triangle thrust");
+
+        return new WaveLevels(
+            "Triangle thrust", bull,
+            new PriceLevel(p[3], Side(thrustUp), "Invalidation — a break through Wave C's end voids the thrust", "End of Wave C"),
+            null,
+            [target],
+            new AlternativeScenario("Triangle extending",
+                "If price stays inside the range, wave E may be subdividing further."));
+    }
+
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static LevelSide Side(bool supportBelow) => supportBelow ? LevelSide.Below : LevelSide.Above;
