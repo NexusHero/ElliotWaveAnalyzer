@@ -55,7 +55,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-004 | Persist analyses per user and evaluate each outcome (held / invalidated / target reached) against real price action | #79 (PR #80) · ADR-010 · §6 Scenario 4 | Fulfilled |
 | REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 (PR #82) · ADR-007 | Fulfilled |
 | REQ-006 | Track-record history UI + save action in the auto-analysis panel | #83 (PR #84) · §6 Scenario 5 | Fulfilled |
-| REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | planned | Proposed |
+| REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | #89 · ADR-012 · §6 Scenario 6 | Fulfilled |
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
 | REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
 
@@ -432,6 +432,40 @@ sequenceDiagram
     WW->>Query: deleteMutation.mutate(id) → DELETE, then invalidate ['analyses']
 ```
 
+## Scenario 6 — Price Alert: Scheduled Re-evaluation → Notify (REQ-007) {#_runtime_scenario_6}
+
+How a saved analysis turns into a notification. The scheduler ticks; the service re-evaluates
+only still-pending snapshots and, on a transition to a terminal outcome, delivers once through
+the enabled channels and advances the stored outcome so it never re-fires.
+
+```mermaid
+sequenceDiagram
+    participant Cron as AlertBackgroundService (cron)
+    participant AS as AlertService
+    participant DB as PostgreSQL (AppDbContext)
+    participant TA as ITechnicalAnalysisService
+    participant Eval as AnalysisOutcomeEvaluator + AlertDecision (pure)
+    participant Ch as IReportDeliveryChannel(s)
+
+    Cron->>AS: RunAsync()
+    AS->>DB: SELECT snapshots WHERE AlertedOutcome = Pending
+    DB-->>AS: pending snapshots
+    loop per distinct symbol
+        AS->>TA: GetAnalysisAsync(symbol) → candles + chart
+    end
+    loop per snapshot
+        AS->>Eval: Evaluate(candles after CreatedAt) → outcome; NewAlert(alerted, outcome)
+        alt transition Pending → Invalidated / TargetReached
+            AS->>Ch: SendAsync(chart + "invalidated/target" caption)
+            AS->>DB: snapshot.AlertedOutcome = terminal outcome
+        else still pending / already alerted
+            Eval-->>AS: no alert
+        end
+    end
+    AS->>DB: SaveChanges (advanced outcomes)
+    AS-->>Cron: alerts delivered (count)
+```
+
 ---
 
 # Deployment View {#section-deployment-view}
@@ -750,6 +784,22 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 | (+) | Decoupling and testability stay high by construction; no endpoint ships undocumented or unexercised |
 | (+) | Reviewers have concrete, checkable gates rather than vibes |
 | (-) | Slightly more up-front discipline per PR; deliberate |
+
+---
+
+## ADR-012: Price Alerts — Scheduled Re-evaluation with Alert-on-Transition, Reusing the Delivery Channels
+
+**Context:** The track record (ADR-010) computes each saved analysis's outcome on read, but a user should be told when a count invalidates or hits its target without re-opening the app. The daily-report feature already has scheduled delivery (Cronos) and pluggable channels (`IReportDeliveryChannel`: Telegram/Email).
+
+**Decision:** A hosted `AlertBackgroundService` (opt-in via `Alerts:Enabled`) runs `IAlertService` on a cron schedule. `AlertService` (Infrastructure, orchestrator) loads still-pending snapshots, re-evaluates each with the pure `AnalysisOutcomeEvaluator`, and applies the pure `AlertDecision` (fire once, only on `Pending → Invalidated/TargetReached`). A new alert is rendered as a chart + caption and delivered through every enabled `IReportDeliveryChannel`. The snapshot stores the outcome it last alerted on (`AlertedOutcome`), advanced after firing so it never re-alerts. The decision logic stays pure and unit-tested; the wiring is covered by a PostgreSQL acceptance test.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Reuses the existing scheduler + delivery channels (OCP/DIP); adding a channel still needs no change here |
+| (+) | Exactly-once alerts; the "should we notify?" logic is a pure, exhaustively-tested function |
+| (-) | Delivery is to the operator-configured global channels (same model as the daily report) — **per-user delivery targets are a follow-up** (REQ, not yet built); alerting cadence is bounded by the cron interval |
 
 ---
 
