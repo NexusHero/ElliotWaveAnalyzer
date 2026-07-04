@@ -53,8 +53,8 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-002 | Detect nested, multi-degree Elliott Wave counts (impulses, diagonals, corrective patterns) deterministically; the LLM only ranks & explains | #76 (PR #75) · ADR-009 | Fulfilled |
 | REQ-003 | Surface the nested count (subdivisions, degree, score) in the auto-analysis UI | #77 (PR #78) | Fulfilled |
 | REQ-004 | Persist analyses per user and evaluate each outcome (held / invalidated / target reached) against real price action | #79 (PR #80) · ADR-010 · §6 Scenario 4 | Fulfilled |
-| REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 · ADR-007 | Fulfilled |
-| REQ-006 | Track-record history UI + save action in the auto-analysis panel | #82 (planned) | Proposed |
+| REQ-005 | Architecture governance: mandatory ADRs, requirements register, per-change sequence diagrams, ≥90% coverage | #81 (PR #82) · ADR-007 | Fulfilled |
+| REQ-006 | Track-record history UI + save action in the auto-analysis panel | planned | Proposed |
 | REQ-007 | Scheduled re-evaluation + price alerts when an invalidation is touched | planned | Proposed |
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | planned | Proposed |
 
