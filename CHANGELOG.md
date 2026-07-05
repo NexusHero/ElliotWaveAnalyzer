@@ -35,6 +35,8 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - API serializes enum values as strings
 
 ### Changed
+- **CI publishes the production Docker image to GHCR** on pushes to `main` (`ghcr.io/<owner>/<repo>:latest` + `:<sha>`), authenticating with the built-in `GITHUB_TOKEN`. Pull-request builds stay build-only (no push, no login, no secrets) so the Dockerfile still can't silently break.
+- **The opt-in schedulers (price alerts, portfolio-review refresh) now run in local Development** (`appsettings.Development.json`); Production and the test suite keep them off. The knobs are documented in `appsettings.json` (`Alerts` / `PortfolioReview`, `Enabled: false`); alert delivery still requires Telegram/Email configured and portfolio narratives an LLM key (both degrade gracefully without).
 - CI/release/security workflows and the frontend target Node.js 24 (was 20)
 - Upgraded frontend tooling: Vite 8, Vitest 4, TypeScript 6, `@vitejs/plugin-react` 6
 
