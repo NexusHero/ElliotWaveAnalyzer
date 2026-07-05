@@ -1,5 +1,6 @@
 import type { TrackedAnalysis } from '../api/types'
 import { Alert, Seal, Trash } from './Icons'
+import ScenarioTree from './ScenarioTree'
 import { outcomeClass, outcomeLabel } from './trackRecord'
 
 export type TrackRecordState = 'loading' | 'error' | 'result'
@@ -92,14 +93,23 @@ export default function TrackRecordPanel({
               </div>
               <div className="tr-item-meta mono">
                 saved {fmtDay(a.createdAt)}
-                {a.invalidationPrice != null && <> · invalidation {fmtMoney(a.invalidationPrice)}</>}
+                {a.invalidationPrice != null && (
+                  <> · invalidation {fmtMoney(a.invalidationPrice)}</>
+                )}
                 {a.targetLow != null && a.targetHigh != null && (
-                  <> · target {fmtMoney(a.targetLow)}–{fmtMoney(a.targetHigh)}</>
+                  <>
+                    {' '}
+                    · target {fmtMoney(a.targetLow)}–{fmtMoney(a.targetHigh)}
+                  </>
                 )}
                 {a.evaluatedPrice != null && a.evaluatedAt != null && (
-                  <> · last {fmtMoney(a.evaluatedPrice)} on {fmtDay(a.evaluatedAt)}</>
+                  <>
+                    {' '}
+                    · last {fmtMoney(a.evaluatedPrice)} on {fmtDay(a.evaluatedAt)}
+                  </>
                 )}
               </div>
+              <ScenarioTree scenarios={a.scenarios ?? []} switchEvents={a.switchEvents ?? []} />
             </li>
           ))}
         </ul>

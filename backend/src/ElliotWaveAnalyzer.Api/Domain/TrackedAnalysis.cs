@@ -37,4 +37,15 @@ public sealed record TrackedAnalysis(
     decimal? Score,
     AnalysisOutcome Outcome,
     decimal? EvaluatedPrice,
-    DateTimeOffset? EvaluatedAt);
+    DateTimeOffset? EvaluatedAt)
+{
+    /// <summary>
+    /// The scenario tree: the primary in force plus its alternates and any retired former primaries,
+    /// each with a calibrated probability (or an insufficient-data marker). Empty for analyses saved
+    /// before scenario trees existed.
+    /// </summary>
+    public IReadOnlyList<Scenario> Scenarios { get; init; } = [];
+
+    /// <summary>The auto-switch history (append-only), newest last.</summary>
+    public IReadOnlyList<ScenarioSwitchEvent> SwitchEvents { get; init; } = [];
+}

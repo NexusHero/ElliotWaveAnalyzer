@@ -278,6 +278,20 @@ export interface TopDownAnalysis {
 /** How a saved analysis has played out since it was saved (mirrors backend `AnalysisOutcome`). */
 export type AnalysisOutcome = 'Pending' | 'Invalidated' | 'TargetReached'
 
+/** A backup count supplied when saving an analysis (mirrors backend `ScenarioInput`). */
+export interface ScenarioInput {
+  structure: string
+  bullish: boolean
+  invalidationPrice: number | null
+  invalidationAbove: boolean
+  entryLow: number | null
+  entryHigh: number | null
+  targetLow: number | null
+  targetHigh: number | null
+  confidence: string
+  score: number | null
+}
+
 /** Request body for `POST /api/analyses` — mirrors the backend `TrackAnalysisRequest`. */
 export interface TrackAnalysisRequest {
   symbol: string
@@ -290,6 +304,45 @@ export interface TrackAnalysisRequest {
   targetHigh: number | null
   confidence: string
   score: number | null
+  /** Entry (pullback) zone of the primary — fires a zone-entry alert when price reaches it. */
+  entryLow?: number | null
+  entryHigh?: number | null
+  /** Backup counts (up to two) the auto-switch promotes from if the primary is invalidated. */
+  alternates?: ScenarioInput[]
+}
+
+/** Whether a scenario's probability is measured or withheld (mirrors backend `ProbabilityBasis`). */
+export type ProbabilityBasis = 'Calibrated' | 'InsufficientData'
+
+/** A scenario's standing in its tree (mirrors backend `ScenarioRole`). */
+export type ScenarioRole = 'Primary' | 'Alternate'
+
+/** One count in a saved analysis's scenario tree (mirrors backend `Scenario`). */
+export interface Scenario {
+  role: ScenarioRole
+  label: string
+  structure: string
+  bullish: boolean
+  invalidationPrice: number | null
+  invalidationAbove: boolean
+  entryLow: number | null
+  entryHigh: number | null
+  targetLow: number | null
+  targetHigh: number | null
+  confidence: string
+  score: number | null
+  /** Calibrated probability in [0,1]; omitted when `probabilityBasis` is `InsufficientData`. */
+  probability?: number | null
+  probabilityBasis: ProbabilityBasis
+  retired: boolean
+}
+
+/** One auto-switch audit record (mirrors backend `ScenarioSwitchEvent`). */
+export interface ScenarioSwitchEvent {
+  at: string // ISO 8601 UTC
+  fromLabel: string
+  toLabel: string
+  reason: string
 }
 
 /**
@@ -311,6 +364,10 @@ export interface TrackedAnalysis {
   outcome: AnalysisOutcome
   evaluatedPrice: number | null
   evaluatedAt: string | null
+  /** The scenario tree: primary + alternates + retired former primaries. Empty for legacy saves. */
+  scenarios?: Scenario[]
+  /** The auto-switch history (append-only), newest last. */
+  switchEvents?: ScenarioSwitchEvent[]
 }
 
 /** Response of `POST /api/analyses` — mirrors the backend `SavedAnalysisResponse`. */

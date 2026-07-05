@@ -1,24 +1,52 @@
-import type { AnalysisOutcome, RankedWaveCount, TrackAnalysisRequest } from '../api/types'
+import type {
+  AnalysisOutcome,
+  RankedWaveCount,
+  ScenarioInput,
+  TrackAnalysisRequest,
+} from '../api/types'
 
 /**
- * Builds the `POST /api/analyses` payload from a ranked count and the current symbol. Pulls the
- * hard invalidation line and the first target zone out of the count's forward levels (both may be
- * absent, e.g. a complete correction with no target) and mirrors the backend's field names.
+ * The invalidation line, entry (pullback) zone and first target zone of a count, pulled from its
+ * forward levels. The entry zone prefers the strongest confluence "Entry" box (Phase 2), falling
+ * back to the support zone; any may be absent (e.g. a complete correction with no target).
  */
-export function toTrackAnalysisRequest(symbol: string, count: RankedWaveCount): TrackAnalysisRequest {
+function geometryOf(count: RankedWaveCount): ScenarioInput {
   const invalidation = count.levels?.invalidation ?? null
   const target = count.levels?.targetZones?.[0] ?? null
+  const entryZone =
+    count.levels?.confluenceZones?.find((z) => z.kind === 'Entry') ??
+    (count.levels?.supportZone
+      ? { low: count.levels.supportZone.low, high: count.levels.supportZone.high }
+      : null)
 
   return {
-    symbol,
     structure: count.structure,
     bullish: count.ruleReport.bullishAssumed,
     invalidationPrice: invalidation?.price ?? null,
     invalidationAbove: invalidation?.side === 'Above',
+    entryLow: entryZone?.low ?? null,
+    entryHigh: entryZone?.high ?? null,
     targetLow: target?.low ?? null,
     targetHigh: target?.high ?? null,
     confidence: count.confidence,
     score: count.score ?? null,
+  }
+}
+
+/**
+ * Builds the `POST /api/analyses` payload from a primary ranked count and the current symbol. Up
+ * to two other ranked counts are carried as alternates so the backend can auto-switch to the best
+ * one if the primary's invalidation breaks. Mirrors the backend's field names.
+ */
+export function toTrackAnalysisRequest(
+  symbol: string,
+  count: RankedWaveCount,
+  alternates: RankedWaveCount[] = []
+): TrackAnalysisRequest {
+  return {
+    symbol,
+    ...geometryOf(count),
+    alternates: alternates.slice(0, 2).map(geometryOf),
   }
 }
 

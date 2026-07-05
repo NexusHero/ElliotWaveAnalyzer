@@ -13,4 +13,14 @@ public sealed record TrackAnalysisRequest(
     decimal? TargetLow,
     decimal? TargetHigh,
     string Confidence,
-    decimal? Score);
+    decimal? Score)
+{
+    /// <summary>Entry (pullback) zone of the primary — fires a zone-entry alert when price reaches it.</summary>
+    public decimal? EntryLow { get; init; }
+
+    /// <summary>Upper bound of the primary's entry zone.</summary>
+    public decimal? EntryHigh { get; init; }
+
+    /// <summary>Backup counts (up to two) the auto-switch promotes from if the primary is invalidated.</summary>
+    public IReadOnlyList<ScenarioInput> Alternates { get; init; } = [];
+}
