@@ -19,6 +19,7 @@ public sealed class TechnicalAnalysisServiceTests
 {
     private IMarketDataProvider _btcProvider = null!;
     private IMarketDataProvider _ethProvider = null!;
+    private IIntradayMarketDataProvider _intradayProvider = null!;
     private IIndicatorCalculator _calculator = null!;
     private ITechnicalAnalysisService _sut = null!;
 
@@ -30,6 +31,7 @@ public sealed class TechnicalAnalysisServiceTests
     {
         _btcProvider = Substitute.For<IMarketDataProvider>();
         _ethProvider = Substitute.For<IMarketDataProvider>();
+        _intradayProvider = Substitute.For<IIntradayMarketDataProvider>();
         _calculator = Substitute.For<IIndicatorCalculator>();
 
         // BTC provider handles BTC only, ETH provider handles ETH only.
@@ -38,10 +40,77 @@ public sealed class TechnicalAnalysisServiceTests
         _ethProvider.Supports("ETH").Returns(true);
         _ethProvider.Supports(Arg.Is<string>(s => s != "ETH")).Returns(false);
 
+        // The intraday source handles RKLB only.
+        _intradayProvider.SupportsIntraday("RKLB").Returns(true);
+        _intradayProvider.SupportsIntraday(Arg.Is<string>(s => s != "RKLB")).Returns(false);
+
         _sut = new TechnicalAnalysisService(
             providers: [_btcProvider, _ethProvider],
+            intradayProviders: [_intradayProvider],
             calculator: _calculator,
             logger: NullLogger<TechnicalAnalysisService>.Instance);
+    }
+
+    /// <summary>Hourly UTC candles from 2024-01-01 00:00, one per hour (for intraday routing tests).</summary>
+    private static IReadOnlyList<MarketCandle> HourlyCandles(int count)
+    {
+        var start = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        return [.. Enumerable.Range(0, count).Select(i =>
+            new MarketCandle(start.AddHours(i), 100m + i, 101m + i, 99m + i, 100.5m + i, 10m))];
+    }
+
+    // ─── Intraday (1H / 4H) routing ───────────────────────────────────────────
+
+    [Test]
+    public async Task GetAnalysisAsync_OneHourInterval_UsesIntradayProvider_PassThrough()
+    {
+        var hourly = HourlyCandles(6);
+        _intradayProvider.GetHourlyCandlesAsync("RKLB", Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(hourly));
+        ArrangeCalculatorReturnsEmpty(hourly);
+
+        var result = await _sut.GetAnalysisAsync("RKLB", interval: CandleInterval.OneHour);
+
+        await _intradayProvider.Received(1).GetHourlyCandlesAsync("RKLB", Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await _btcProvider.DidNotReceive().GetCandlesAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        Assert.That(result.Candles, Is.SameAs(hourly)); // 1H is a pass-through
+    }
+
+    [Test]
+    public async Task GetAnalysisAsync_FourHourInterval_ResamplesHourlyToFourHourBuckets()
+    {
+        // 8 hourly bars from 00:00 → two UTC-aligned 4h buckets (00–04, 04–08).
+        var hourly = HourlyCandles(8);
+        _intradayProvider.GetHourlyCandlesAsync("RKLB", Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(hourly));
+        _calculator.CalculateRsi(Arg.Any<IReadOnlyList<MarketCandle>>(), Arg.Any<int>()).Returns(EmptyRsi);
+        _calculator.CalculateMacd(Arg.Any<IReadOnlyList<MarketCandle>>(),
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>()).Returns(EmptyMacd);
+
+        var result = await _sut.GetAnalysisAsync("RKLB", interval: CandleInterval.FourHours);
+
+        Assert.That(result.Candles, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void GetAnalysisAsync_IntradayInterval_NoIntradaySource_ThrowsArgumentException()
+    {
+        var ex = Assert.ThrowsAsync<ArgumentException>(
+            () => _sut.GetAnalysisAsync("BTC", interval: CandleInterval.FourHours));
+
+        Assert.That(ex!.Message, Does.Contain("BTC"));
+    }
+
+    [Test]
+    public void GetAnalysisAsync_IntradayRangeExceeded_PropagatesMarketDataRangeException()
+    {
+        _intradayProvider.GetHourlyCandlesAsync("RKLB", Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns<Task<IReadOnlyList<MarketCandle>>>(_ => throw new MarketDataRangeException("too far", 730));
+
+        var ex = Assert.ThrowsAsync<MarketDataRangeException>(
+            () => _sut.GetAnalysisAsync("RKLB", days: 900, interval: CandleInterval.OneHour));
+
+        Assert.That(ex!.MaxDays, Is.EqualTo(730));
     }
 
     // ─── Provider selection ───────────────────────────────────────────────────

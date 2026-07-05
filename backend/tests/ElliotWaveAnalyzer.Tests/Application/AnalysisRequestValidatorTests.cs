@@ -4,8 +4,9 @@ using FluentValidation.TestHelper;
 namespace ElliotWaveAnalyzer.Tests.Application;
 
 /// <summary>
-/// Unit tests for <see cref="AnalysisRequestValidator"/>: the symbol allow-list (case-insensitive),
-/// the interval allow-list, and the inclusive limit bounds. Pure logic — no I/O.
+/// Unit tests for <see cref="AnalysisRequestValidator"/>: the symbol abuse guard (a ticker
+/// character whitelist, no longer an allow-list — ADR-022), the interval allow-list, and the
+/// inclusive limit bounds. Pure logic — no I/O.
 /// </summary>
 [TestFixture]
 public sealed class AnalysisRequestValidatorTests
@@ -19,12 +20,14 @@ public sealed class AnalysisRequestValidatorTests
         result.ShouldNotHaveAnyValidationErrors();
     }
 
+    // Any real ticker shape is accepted now — existence is checked when data is fetched.
     [TestCase("BTC")]
-    [TestCase("eth")]
-    [TestCase("Nasdaq")]
-    [TestCase("AAPL")]
-    [TestCase("msft")]
-    public void AllowedSymbols_AnyCase_AreAccepted(string symbol)
+    [TestCase("rklb")]
+    [TestCase("^IXIC")]
+    [TestCase("BRK-B")]
+    [TestCase("SI=F")]
+    [TestCase("DOGE")]
+    public void ValidTickerShapes_AreAccepted(string symbol)
     {
         var result = _validator.TestValidate(new AnalysisRequest(symbol, "1d", 100));
         result.ShouldNotHaveValidationErrorFor(x => x.Symbol);
@@ -37,10 +40,12 @@ public sealed class AnalysisRequestValidatorTests
         result.ShouldHaveValidationErrorFor(x => x.Symbol);
     }
 
-    [Test]
-    public void UnsupportedSymbol_IsRejected()
+    [TestCase("has space")]
+    [TestCase("bad$char")]
+    [TestCase("waaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaytoolongtickeridentifier")]
+    public void MalformedSymbol_IsRejected(string symbol)
     {
-        var result = _validator.TestValidate(new AnalysisRequest("DOGE", "1d", 100));
+        var result = _validator.TestValidate(new AnalysisRequest(symbol, "1d", 100));
         result.ShouldHaveValidationErrorFor(x => x.Symbol);
     }
 

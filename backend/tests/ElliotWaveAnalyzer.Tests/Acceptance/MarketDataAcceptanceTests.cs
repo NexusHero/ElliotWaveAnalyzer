@@ -83,9 +83,32 @@ public sealed class MarketDataAcceptanceTests
     }
 
     [Test]
-    public async Task GetMarketData_UnsupportedInterval_Returns400()
+    public async Task GetMarketData_UnknownInterval_Returns400()
     {
-        var response = await _client.GetAsync("/api/market-data/BTC?interval=4h");
+        var response = await _client.GetAsync("/api/market-data/BTC?interval=5m");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetMarketData_FourHourInterval_Returns200WithCandlesAndIndicators()
+    {
+        var response = await _client.GetAsync("/api/market-data/BTC?days=30&interval=4h");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(body.GetProperty("candles").GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(body.GetProperty("rsi").GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(body.GetProperty("macd").GetArrayLength(), Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
+    public async Task GetMarketData_MalformedSymbol_Returns400()
+    {
+        var response = await _client.GetAsync("/api/market-data/bad$sym");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }

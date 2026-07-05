@@ -56,6 +56,7 @@ try
     app.MapTrackRecordEndpoints();
     app.MapKeyEndpoints();
     app.MapDepotEndpoints();
+    app.MapSymbolEndpoints();
 
     app.Run();
 }

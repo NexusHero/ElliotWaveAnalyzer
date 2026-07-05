@@ -4,23 +4,30 @@ using ElliotWaveAnalyzer.Api.Interfaces;
 namespace ElliotWaveAnalyzer.Api.Infrastructure;
 
 /// <summary>
-/// Fetches daily OHLCV candles for stock indices from the Yahoo Finance chart API
-/// (<c>/v8/finance/chart/{symbol}</c>). Adds equity-market coverage (NASDAQ, S&amp;P 500)
-/// alongside the crypto provider.
+/// Fetches OHLCV candles from the Yahoo Finance chart API (<c>/v8/finance/chart/{symbol}</c>) for
+/// arbitrary instruments — equities, ETFs, indices and metals/commodities (via Yahoo tickers such
+/// as <c>SI=F</c>). Friendly aliases (e.g. <c>NASDAQ</c> → <c>^IXIC</c>) are mapped; any other
+/// symbol is passed through to Yahoo as-is, so a ticker resolved by <see cref="ISymbolResolver"/>
+/// can be charted directly.
 ///
-/// Registered as another <see cref="IMarketDataProvider"/>; selection happens via
-/// <see cref="Supports"/>, so adding this required no change to existing providers or
-/// to the orchestrating services (OCP).
+/// It is the <b>fallback</b> daily provider (<see cref="Supports"/> returns true for everything, so
+/// it must be registered last — earlier providers like CoinGecko claim their symbols first) and it
+/// serves <b>hourly</b> candles for 1H/4H analysis (<see cref="IIntradayMarketDataProvider"/>).
+/// Yahoo's hourly history reaches ~2 years back; requests beyond that raise
+/// <see cref="MarketDataRangeException"/> rather than silently returning a shorter range.
 ///
-/// NOTE: this uses Yahoo's public chart endpoint (no API key). Prices are read straight
-/// to decimal — never through double — to preserve precision for financial data.
+/// NOTE: Yahoo's public chart endpoint needs no API key. Prices are read straight to decimal —
+/// never through double — to preserve precision for financial data.
 /// </summary>
 internal sealed class YahooFinanceMarketDataProvider(
     HttpClient httpClient,
-    ILogger<YahooFinanceMarketDataProvider> logger) : IMarketDataProvider
+    ILogger<YahooFinanceMarketDataProvider> logger) : IMarketDataProvider, IIntradayMarketDataProvider
 {
-    // Public ticker → Yahoo index symbol. Extend here to add more indices (OCP).
-    private static readonly IReadOnlyDictionary<string, string> SymbolMap =
+    /// <summary>Yahoo's hourly (60m) history depth. Beyond this the chart API returns no data.</summary>
+    internal const int MaxHourlyLookbackDays = 730;
+
+    // Friendly public alias → Yahoo symbol. Unmapped symbols pass straight through (OCP).
+    private static readonly IReadOnlyDictionary<string, string> AliasMap =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["NASDAQ"] = "^IXIC",  // NASDAQ Composite
@@ -29,31 +36,46 @@ internal sealed class YahooFinanceMarketDataProvider(
         };
 
     /// <inheritdoc/>
-    public bool Supports(string symbol) => SymbolMap.ContainsKey(symbol);
+    public bool Supports(string symbol) => !string.IsNullOrWhiteSpace(symbol);
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<MarketCandle>> GetCandlesAsync(
-        string symbol,
-        int days,
-        CancellationToken cancellationToken = default)
+    public bool SupportsIntraday(string symbol) => !string.IsNullOrWhiteSpace(symbol);
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<MarketCandle>> GetCandlesAsync(
+        string symbol, int days, CancellationToken cancellationToken = default)
+        => FetchAsync(symbol, "1d", Math.Max(days, 1), cancellationToken);
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<MarketCandle>> GetHourlyCandlesAsync(
+        string symbol, int days, CancellationToken cancellationToken = default)
     {
-        if (!SymbolMap.TryGetValue(symbol, out var yahooSymbol))
+        var window = Math.Max(days, 1);
+        if (window > MaxHourlyLookbackDays)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(symbol), symbol,
-                $"YahooFinanceMarketDataProvider does not support symbol '{symbol}'. " +
-                $"Supported: {string.Join(", ", SymbolMap.Keys)}");
+            throw new MarketDataRangeException(
+                $"Yahoo Finance serves at most {MaxHourlyLookbackDays} days of hourly candles " +
+                $"(requested {window}). Use a coarser timeframe or a shorter range.",
+                MaxHourlyLookbackDays);
         }
 
+        return FetchAsync(symbol, "60m", window, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<MarketCandle>> FetchAsync(
+        string symbol, string interval, int days, CancellationToken cancellationToken)
+    {
+        var yahooSymbol = AliasMap.TryGetValue(symbol, out var mapped) ? mapped : symbol;
+
         var end = DateTimeOffset.UtcNow;
-        var start = end.AddDays(-Math.Max(days, 1));
+        var start = end.AddDays(-days);
         var url =
             $"v8/finance/chart/{Uri.EscapeDataString(yahooSymbol)}" +
-            $"?interval=1d&period1={start.ToUnixTimeSeconds()}&period2={end.ToUnixTimeSeconds()}";
+            $"?interval={interval}&period1={start.ToUnixTimeSeconds()}&period2={end.ToUnixTimeSeconds()}";
 
         logger.LogInformation(
-            "Fetching {Days} days of daily candles for {Symbol} (Yahoo symbol: {YahooSymbol})",
-            days, symbol, yahooSymbol);
+            "Fetching {Days} days of {Interval} candles for {Symbol} (Yahoo symbol: {YahooSymbol})",
+            days, interval, symbol, yahooSymbol);
 
         var response = await httpClient.GetAsync(url, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -95,7 +117,7 @@ internal sealed class YahooFinanceMarketDataProvider(
 
         candles.Sort((a, b) => a.OpenTime.CompareTo(b.OpenTime));
 
-        logger.LogInformation("Received {Count} candles for {Symbol}", candles.Count, symbol);
+        logger.LogInformation("Received {Count} {Interval} candles for {Symbol}", candles.Count, interval, symbol);
         return candles;
     }
 

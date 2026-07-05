@@ -14,7 +14,15 @@ export interface MarketCandle {
 }
 
 /** Candle timeframe code accepted by `GET /api/market-data/{symbol}?interval=`. */
-export type CandleIntervalCode = '1d' | '1w'
+export type CandleIntervalCode = '1h' | '4h' | '1d' | '1w'
+
+/** One instrument resolved from a ticker/name/ISIN query (mirrors backend `ResolvedSymbol`). */
+export interface ResolvedSymbol {
+  symbol: string
+  name: string
+  assetClass: string
+  exchange: string | null
+}
 
 export interface RsiResult {
   date: string
