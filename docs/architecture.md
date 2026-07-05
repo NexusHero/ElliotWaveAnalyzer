@@ -61,7 +61,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-010 | Timeframe selector (Daily/Weekly via resampling; 4H needs an intraday source) | #93 · ADR-013 | Fulfilled |
 | REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
 | REQ-012 | Per-user encrypted API-key vault (replace the localStorage facade) | #96 · ADR-014 | Fulfilled |
-| REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
+| REQ-013 | Consume the per-user stored key in the LLM pipeline: the active-provider `IChatClient` is resolved per request against the calling user's decrypted key for that provider, falling back to the operator's startup key when the user has none (or the request has no authenticated user); the key is decrypted only to build the client and never logged | #149 · ADR-031 · §6 Scenario 18 | Fulfilled |
 | REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
 | REQ-015 | Route ATR through `IIndicatorCalculator`/Skender instead of a hand-rolled Wilder recurrence | #101 · ADR-016 | Fulfilled |
 | REQ-016 | Import a broker depot from a file via pluggable per-broker importers (Smartbroker+ PDF first) | #103 · ADR-017 · §6 Scenario 8 | Fulfilled |
@@ -862,6 +862,43 @@ sequenceDiagram
 
 ---
 
+## Scenario 18 — Analyze with the Caller's Own LLM Key (REQ-013) {#_runtime_scenario_18}
+
+An authenticated user who saved their own key for the active provider triggers an LLM-using endpoint. The active `IChatClient` resolves per request: it decrypts *their* key and builds a client with it; a user without a stored key (or a background job with no HTTP user) transparently falls back to the operator's startup key. The key is decrypted only to build the client and is never logged.
+
+```mermaid
+sequenceDiagram
+    participant UI as Client
+    participant Ep as Wave-Analysis Endpoint
+    participant Cc as UserAwareChatClient (singleton IChatClient)
+    participant Http as IHttpContextAccessor
+    participant Vault as IUserKeyStore (scoped)
+    participant Fac as IUserChatClientFactory
+    participant Res as IChatClientResolver (startup key)
+
+    UI->>Ep: POST /api/wave-analysis (auth)
+    Ep->>Cc: GetResponseAsync(prompt)
+    Cc->>Http: current user id (NameIdentifier claim)?
+    alt authenticated user
+        Cc->>Vault: GetDecryptedAsync(userId, activeProvider)  %% short-lived scope
+        alt user has a key
+            Vault-->>Cc: decrypted key (never logged)
+            Cc->>Fac: Create(activeProvider, key)
+            Fac-->>Cc: user's IChatClient
+        else no stored key
+            Cc->>Res: Resolve(activeProvider)
+            Res-->>Cc: operator's startup client
+        end
+    else no HTTP user (background job)
+        Cc->>Res: Resolve(activeProvider)  %% vault not queried
+        Res-->>Cc: operator's startup client
+    end
+    Cc-->>Ep: ChatResponse
+    Ep-->>UI: 200 analysis
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1225,7 +1262,7 @@ No manual type maintenance is needed; the backend OpenAPI spec is the single sou
 |---|---|
 | (+) | The security promise is now true: encrypted at rest, never echoed back; per-user isolation; acceptance-tested (ciphertext ≠ plaintext, key never in any response) |
 | (+) | No hand-rolled crypto — the framework owns key management and rotation |
-| (-) | The stored key is **not yet consumed** by the LLM pipeline (still uses the startup-configured key) — tracked as REQ-013 |
+| (+) | The stored key is now consumed by the LLM pipeline — the active-provider client is resolved per request against the user's key (ADR-031 / REQ-013) |
 | (-) | The Data Protection key ring uses the default (local) provider; for multi-instance production it must be persisted to a shared store (DB/Redis) — a deployment follow-up |
 
 ---
@@ -1543,6 +1580,28 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The highest-leverage daily tool — "what has a setup right now" across the universe — at near-zero marginal cost because it's LLM-free; ranking surfaces the live, high-quality, tight-risk setups first |
 | (+) | Safe by construction: bounded concurrency + symbol cap + per-day cache keep cost/latency in hand; one bad symbol can't abort the scan; coverage is reported, never silently truncated |
 | (-) | The default universe is a small configured list (BTC/ETH out of the box) — a large, curated, exchange-wide universe depends on the broader market-data coverage still being expanded (Yahoo equities are "planned"); intraday scans inherit the same intraday-history limits as the rest of the app |
+
+---
+
+## ADR-031: Consume the Per-User Key by Making the Active `IChatClient` a Per-Request User-Aware Resolver
+
+**Context:** ADR-014 built the encrypted key vault but left it inert — every LLM call still used the operator's startup key (the open `(-)` under ADR-014, tracked as REQ-013). A user who saved their own Gemini/Claude/OpenAI key expected *their* key (and quota, and billing) to be used. The challenge: `IChatClient` is a **singleton** consumed all over (manual validation, single-provider ranking, the portfolio narrator, vision import), the key is **per user** and **per request**, and `IUserKeyStore` is **scoped** (it touches the DbContext) — so a singleton can't just hold a decrypted key.
+
+**Decision:**
+
+- **One construction seam.** `IUserChatClientFactory.Create(provider, apiKey)` (Infrastructure) owns *all* provider-SDK construction + middleware (distributed cache + logging) — extracted out of the DI extension so the operator's startup client and a user's client are built **identically**; only the key differs. Startup keyed registrations and the per-user path both call it (DRY).
+- **The active client resolves per request.** The single non-keyed `IChatClient` is now `UserAwareChatClient` (singleton). On each call it reads the caller's id from `IHttpContextAccessor` (the `NameIdentifier` claim); if present it opens a **short-lived scope** to resolve the scoped `IUserKeyStore`, decrypts the user's key **for the active provider only**, and — when there is one — builds the client with `factory.Create(...)`. No user, or no stored key, falls through to the operator's startup client via `IChatClientResolver` — **unchanged behaviour**. The key is decrypted solely to build the client and is **never logged**.
+- **Transparent to every consumer.** Because the swap is behind the same `IChatClient` interface, manual analysis, single-provider ranking, the narrator and vision all honour the user's key with no call-site changes. Background jobs (no HTTP user) keep using the startup key by construction.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | REQ-013 fulfilled: a user's saved key drives their LLM calls (their quota/billing), transparently across every `IChatClient` consumer, with a safe fallback to the operator key |
+| (+) | Provider construction lives in exactly one factory now — adding/altering a provider or its middleware is a single edit shared by the startup and per-user paths |
+| (+) | The decrypted key exists only for the lifetime of one built client and never leaves the server or reaches a log |
+| (-) | The **Ensemble** auto-ranker still resolves the *keyed* per-provider startup clients directly, so it uses operator keys, not per-user keys — a documented limitation (a per-user ensemble would need the factory threaded through that path) |
+| (-) | Each LLM call that finds a user key costs one short-lived DI scope + a decrypt; negligible next to the network round-trip, and skipped entirely when there is no authenticated user |
 
 ---
 

@@ -1,12 +1,7 @@
-using System.ClientModel;
-using Anthropic.SDK;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
-using OpenAI;
-using OpenAI.Chat;
 
 namespace ElliotWaveAnalyzer.Api.Extensions;
 
@@ -26,50 +21,26 @@ internal static class LlmExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        // One keyed IChatClient per provider (.NET 8 Keyed Services). The factory for a
-        // provider only runs when that provider is selected, so unused providers cost nothing
-        // and need no credentials. Adding a provider = one more keyed registration (OCP).
+        // The provider-SDK construction lives in one factory (REQ-013), reused by both the startup
+        // keyed clients (below) and the per-user client. HttpContextAccessor lets the per-user client
+        // read the calling user from the request.
+        services.AddHttpContextAccessor();
+        services.AddSingleton<IUserChatClientFactory, UserChatClientFactory>();
+
+        // One keyed IChatClient per provider (.NET 8 Keyed Services), built from the operator's
+        // startup key. The factory for a provider only runs when that provider is resolved, so unused
+        // providers cost nothing. Adding a provider = one more keyed registration (OCP).
         services.AddKeyedSingleton<IChatClient>("openai", (sp, _) =>
-        {
-            var endpoint = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value.OpenAI;
-            // OpenAI: native endpoint.
-            var inner = new OpenAIClient(endpoint.ApiKey)
-                .GetChatClient(endpoint.Model)
-                .AsIChatClient();
-            return BuildClient(inner, sp);
-        });
-
+            KeyedStartupClient(sp, "openai", o => o.OpenAI.ApiKey));
         services.AddKeyedSingleton<IChatClient>("gemini", (sp, _) =>
-        {
-            var endpoint = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value.Gemini;
-            // Gemini: Google exposes an OpenAI-compatible endpoint, so the same client works
-            // by pointing it at that base URL.
-            var inner = new ChatClient(
-                    model: endpoint.Model,
-                    credential: new ApiKeyCredential(endpoint.ApiKey),
-                    options: new OpenAIClientOptions
-                    {
-                        Endpoint = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/")
-                    })
-                .AsIChatClient();
-            return BuildClient(inner, sp);
-        });
-
+            KeyedStartupClient(sp, "gemini", o => o.Gemini.ApiKey));
         services.AddKeyedSingleton<IChatClient>("claude", (sp, _) =>
-        {
-            var endpoint = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value.Claude;
-            // Claude: Anthropic.SDK exposes its Messages endpoint as an IChatClient.
-            var inner = new AnthropicClient(endpoint.ApiKey).Messages;
-            return BuildClient(inner, sp);
-        });
+            KeyedStartupClient(sp, "claude", o => o.Claude.ApiKey));
 
-        // The single non-keyed IChatClient resolves the active provider by key. An unknown
-        // value surfaces naturally as InvalidOperationException from the keyed lookup.
-        services.AddSingleton<IChatClient>(sp =>
-        {
-            var key = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value.Active.ToLowerInvariant();
-            return sp.GetRequiredKeyedService<IChatClient>(key);
-        });
+        // The single non-keyed IChatClient is the active provider resolved PER REQUEST against the
+        // calling user's stored key, falling back to the startup key (REQ-013). Every consumer that
+        // injects IChatClient (manual analysis, single-provider ranking, narrative, vision) honours it.
+        services.AddSingleton<IChatClient, UserAwareChatClient>();
 
         // Resolver seam so consumers depend on an abstraction instead of IServiceProvider
         // (the keyed-service lookup lives only in KeyedChatClientResolver).
@@ -102,13 +73,13 @@ internal static class LlmExtensions
 
         return services;
 
-        // Standard middleware pipeline. Distributed caching short-circuits identical requests
-        // (same prompt → cached response, saving latency and token spend); OpenTelemetry/retry
-        // can be chained the same way without touching provider code.
-        static IChatClient BuildClient(IChatClient inner, IServiceProvider sp)
-            => new ChatClientBuilder(inner)
-                .UseDistributedCache(sp.GetRequiredService<IDistributedCache>())
-                .UseLogging(sp.GetRequiredService<ILoggerFactory>())
-                .Build();
+        // A keyed startup client for one provider, built from the operator's configured key via the
+        // shared factory (same construction + middleware as the per-user client).
+        static IChatClient KeyedStartupClient(
+            IServiceProvider sp, string provider, Func<LlmProviderOptions, string> apiKey)
+        {
+            var options = sp.GetRequiredService<IOptions<LlmProviderOptions>>().Value;
+            return sp.GetRequiredService<IUserChatClientFactory>().Create(provider, apiKey(options));
+        }
     }
 }
