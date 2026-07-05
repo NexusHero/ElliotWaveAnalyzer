@@ -16,6 +16,7 @@ const baseCount: RankedWaveCount = {
     alternative: null,
     scale: 'Linear',
     confluenceZones: [],
+    channels: [],
   },
   confidence: 'high',
   rationale: '',

@@ -97,6 +97,20 @@
           }
         ]
       }
+    ],
+    Channels: [
+      {
+        OriginDate: DateTime_1,
+        Baseline: {
+          Slope: 518.51851851851851851851851852,
+          Intercept: 38000.0
+        },
+        Parallel: {
+          Slope: 518.51851851851851851851851852,
+          Intercept: 29814.814814814814814814814815
+        },
+        Basis: Base channel: 0→2 line, parallel through wave 1
+      }
     ]
   },
   Usage: {

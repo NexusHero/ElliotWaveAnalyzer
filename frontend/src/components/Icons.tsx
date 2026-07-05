@@ -92,6 +92,16 @@ export function Target({ size = 22, className }: IconProps) {
   )
 }
 
+export function ChartImage({ size = 16, className }: IconProps) {
+  return (
+    <svg {...base(size, className)} strokeWidth={1.8}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 15l5-4 4 3 4-5 5 4" />
+      <circle cx="8" cy="9" r="1.4" />
+    </svg>
+  )
+}
+
 export function Trash({ size = 16, className }: IconProps) {
   return (
     <svg {...base(size, className)} strokeWidth={1.9}>

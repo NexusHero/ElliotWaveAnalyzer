@@ -107,6 +107,16 @@ internal sealed class TrackRecordService(
     }
 
     /// <inheritdoc/>
+    public async Task<TrackedAnalysis?> GetAsync(
+        Guid userId, Guid id, CancellationToken cancellationToken = default)
+    {
+        // Reuse the list path so the outcome and the calibration-derived scenario probabilities are
+        // computed identically (the calibration buckets are drawn from the user's whole history).
+        var all = await ListAsync(userId, cancellationToken);
+        return all.FirstOrDefault(a => a.Id == id);
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> DeleteAsync(
         Guid userId, Guid id, CancellationToken cancellationToken = default)
     {

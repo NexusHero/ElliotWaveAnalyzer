@@ -144,6 +144,27 @@ export interface ConfluenceZone {
   contributions: ContributingLevel[]
 }
 
+/** Which Elliott channel a projection describes (mirrors backend `ChannelKind`). */
+export type ChannelKind = 'Base' | 'Acceleration'
+
+/** A straight channel line `y = slope·x + intercept` (mirrors backend `ChannelLine`). */
+export interface ChannelLine {
+  slope: number
+  intercept: number
+}
+
+/** A projected Elliott channel with an optional target band (mirrors backend `Channel`). */
+export interface Channel {
+  kind: ChannelKind
+  scale: FibScale
+  originDate: string
+  baseline: ChannelLine
+  parallel: ChannelLine
+  targetLow: number | null
+  targetHigh: number | null
+  basis: string
+}
+
 /** Deterministic forward levels for the unfolding wave (mirrors backend `WaveLevels`). */
 export interface WaveLevels {
   unfoldingWave: string
@@ -154,6 +175,7 @@ export interface WaveLevels {
   alternative: AlternativeScenario | null
   scale: FibScale
   confluenceZones: ConfluenceZone[]
+  channels: Channel[]
 }
 
 /** Response of `POST /api/wave-analysis` — mirrors the backend `WaveAnalysisResponse`. */

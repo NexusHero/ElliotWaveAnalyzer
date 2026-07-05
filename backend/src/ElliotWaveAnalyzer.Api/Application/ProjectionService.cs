@@ -45,7 +45,12 @@ public static class ProjectionService
         };
 
         var scale = FibMath.AutoSelect(p);
-        return levels with { Scale = scale, ConfluenceZones = MotiveConfluence(p, unfolding, scale) };
+        return levels with
+        {
+            Scale = scale,
+            ConfluenceZones = MotiveConfluence(p, unfolding, scale),
+            Channels = ChannelProjector.Project(annotations, scale),
+        };
     }
 
     // Log-correct confluence zones for the wave currently unfolding, built from the legs that

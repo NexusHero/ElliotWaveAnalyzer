@@ -1,5 +1,5 @@
 import type { TrackedAnalysis } from '../api/types'
-import { Alert, Seal, Trash } from './Icons'
+import { Alert, ChartImage, Seal, Trash } from './Icons'
 import ScenarioTree from './ScenarioTree'
 import { outcomeClass, outcomeLabel } from './trackRecord'
 
@@ -81,6 +81,16 @@ export default function TrackRecordPanel({
                 <span className={`verdict-badge ${outcomeClass(a.outcome)}`}>
                   {outcomeLabel(a.outcome)}
                 </span>
+                <a
+                  className="tr-chart"
+                  href={`/api/analyses/${a.id}/chart.png`}
+                  download={`${a.symbol}-${a.structure}-chart.png`}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={`Download annotated chart for ${a.structure} on ${a.symbol}`}
+                >
+                  <ChartImage size={15} />
+                </a>
                 <button
                   type="button"
                   className="tr-delete"
