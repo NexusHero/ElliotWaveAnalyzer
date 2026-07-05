@@ -10,6 +10,14 @@ interface LiveVerifyPanelProps {
   error: string | null
   /** Latest price, for the live distance to the invalidation in the levels panel. */
   currentPrice: number | null
+  /** Persist the current edited count to the track record. */
+  onSave?: () => void
+  /** True while the save is in flight. */
+  savePending?: boolean
+  /** Error message from a failed save, if any. */
+  saveError?: string | null
+  /** The id of the just-saved analysis; when set, an annotated-chart download is offered. */
+  savedId?: string | null
 }
 
 /**
@@ -22,6 +30,10 @@ export default function LiveVerifyPanel({
   verification,
   error,
   currentPrice,
+  onSave,
+  savePending = false,
+  saveError = null,
+  savedId = null,
 }: LiveVerifyPanelProps) {
   if (state === 'idle') return null
 
@@ -81,6 +93,29 @@ export default function LiveVerifyPanel({
           )}
 
           <LevelsSummary levels={verification.levels} currentPrice={currentPrice} />
+
+          {onSave && (
+            <div className="lv-save">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={onSave}
+                disabled={savePending || savedId != null}
+              >
+                {savePending ? 'Saving…' : savedId != null ? 'Saved ✓' : 'Save to track record'}
+              </button>
+              {savedId != null && (
+                <a
+                  className="lv-export"
+                  href={`/api/analyses/${savedId}/chart.png`}
+                  download={`${verification.structure}-chart.png`}
+                >
+                  Download chart
+                </a>
+              )}
+              {saveError && <span className="lv-save-error">{saveError}</span>}
+            </div>
+          )}
         </>
       )}
     </section>

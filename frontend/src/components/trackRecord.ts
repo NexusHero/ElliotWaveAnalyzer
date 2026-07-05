@@ -3,34 +3,54 @@ import type {
   RankedWaveCount,
   ScenarioInput,
   TrackAnalysisRequest,
+  WaveLevels,
+  WaveVerification,
 } from '../api/types'
 
+/** Confidence label recorded for a hand-drawn count — it has no LLM confidence bucket. */
+export const MANUAL_CONFIDENCE = 'manual'
+
 /**
- * The invalidation line, entry (pullback) zone and first target zone of a count, pulled from its
- * forward levels. The entry zone prefers the strongest confluence "Entry" box (Phase 2), falling
- * back to the support zone; any may be absent (e.g. a complete correction with no target).
+ * The invalidation line, entry (pullback) zone and first target zone pulled from a count's forward
+ * levels. The entry zone prefers the strongest confluence "Entry" box (Phase 2), falling back to the
+ * support zone; any may be absent (e.g. a complete correction with no target). Shared by the ranked
+ * and the analyst-edited save paths so both persist identical geometry.
  */
-function geometryOf(count: RankedWaveCount): ScenarioInput {
-  const invalidation = count.levels?.invalidation ?? null
-  const target = count.levels?.targetZones?.[0] ?? null
+function scenarioFromLevels(
+  structure: string,
+  bullish: boolean,
+  levels: WaveLevels | null,
+  confidence: string,
+  score: number | null
+): ScenarioInput {
+  const invalidation = levels?.invalidation ?? null
+  const target = levels?.targetZones?.[0] ?? null
   const entryZone =
-    count.levels?.confluenceZones?.find((z) => z.kind === 'Entry') ??
-    (count.levels?.supportZone
-      ? { low: count.levels.supportZone.low, high: count.levels.supportZone.high }
-      : null)
+    levels?.confluenceZones?.find((z) => z.kind === 'Entry') ??
+    (levels?.supportZone ? { low: levels.supportZone.low, high: levels.supportZone.high } : null)
 
   return {
-    structure: count.structure,
-    bullish: count.ruleReport.bullishAssumed,
+    structure,
+    bullish,
     invalidationPrice: invalidation?.price ?? null,
     invalidationAbove: invalidation?.side === 'Above',
     entryLow: entryZone?.low ?? null,
     entryHigh: entryZone?.high ?? null,
     targetLow: target?.low ?? null,
     targetHigh: target?.high ?? null,
-    confidence: count.confidence,
-    score: count.score ?? null,
+    confidence,
+    score,
   }
+}
+
+function geometryOf(count: RankedWaveCount): ScenarioInput {
+  return scenarioFromLevels(
+    count.structure,
+    count.ruleReport.bullishAssumed,
+    count.levels ?? null,
+    count.confidence,
+    count.score ?? null
+  )
 }
 
 /**
@@ -47,6 +67,28 @@ export function toTrackAnalysisRequest(
     symbol,
     ...geometryOf(count),
     alternates: alternates.slice(0, 2).map(geometryOf),
+  }
+}
+
+/**
+ * Builds the `POST /api/analyses` payload from the analyst's own edited count — the deterministic
+ * verification (its structure, direction, invalidation and target zones). No alternates and a
+ * "manual" confidence, since a hand-drawn count carries no LLM ranking.
+ */
+export function verificationToTrackRequest(
+  symbol: string,
+  verification: WaveVerification
+): TrackAnalysisRequest {
+  return {
+    symbol,
+    ...scenarioFromLevels(
+      verification.structure,
+      verification.bullish,
+      verification.levels ?? null,
+      MANUAL_CONFIDENCE,
+      verification.score ?? null
+    ),
+    alternates: [],
   }
 }
 
