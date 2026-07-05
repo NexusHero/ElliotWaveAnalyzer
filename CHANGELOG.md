@@ -35,6 +35,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 - Upgraded frontend tooling: Vite 8, Vitest 4, TypeScript 6, `@vitejs/plugin-react` 6
 
 ### Fixed
+- Saved depot holdings now read back in the exact order they were imported. The positions navigation is an unordered bag, so PostgreSQL was free to return the rows in any sequence — `GET /api/depot` could list holdings in a different order than the statement. Each position now persists its import ordinal (new EF migration `AddDepotPositionOrdinal`) and is sorted by it on read
 - Login now works in local dev: the Vite proxy strips the `Secure` attribute from the session cookie so the browser (http://localhost:5173) stores it. Previously the backend marked the cookie `Secure` over the proxy's HTTPS hop, and the browser dropped it on the insecure dev origin — so `/api/auth/me` returned 401 and the app bounced straight back to the login screen
 - Restored the frontend test suite after the tooling upgrade by declaring the `@testing-library/dom` peer dependency explicitly (`legacy-peer-deps=true` in `.npmrc` no longer installs it transitively)
 

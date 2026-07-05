@@ -33,9 +33,10 @@ internal sealed class DepotStore(AppDbContext db) : IDepotStore
             TotalValue = snapshot.Totals?.TotalValue,
             GainAbsolute = snapshot.Totals?.GainAbsolute,
             GainRelativePercent = snapshot.Totals?.GainRelativePercent,
-            Positions = [.. snapshot.Positions.Select(p => new SavedDepotPosition
+            Positions = [.. snapshot.Positions.Select((p, ordinal) => new SavedDepotPosition
             {
                 Id = Guid.NewGuid(),
+                Ordinal = ordinal,
                 Isin = p.Isin,
                 Wkn = p.Wkn,
                 Name = p.Name,
@@ -66,6 +67,7 @@ internal sealed class DepotStore(AppDbContext db) : IDepotStore
         }
 
         var positions = depot.Positions
+            .OrderBy(p => p.Ordinal)
             .Select(p => new DepotPosition(
                 p.Isin, p.Wkn, p.Name, p.Quantity, p.CostPrice, p.CostValue,
                 p.MarketPrice, p.MarketValue, p.GainAbsolute, p.GainRelativePercent, p.Exchange))
