@@ -25,13 +25,3 @@ public sealed record WaveNode(
     WaveRuleReport? RuleReport,
     decimal Score,
     IReadOnlyList<WaveNode> Children);
-
-/// <summary>A complete parsed count: the nested tree plus its overall score.</summary>
-public sealed record ScoredWaveTree(WaveNode Root, decimal Score);
-
-/// <summary>
-/// Result of a grammar parse. <see cref="SearchTruncated"/> is true when the evaluation
-/// budget stopped the search early — the returned trees are still valid and deterministic,
-/// but coverage was bounded (never silently: callers should surface this).
-/// </summary>
-public sealed record WaveParseResult(IReadOnlyList<ScoredWaveTree> Trees, bool SearchTruncated);

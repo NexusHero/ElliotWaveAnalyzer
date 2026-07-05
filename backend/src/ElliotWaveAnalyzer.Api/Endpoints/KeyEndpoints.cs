@@ -110,6 +110,3 @@ public static class KeyEndpoints
     private static Guid GetUserId(ClaimsPrincipal user)
         => Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 }
-
-/// <summary>Request body for <c>PUT /api/keys/{provider}</c>: the plaintext key to encrypt and store.</summary>
-public sealed record SaveApiKeyRequest(string Key);

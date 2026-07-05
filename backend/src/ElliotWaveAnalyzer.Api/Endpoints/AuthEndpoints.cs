@@ -167,9 +167,3 @@ public static class AuthEndpoints
             email = user.FindFirstValue(ClaimTypes.Email),
         });
 }
-
-/// <summary>Request body for <c>POST /api/auth/register</c>.</summary>
-public sealed record RegisterRequest(string Email, string Password);
-
-/// <summary>Request body for <c>POST /api/auth/login</c>.</summary>
-public sealed record LoginRequest(string Email, string Password);
