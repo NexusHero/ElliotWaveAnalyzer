@@ -54,6 +54,7 @@ try
     app.MapAuthEndpoints();
     app.MapMarketDataEndpoints();
     app.MapWaveAnalysisEndpoints();
+    app.MapScanEndpoints();
     app.MapTrackRecordEndpoints();
     app.MapBacktestEndpoints();
     app.MapKeyEndpoints();

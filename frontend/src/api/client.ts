@@ -4,6 +4,8 @@ import type {
   BacktestSummary,
   ImageVerificationReport,
   PortfolioReview,
+  ScanFilters,
+  ScanResult,
   CandleIntervalCode,
   DepotSnapshot,
   ResolvedSymbol,
@@ -181,6 +183,26 @@ export async function getPortfolioReview(signal?: AbortSignal): Promise<Portfoli
   }
 
   return (await response.json()) as PortfolioReview
+}
+
+/** Scans symbols for Elliott Wave setups via `GET /api/scan`. */
+export async function scanSetups(filters: ScanFilters = {}, signal?: AbortSignal): Promise<ScanResult> {
+  const params = new URLSearchParams()
+  if (filters.symbols) params.set('symbols', filters.symbols)
+  if (filters.structure) params.set('structure', filters.structure)
+  if (filters.minScore != null) params.set('minScore', String(filters.minScore))
+  if (filters.inZone) params.set('inZone', 'true')
+  if (filters.timeframe) params.set('timeframe', filters.timeframe)
+  if (filters.limit != null) params.set('limit', String(filters.limit))
+
+  const query = params.toString()
+  const response = await fetch(`/api/scan${query ? `?${query}` : ''}`, { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as ScanResult
 }
 
 /** Verifies an uploaded analyst chart via `POST /api/wave-analysis/verify-image` (multipart). */

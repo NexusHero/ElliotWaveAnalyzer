@@ -444,6 +444,37 @@ export interface BacktestSummary {
   buckets: BacktestBucket[]
 }
 
+/** One symbol the scanner flagged with a setup (mirrors backend `ScanHit`). */
+export interface ScanHit {
+  symbol: string
+  structure: string
+  unfoldingWave: string
+  bullish: boolean
+  score: number
+  currentPrice: number
+  invalidationPrice: number | null
+  distanceToInvalidationPercent: number | null
+  inEntryZone: boolean
+  inConfluenceZone: boolean
+}
+
+/** A universe scan result (mirrors backend `ScanResult`). */
+export interface ScanResult {
+  hits: ScanHit[]
+  scanned: number
+  matched: number
+}
+
+/** Filters for a scan request. */
+export interface ScanFilters {
+  symbols?: string
+  structure?: string
+  minScore?: number
+  inZone?: boolean
+  timeframe?: string
+  limit?: number
+}
+
 /** A pivot claimed by the vision model (mirrors backend `ClaimedPivot`). */
 export interface ClaimedPivot {
   approxDate: string

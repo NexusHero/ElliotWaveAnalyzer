@@ -77,6 +77,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-026 | Backtest harness that replays the whole deterministic pipeline over history with a structurally-enforced no-lookahead guarantee, aggregates measured scenario hit rates (by structure/confidence/confluence/timeframe), persists them idempotently, exposes `GET /api/backtest/summary`, and feeds the rates back as priors for scenario probabilities | #121 · ADR-027 · §6 Scenario 14 | Fulfilled |
 | REQ-027 | Portfolio auto-commentary: `GET /api/depot/analysis` reviews each imported holding — resolve ISIN → top-down count → scenario geometry → optional fact-checked LLM narrative — with a portfolio summary and an explicit unresolved list; narrative degrades gracefully (no key / failed fact-guard); results cached per (position, day); opt-in scheduled refresh | #122 · ADR-028 · §6 Scenario 15 | Fulfilled |
 | REQ-028 | Vision import: `POST /api/wave-analysis/verify-image` extracts a claimed count from an uploaded chart with a vision LLM (strict JSON + one retry), snaps every claimed pivot to a real candle extreme (hallucination guard; too few → `ExtractionUnreliable`), runs the deterministic rules on what survives, and compares side-by-side with our own count; image never persisted | #123 · ADR-029 · §6 Scenario 16 | Fulfilled |
+| REQ-029 | Setup scanner: `GET /api/scan` sweeps a set of symbols (configured universe or request-supplied) with the deterministic pipeline and returns ranked hits (in-zone → higher score → tighter risk) with structure/score/zone flags; filters (structure/minScore/inZone); bounded concurrency + per-(symbol,day) cache; no LLM; coverage reported (scanned/matched) | #148 · ADR-030 · §6 Scenario 17 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -830,6 +831,37 @@ sequenceDiagram
 
 ---
 
+## Scenario 17 — Scan the Universe for Setups (REQ-029) {#_runtime_scenario_17}
+
+A user sweeps a set of symbols for setups. The deterministic pipeline runs per symbol with bounded concurrency; each symbol's hit is cached per day; a symbol that can't be served is skipped, not fatal. Hits are ranked and returned with coverage. No LLM.
+
+```mermaid
+sequenceDiagram
+    participant UI as ScannerPanel
+    participant Ep as ScanEndpoints
+    participant Svc as ScanService
+    participant Md as ITechnicalAnalysisService
+    participant Sc as SetupScanner (pure)
+
+    UI->>Ep: GET /api/scan?symbols=&structure=&inZone=&timeframe=
+    Ep->>Svc: ScanAsync(symbols|default, filter, timeframe, limit)
+    loop each symbol (bounded concurrency, cached by symbol+day)
+        Svc->>Md: GetAnalysisAsync(symbol, timeframe)
+        alt not servable
+            Md-->>Svc: throws → skip (scan continues)
+        else candles
+            Svc->>Sc: Scan(symbol, candles)  %% pivots→parse→best count→hit?
+            Sc-->>Svc: ScanHit? (structure, wave, score, zone flags, distance)
+        end
+    end
+    Svc->>Sc: Rank(hits passing filter)
+    Sc-->>Svc: hits, most-relevant first
+    Svc-->>Ep: ScanResult (hits, scanned, matched)
+    Ep-->>UI: 200 ranked result
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1490,6 +1522,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | A genuine differentiator — "upload any analyst's chart, we re-check it against the rules and the real data" — with hallucination made impossible to hide: an un-snappable pivot is reported, not silently used |
 | (+) | The perception/judgment split holds end to end: swapping the vision model can't change a single verdict, and all geometry stays pure and unit-tested (snap, guard, rules, comparison) |
 | (-) | The claimed count is not independently *scored* (only rule-checked) — a score comparison would need to run the guideline scorer on an arbitrary flat count, deferred; zone overlap is reported as both sets rather than a computed intersection; a real analyst's copyrighted chart is never shipped as a fixture (the test image is script-generated) |
+
+---
+
+## ADR-030: Deterministic Setup Scanner — Ranked Sweep Across the Universe, No LLM
+
+**Context:** The one thing a working analyst does every morning is *not* deep-dive a single symbol — it's ask "where should I even look today?". We already had every building block (pivots, parser, projections, confluence zones) but nothing ran them across many symbols. Because the whole count pipeline is deterministic and LLM-free, a broad sweep is cheap — which is exactly what makes a scanner viable where an LLM-per-symbol approach would be too slow and costly.
+
+**Decision:**
+
+- **Pure scanner.** `SetupScanner` (static) turns one symbol's candles into a `ScanHit?` (best count's structure, unfolding wave, score, distance-to-invalidation, in-entry/in-confluence flags) and ranks a set of hits deterministically: **price already in a zone first** (the setup is live now), then **higher guideline score**, then **tighter risk** (closer to invalidation), then symbol for stability. No LLM, no I/O — fully unit-testable.
+- **Bounded, cached service.** `ScanService` resolves the universe (request-supplied symbols or the configured `Scan:DefaultSymbols`), runs the scanner across it with **capped concurrency** (`MaxConcurrency`) and a **hard symbol cap** (`MaxSymbols`, no silent overrun), caching each symbol's hit by **(symbol, timeframe, day)** so a re-scan the same day is free. A symbol the data source can't serve is **skipped, never fatal** — the sweep always returns.
+- **Coverage is explicit.** The response reports `scanned` and `matched` alongside the ranked `hits`, so the caller sees how much of the universe was covered rather than mistaking a capped/filtered list for "everything".
+- **Filters as a value object.** `ScanFilter` (`structure` / `minScore` / `inZone`) is pure and unit-tested; the endpoint (`GET /api/scan`, auth, per-user rate-limited, OpenAPI-documented) just parses query params into it.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The highest-leverage daily tool — "what has a setup right now" across the universe — at near-zero marginal cost because it's LLM-free; ranking surfaces the live, high-quality, tight-risk setups first |
+| (+) | Safe by construction: bounded concurrency + symbol cap + per-day cache keep cost/latency in hand; one bad symbol can't abort the scan; coverage is reported, never silently truncated |
+| (-) | The default universe is a small configured list (BTC/ETH out of the box) — a large, curated, exchange-wide universe depends on the broader market-data coverage still being expanded (Yahoo equities are "planned"); intraday scans inherit the same intraday-history limits as the rest of the app |
 
 ---
 

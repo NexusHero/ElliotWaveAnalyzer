@@ -18,6 +18,11 @@ internal static class WaveAnalysisExtensions
         services.AddTransient<IAutoWaveAnalysisService, AutoWaveAnalysisService>();
         services.AddTransient<ITopDownAnalysisService, TopDownAnalysisService>();
 
+        // Setup scanner (REQ-029): deterministic sweep across symbols. Bind its options and register
+        // the service scoped (it resolves the scoped/transient analysis service; the cache is shared).
+        services.AddOptions<ScanOptions>().BindConfiguration(ScanOptions.SectionName);
+        services.AddScoped<IScanService, ScanService>();
+
         // Input validation (FluentValidation). Scans this assembly for all
         // AbstractValidator<T> implementations and registers them.
         services.AddValidatorsFromAssemblyContaining<Program>();
