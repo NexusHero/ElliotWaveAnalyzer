@@ -27,24 +27,3 @@ public sealed class DailyReportOptions
     public TelegramOptions Telegram { get; init; } = new();
     public EmailOptions Email { get; init; } = new();
 }
-
-/// <summary>Telegram Bot API delivery settings.</summary>
-public sealed class TelegramOptions
-{
-    public bool Enabled { get; init; }
-    public string BotToken { get; init; } = string.Empty;
-    public string ChatId { get; init; } = string.Empty;
-}
-
-/// <summary>SMTP email delivery settings.</summary>
-public sealed class EmailOptions
-{
-    public bool Enabled { get; init; }
-    public string Host { get; init; } = string.Empty;
-    public int Port { get; init; } = 587;
-    public bool UseSsl { get; init; } = true;
-    public string Username { get; init; } = string.Empty;
-    public string Password { get; init; } = string.Empty;
-    public string From { get; init; } = string.Empty;
-    public string[] To { get; init; } = [];
-}

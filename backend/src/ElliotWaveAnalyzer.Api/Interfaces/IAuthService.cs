@@ -1,14 +1,5 @@
 namespace ElliotWaveAnalyzer.Api.Interfaces;
 
-/// <summary>Outcome of a registration attempt.</summary>
-public sealed record AuthResult(bool Succeeded, IReadOnlyList<string> Errors);
-
-/// <summary>Outcome of a login attempt. On success carries the opaque session token.</summary>
-public sealed record SessionResult(bool Succeeded, string? Token, DateTimeOffset? ExpiresAt, string? Error);
-
-/// <summary>The authenticated principal resolved from a session token.</summary>
-public sealed record SessionPrincipal(Guid UserId, string Email);
-
 /// <summary>
 /// Authentication operations: account creation, login (issuing an opaque server-side
 /// session), session validation, and logout.

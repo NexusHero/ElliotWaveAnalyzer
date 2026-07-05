@@ -105,6 +105,3 @@ public static class TrackRecordEndpoints
     private static Guid GetUserId(ClaimsPrincipal user)
         => Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 }
-
-/// <summary>Response of <c>POST /api/analyses</c>: the id of the newly saved analysis.</summary>
-public sealed record SavedAnalysisResponse(Guid Id);

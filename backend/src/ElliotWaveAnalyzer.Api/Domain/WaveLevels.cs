@@ -1,36 +1,5 @@
 namespace ElliotWaveAnalyzer.Api.Domain;
 
-/// <summary>Which side of the current price a level sits on.</summary>
-public enum LevelSide
-{
-    /// <summary>The level is below current price (support / floor in a bullish count).</summary>
-    Below,
-
-    /// <summary>The level is above current price (resistance / cap in a bearish count).</summary>
-    Above,
-}
-
-/// <summary>
-/// A single horizontal price level (e.g. the hard invalidation line).
-/// </summary>
-/// <param name="Price">The price.</param>
-/// <param name="Side">Where it sits relative to current price.</param>
-/// <param name="Label">Short human label, e.g. "Invalidation (Wave 4 must hold Wave 1)".</param>
-/// <param name="Basis">What it is derived from, e.g. "End of Wave 1".</param>
-public sealed record PriceLevel(decimal Price, LevelSide Side, string Label, string Basis);
-
-/// <summary>A price band (e.g. the expected Fibonacci retracement zone for the unfolding wave).</summary>
-/// <param name="Low">Lower bound.</param>
-/// <param name="High">Upper bound.</param>
-/// <param name="Label">Short human label, e.g. "Wave 4 support (23.6–38.2% of Wave 3)".</param>
-/// <param name="Basis">Derivation, e.g. "Fibonacci retracement of Wave 3".</param>
-public sealed record PriceZone(decimal Low, decimal High, string Label, string Basis);
-
-/// <summary>The count that would apply if the primary count's invalidation breaks.</summary>
-/// <param name="Name">Short name, e.g. "Ending diagonal / ABC".</param>
-/// <param name="Note">One-line explanation of when and why it takes over.</param>
-public sealed record AlternativeScenario(string Name, string Note);
-
 /// <summary>
 /// Forward-looking, deterministic price levels derived from a (partial or complete) Elliott
 /// Wave count: the hard invalidation line (rule-based), the expected Fibonacci support zone

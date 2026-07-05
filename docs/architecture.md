@@ -67,6 +67,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-016 | Import a broker depot from a file via pluggable per-broker importers (Smartbroker+ PDF first) | #103 · ADR-017 · §6 Scenario 8 | Fulfilled |
 | REQ-017 | Deduplicate the cron scheduler loops behind a shared `CronBackgroundService` base | #105 · ADR-018 | Fulfilled |
 | REQ-018 | Scalable Capital depot import from the transactions CSV (second `IDepotImporter`) | #107 · ADR-019 | Fulfilled |
+| REQ-019 | One top-level type per file, enforced by an architecture test | #109 · ADR-020 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -979,6 +980,22 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | Uses the officially-supported export; no credentials, no unofficial API |
 | (-) | Average-cost, not lot-level FIFO — the cost basis is an approximation after partial sells; acceptable for a portfolio overview, documented in code |
 | (-) | No current market value / gain-loss from a transactions file (would need a live price lookup — a later enrichment step, shared with any importer) |
+
+---
+
+## ADR-020: One Top-Level Type Per File (enforced)
+
+**Context:** Several files had grown to hold many types — `DepotTypes.cs` (6), `WaveCandidate.cs` (6), `WaveLevels.cs` (5), and others bundled an enum, its records and helpers together. Grouping types by file makes them hard to find (the file name no longer names the type) and lets unrelated types churn together in diffs.
+
+**Decision:** Every top-level type (class/record/interface/enum/struct at namespace scope) lives in its own file named after it. Nested types stay with their parent (they are an implementation detail of it). This was applied across the API source (grouping files split, one file per type; no code, names, namespaces or doc-comments changed — pure moves) and is enforced by an architecture test, `OneTypePerFileTests`, which scans the API source and fails if any file declares more than one top-level type — a Quality Gate alongside the layering tests.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The file name is the type name — navigation and review are predictable; diffs stay scoped to one type |
+| (+) | The rule is enforced, not aspirational — a re-bundled file fails CI |
+| (-) | More, smaller files (≈28 added); mitigated by the naming convention making them trivial to locate |
 
 ---
 
