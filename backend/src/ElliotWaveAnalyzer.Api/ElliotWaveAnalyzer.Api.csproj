@@ -34,7 +34,7 @@
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
          Replaces Swagger UI (Swashbuckle dependency). -->
-    <PackageReference Include="Scalar.AspNetCore" Version="2.16.6" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.10" />
 
     <!-- LLM access goes through Microsoft.Extensions.AI's IChatClient abstraction —
          the .NET-standard "messages in, response out" surface — instead of hand-rolled
