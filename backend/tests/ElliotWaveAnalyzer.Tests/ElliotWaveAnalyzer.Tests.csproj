@@ -45,6 +45,11 @@
 
     <!-- Snapshot testing for the wave-analysis result shape. -->
     <PackageReference Include="Verify.NUnit" Version="31.20.0" />
+
+    <!-- Property-based testing: encode the safety invariants (I1-I9) and let CsCheck attack them with
+         thousands of generated + shrunk variants over the pure deterministic core. Pure managed, no
+         native deps. Seeded for reproducibility (ADR-034). -->
+    <PackageReference Include="CsCheck" Version="4.6.0" />
   </ItemGroup>
 
   <ItemGroup>

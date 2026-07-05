@@ -80,6 +80,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-029 | Setup scanner: `GET /api/scan` sweeps a set of symbols (configured universe or request-supplied) with the deterministic pipeline and returns ranked hits (in-zone → higher score → tighter risk) with structure/score/zone flags; filters (structure/minScore/inZone); bounded concurrency + per-(symbol,day) cache; no LLM; coverage reported (scanned/matched) | #148 · ADR-030 · §6 Scenario 17 | Fulfilled |
 | REQ-030 | Risk layer: `POST /api/risk` turns a count's geometry (entry, the invalidation as the stop, target prices, direction) plus an account-risk input (percent of equity or absolute) into stop distance (abs + %), reward:risk per target, and the position size that risks exactly the chosen capital; direction-aware; an entry on the wrong side of the invalidation → explicit `hasValidStop:false` (never a negative/infinite size), non-positive risk keeps the stop/R:R but omits the size; pure arithmetic, no LLM; "not trading advice" | #150 · ADR-032 · §6 Scenario 19 | Fulfilled |
 | REQ-031 | Analyst-in-the-loop editing: the chart supports add/move/delete/relabel of pivots (placement + nudge snap to real candle extremes) and `POST /api/wave-analysis/verify` re-runs the **deterministic** pipeline on the edited set — snap, hard rules, projections/zones/invalidation/channels, guideline score — returning the objective read live on every (debounced) edit; no LLM in the loop (it only narrates afterwards); the edited count reuses the existing track-record persistence and annotated-chart export | #151 · ADR-033 · §6 Scenario 20 | Fulfilled |
+| REQ-032 | Test strategy: the safety invariants are encoded as **property-based + metamorphic** tests (CsCheck) that attack the pure deterministic core with thousands of generated, shrunk variants — sizing never negative/underflowing, no-valid-stop ⇔ the direction guard, verifier never throws + snapped pivots ⊆ real candles + valid ⇔ no hard-rule fail, snap idempotence, determinism, and rule-verdict invariance under price-scaling and time-shift; generators emit only valid fixtures; the wider layers (adversarial corpus, mutation, browser-E2E, contract-drift, real-LLM eval, load) are tracked as their own issues | #192 (epic #201) · ADR-034 | Fulfilled (foundation) |
 
 ## Quality Goals {#_quality_goals}
 
@@ -1702,6 +1703,30 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | Zero new geometry: the verifier reuses the same snap/rules/projection/score code the auto-count and vision-import paths already use, so an edited count can't be judged by a different standard |
 | (-) | Each verify fetches the symbol's candles server-side (one market-data call per debounced edit); mitigated by the debounce and provider caching, but it is not free |
 | (-) | "Move" is a candle-to-candle nudge, not pixel-perfect dragging; a deliberate scope cut that keeps every edit snapped to real data |
+
+---
+
+## ADR-034: Test Strategy — Invariants Over Examples, Attacked by Generated Variants, Strength Measured
+
+**Context:** This is a financial tool whose defensibility rests on a set of hard invariants (the LLM never does geometry, determinism, no-lookahead, fact-guard, injection-inert, privacy, financial-math correctness). Example-based tests confirm known cases but cannot cover the unknown one — exactly where a costly bug hides. The pure, static deterministic core (`RiskCalculator`, `WaveVerifier`, `PivotSnapper`, `ElliottRuleChecker`, `FibMath`, `SetupScanner`) is ideal for a stronger method.
+
+**Decision:** Adopt a layered strategy whose spine is **property-based + metamorphic testing**, and **measure the test suite's own strength** rather than trusting coverage alone:
+
+- **Properties over examples (CsCheck, pure-managed):** encode each safety invariant as a property and let the framework attack it with generated, automatically-**shrunk** inputs. Generators emit only *valid* fixtures (OHLC with `Low ≤ Open,Close ≤ High`; annotations on real candle extremes), so a failure is always a real defect. This foundation ships now: sizing never goes negative/underflows, `HasValidStop ⇔ the direction guard`, `WaveVerifier` never throws + snapped pivots ⊆ real candles + `IsValid ⇔ no hard-rule fail`, snap idempotence, and determinism.
+- **Metamorphic relations** (no known-good oracle needed): the rule verdict is invariant under a **positive price scaling** and a **time shift**; the analysis truncated at a cutoff is unchanged by appended future candles (no-lookahead); a varied fake-LLM output never changes a deterministic field (the LLM-never-does-geometry invariant).
+- **Adversarial corpora** for the LLM/security surfaces (prompt-injection, fact-guard evasion, exfiltration) that grow monotonically — every discovered bypass becomes a permanent regression test.
+- **Mutation testing (Stryker, already configured)** as the answer to "do our tests actually catch bugs?" — promoted into CI with a score floor on the core.
+- **The full pyramid:** unit → contract (frontend↔backend DTO drift) → acceptance (real Postgres, fake LLM) → browser-E2E (Playwright) → nightly real-LLM eval + load/soak. Cheap/deterministic layers **block** every PR; expensive/non-deterministic layers run **nightly** and report. (Tracked as epic #201, issues #192–#200.)
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Thousands of variants per run exercise the invariants that matter, catching whole bug classes (units/scale, time, lookahead, underflow) that example tests miss — the property suite already surfaced a decimal-underflow edge in risk sizing on absurd inputs |
+| (+) | Mutation testing makes the suite's strength a measured number, not a coverage guess; the adversarial corpora make fixed vulnerabilities un-regressable |
+| (+) | The invariants double as living documentation of the product's guarantees, and the fact-guard/injection corpora are a hard merge gate for every AI feature |
+| (-) | Property/metamorphic tests are a different skill to write and debug (a failure is a generated counterexample, not a hand-picked case) — mitigated by CsCheck's shrinking + reproducible seed |
+| (-) | The heavier layers (real-LLM eval, load, browser-E2E, mutation) are nightly, so a regression they alone would catch surfaces within a day, not on the PR — an accepted cost/latency trade-off |
 
 ---
 
