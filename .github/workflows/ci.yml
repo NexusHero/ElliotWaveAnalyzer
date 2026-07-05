@@ -58,7 +58,12 @@ jobs:
           --results-directory ./TestResults
         working-directory: backend
         env:
+          # Run against the managed Postgres service container (production-near) instead of
+          # spinning up throwaway Testcontainers: EWA_TEST_POSTGRES drives the auth integration
+          # test, ACCEPTANCE_PG_CONNSTRING routes every acceptance test (each fixture isolated in
+          # its own schema) at the same instance.
           EWA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=ewa_test;Username=postgres;Password=postgres"
+          ACCEPTANCE_PG_CONNSTRING: "Host=localhost;Port=5432;Database=ewa_test;Username=postgres;Password=postgres"
 
       - name: Generate coverage report
         run: >
@@ -137,3 +142,26 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: frontend
+
+  # ── Docker image (production artifact) ───────────────────────────────────
+  # Builds the production image on every PR/push so the Dockerfile can't silently break.
+  # Build-only (no registry push, no secrets); flip `push` + add a login step to publish.
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: elliotwaveanalyzer-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
