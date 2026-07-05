@@ -27,6 +27,7 @@ vi.mock('lightweight-charts', () => ({
   CandlestickSeries: 'Candlestick',
   LineSeries: 'Line',
   LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
+  PriceScaleMode: { Normal: 0, Logarithmic: 1 },
   createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
   ColorType: { Solid: 'solid' },
   CrosshairMode: { Normal: 'normal' },
@@ -55,6 +56,11 @@ describe('PriceChart', () => {
   it('accepts multiple candles without throwing', () => {
     const candles = Array.from({ length: 30 }, (_, i) => makeCandle(i))
     expect(() => render(<PriceChart candles={candles} />)).not.toThrow()
+  })
+
+  it('renders with a logarithmic price axis without throwing', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() => render(<PriceChart candles={candles} logScale />)).not.toThrow()
   })
 
   it('renders connected wave lines without throwing', () => {

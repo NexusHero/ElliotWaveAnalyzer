@@ -12,6 +12,7 @@ import {
   LineSeries,
   LineStyle,
   type MouseEventParams,
+  PriceScaleMode,
   type SeriesMarker,
   type Time,
 } from 'lightweight-charts'
@@ -53,6 +54,8 @@ interface PriceChartProps {
   waveLines?: WaveLine[]
   /** Horizontal level lines (invalidation / fib zones) to overlay. */
   priceLines?: PriceLineSpec[]
+  /** Render the price axis logarithmically (so the log-correct Fibonacci levels line up). */
+  logScale?: boolean
   /** Called when the user clicks a point on the chart (date + price at the click). */
   onPointClick?: (time: string, price: number) => void
   /** Current theme — drives the chart colours, which are read from the CSS variables. */
@@ -69,6 +72,7 @@ export default function PriceChart({
   annotations = [],
   waveLines = [],
   priceLines = [],
+  logScale = false,
   onPointClick,
   theme = 'dark',
 }: PriceChartProps) {
@@ -181,6 +185,13 @@ export default function PriceChart({
     })
     series.applyOptions(candleColors(colors))
   }, [theme])
+
+  // ── Apply the price-axis scale (log vs linear) when it changes ─────────────
+  useEffect(() => {
+    chartRef.current?.applyOptions({
+      rightPriceScale: { mode: logScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal },
+    })
+  }, [logScale])
 
   // ── Draw wave-label markers when annotations (or theme) change ─────────────
   useEffect(() => {
