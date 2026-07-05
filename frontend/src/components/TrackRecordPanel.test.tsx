@@ -84,4 +84,11 @@ describe('TrackRecordPanel', () => {
     renderPanel({ deletingId: 'a1' })
     expect(screen.getByRole('button', { name: /delete impulse on btc/i })).toBeDisabled()
   })
+
+  it('offers an annotated-chart download linking to the analysis chart.png endpoint', () => {
+    renderPanel()
+    const link = screen.getByRole('link', { name: /download annotated chart for impulse on btc/i })
+    expect(link).toHaveAttribute('href', '/api/analyses/a1/chart.png')
+    expect(link).toHaveAttribute('download')
+  })
 })

@@ -19,6 +19,13 @@ public interface ITrackRecordService
     Task<IReadOnlyList<TrackedAnalysis>> ListAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns the single saved analysis with <paramref name="id"/> owned by <paramref name="userId"/>
+    /// — its outcome and scenario probabilities evaluated exactly as in <see cref="ListAsync"/> — or
+    /// null when it does not exist or is owned by someone else.
+    /// </summary>
+    Task<TrackedAnalysis?> GetAsync(Guid userId, Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes the analysis with <paramref name="id"/> if it belongs to <paramref name="userId"/>.
     /// Returns false when it does not exist or is owned by someone else.
     /// </summary>

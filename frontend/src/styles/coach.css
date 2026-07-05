@@ -703,6 +703,7 @@
   flex: 1;
   min-width: 0;
 }
+.tr-chart,
 .tr-delete {
   display: inline-flex;
   align-items: center;
@@ -713,6 +714,9 @@
   cursor: pointer;
   padding: 2px;
   border-radius: 6px;
+}
+.tr-chart:hover {
+  color: var(--accent);
 }
 .tr-delete:hover:not(:disabled) {
   color: var(--fail);

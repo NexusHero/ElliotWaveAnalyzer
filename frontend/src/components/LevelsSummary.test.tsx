@@ -27,6 +27,7 @@ const baseLevels: WaveLevels = {
       ],
     },
   ],
+  channels: [],
 }
 
 describe('LevelsSummary', () => {

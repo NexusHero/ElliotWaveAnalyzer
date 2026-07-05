@@ -11,6 +11,7 @@ const levels: WaveLevels = {
   alternative: { name: 'Ending diagonal', note: 'note' },
   scale: 'Linear',
   confluenceZones: [],
+  channels: [],
 }
 
 describe('levelsToPriceLines', () => {

@@ -35,4 +35,12 @@ public sealed record WaveLevels(
     /// See <see cref="Application.FibConfluenceCalculator"/>.
     /// </summary>
     public IReadOnlyList<ConfluenceZone> ConfluenceZones { get; init; } = [];
+
+    /// <summary>
+    /// Deterministic Elliott channel projections (base 0→2, acceleration 2→4) for the count — the
+    /// parallel channels an analyst draws, with the acceleration channel projecting the wave-5
+    /// target band. Fitted in log space when <see cref="Scale"/> is <see cref="FibScale.Log"/>.
+    /// Empty when there are too few pivots. See <see cref="Application.ChannelProjector"/>.
+    /// </summary>
+    public IReadOnlyList<Channel> Channels { get; init; } = [];
 }

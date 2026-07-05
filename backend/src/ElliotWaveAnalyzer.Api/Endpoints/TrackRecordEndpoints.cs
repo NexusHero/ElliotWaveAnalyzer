@@ -37,6 +37,17 @@ public static class TrackRecordEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/{id:guid}/chart.png", GetChart)
+            .WithName("GetAnalysisChart")
+            .WithSummary("Render a saved analysis as a publication-grade annotated PNG")
+            .WithDescription("""
+                Returns an annotated chart (candles, shaded entry/target zones, invalidation line with
+                price tag, scenario arrows and a title block) for one of your saved analyses as
+                image/png. Scoped to the caller — another user's id returns 404.
+                """)
+            .Produces(StatusCodes.Status200OK, contentType: "image/png")
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/calibration", GetCalibration)
             .WithName("GetCalibration")
             .WithSummary("Confidence calibration over your track record")
@@ -87,6 +98,16 @@ public static class TrackRecordEndpoints
     {
         var deleted = await trackRecord.DeleteAsync(GetUserId(user), id, cancellationToken);
         return deleted ? Results.NoContent() : Results.NotFound();
+    }
+
+    private static async Task<IResult> GetChart(
+        Guid id,
+        ClaimsPrincipal user,
+        IAnalysisChartService chartService,
+        CancellationToken cancellationToken)
+    {
+        var png = await chartService.RenderChartAsync(GetUserId(user), id, cancellationToken);
+        return png is null ? Results.NotFound() : Results.File(png, "image/png");
     }
 
     private static async Task<IResult> GetCalibration(

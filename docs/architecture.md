@@ -73,6 +73,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-022 | Log-correct Fibonacci math and scored confluence zones ("green boxes") attached to every projection; scale auto-selected and always reported | #117 · ADR-023 · §6 Scenario 10 | Fulfilled |
 | REQ-023 | Top-down multi-timeframe consistency: each finer count constrained to the wave unfolding on the timeframe above it (hard reject on wrong direction, soft penalty on class/window), with a per-link verdict | #118 · ADR-024 · §6 Scenario 11 | Fulfilled |
 | REQ-024 | Scenario tree per saved analysis (primary + alternates) with calibrated probabilities (or an insufficient-data marker), zone-entry alerts, and auto-switch to the best alternate on invalidation with an append-only switch history | #119 · ADR-025 · §6 Scenario 12 | Fulfilled |
+| REQ-025 | Channel projections (base 0→2 and acceleration 2→4 with a projected wave-5 band) added to every projection, plus a publication-grade annotated chart PNG for any saved analysis (`GET /api/analyses/{id}/chart.png`) via a backend-agnostic draw-op seam and a confined SkiaSharp backend; the LLM still does no geometry | #120 · ADR-026 · §6 Scenario 13 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -674,6 +675,41 @@ sequenceDiagram
 
 ---
 
+## Scenario 13 — Export a Saved Analysis as an Annotated Chart (REQ-025) {#_runtime_scenario_13}
+
+A user downloads the publication-grade chart for one of their saved analyses. Ownership is enforced, candles are fetched live, the layout is decided by a pure composer (all geometry), and only the final rasterization touches SkiaSharp. Deterministic for a given analysis + render date.
+
+```mermaid
+sequenceDiagram
+    participant UI as TrackRecordPanel (chart link)
+    participant Ep as TrackRecordEndpoints
+    participant Cs as AnalysisChartService
+    participant Tr as ITrackRecordService
+    participant Md as IMarketDataProvider
+    participant Comp as AnnotatedChartComposer (pure)
+    participant Rnd as IAnnotatedChartRenderer (SkiaSharp)
+
+    UI->>Ep: GET /api/analyses/{id}/chart.png (cookie auth)
+    Ep->>Cs: RenderChartAsync(userId, id)
+    Cs->>Tr: GetAsync(userId, id)
+    alt not found / other user
+        Tr-->>Cs: null
+        Cs-->>Ep: null
+        Ep-->>UI: 404 Not Found
+    else owned
+        Tr-->>Cs: TrackedAnalysis
+        Cs->>Md: GetCandlesAsync(symbol) (empty on failure — still renders)
+        Cs->>Comp: Compose(input) → ChartScene (pixel-space draw ops)
+        Comp-->>Cs: ChartScene
+        Cs->>Rnd: Render(scene) → PNG bytes
+        Rnd-->>Cs: image/png
+        Cs-->>Ep: bytes
+        Ep-->>UI: 200 image/png
+    end
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1248,6 +1284,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | A saved call is now a living tree: it enters a zone with an alert, and on invalidation it self-promotes the best alternate and records why — the audit trail is never overwritten |
 | (+) | Probabilities are honest (measured, or explicitly withheld) and the switch/zone/probability logic is pure and fully unit-tested; the full lifecycle is covered by a PostgreSQL acceptance test |
 | (-) | Capped at two alternates and one entry zone per analysis (issue scope); position sizing/order suggestions are out of scope. The promoted primary re-evaluates from the original save time, not the switch instant — acceptable now, revisitable if double-fires appear |
+
+---
+
+## ADR-026: Channel Projections and a Draw-Op Seam for Publication-Grade Annotated Charts (SkiaSharp Confined to Infrastructure)
+
+**Context:** Two gaps remained on the analytical and communication sides. Analytically, we scored channel *fit* but never *projected* channels — the 0→2 base channel and the 2→4 acceleration channel that professionals draw to bound wave 3 and target wave 5 are pure geometry, so they belong on the deterministic side of the core invariant (ADR-009). On the communication side, the app rendered a plain candles+RSI+MACD PNG (`SkiaSharpChartRenderer`) but nothing an analyst would publish: no wave labels, shaded Fibonacci boxes, invalidation lines with price tags, scenario arrows or channels. Naïvely extending the SkiaSharp renderer would bury all the layout/geometry decisions inside an Infrastructure class that can only be tested by decoding pixels (OCR-style) — brittle and slow, and it would spread the rendering backend across the layout logic.
+
+**Decision:**
+
+- **Channel projection (pure).** A static `ChannelProjector.Project(annotations, scale)` fits the base channel (0→2 line, parallel through 1) once wave 2 exists and the acceleration channel (2→4 line, parallel through 3) once wave 4 exists, projecting the wave-5 band one acceleration-leg (the 2→4 duration) beyond wave 4. Lines are fit in price space on a linear analysis and in ln(price) space on a log one, with x measured in days from the origin pivot, so a straight channel on a log chart is a straight line here too. Each `Channel` (a `ChannelKind`, two `ChannelLine`s and, for the acceleration channel, a target band) is attached to `WaveLevels.Channels`. Line equations are asserted against hand-computed slope/intercept in both scales (tolerance 1e-6).
+- **Draw-op seam.** A backend-agnostic `ChartScene` — an ordered list of `ChartDrawOp`s (`ChartLineOp`/`ChartRectOp`/`ChartTextOp`) in **pixel** space, plus a canvas size and background — is produced by the pure `AnnotatedChartComposer` in the Application layer. The composer owns the whole layered pipeline (grid → candles → channels → zones → invalidation → wave labels → scenario arrows → title) and all coordinate mapping (linear or log price axis, date→x). Because it emits data, its output is asserted structurally — the draw list contains a `[2]` label, a `61.8%` zone label, a dashed invalidation line, wide translucent zone rects, channel rays — with no pixels and no OCR.
+- **SkiaSharp confined.** An internal `IAnnotatedChartRenderer` (`SkiaAnnotatedChartRenderer`) in Infrastructure only *replays* a `ChartScene` onto a bitmap and encodes PNG — it carries no analytical logic. SkiaSharp stays entirely inside Infrastructure (ArchitectureTests keep it there). Output is **deterministic**: the scene has no clock read (the render date is passed in) and no randomness, so the same input yields byte-identical PNG — asserted by hashing two renders. A handful of pixel-decode tests confirm the backend actually paints the ops (a filled rect paints its colour inside its rectangle and not outside; a horizontal line paints a colour run at its row).
+- **Endpoint.** `GET /api/analyses/{id}/chart.png` (auth, per-user rate-limited) resolves the analysis through the new `ITrackRecordService.GetAsync` (ownership → null → 404), fetches candles, composes and renders. The track-record UI exposes a per-row download link.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | All layout/geometry is pure and unit-testable without a rendering backend; SkiaSharp is a thin, confined leaf; determinism is provable by hashing |
+| (+) | Channel projections are now analytical output (base + acceleration + wave-5 band), computed deterministically and attached to every projection — the LLM still does no geometry |
+| (-) | Saved analyses persist no pivots, so their exported chart omits wave-degree labels and channel rays (it draws candles, zones, invalidation, scenario arrows, title); the composer supports both and the live-projection path can supply them. A richer PNG for saved analyses would require persisting the count's pivots — deferred |
 
 ---
 

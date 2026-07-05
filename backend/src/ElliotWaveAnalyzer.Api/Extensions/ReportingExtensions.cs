@@ -22,6 +22,11 @@ internal static class ReportingExtensions
 
         services.AddSingleton<IChartRenderer, SkiaSharpChartRenderer>();
 
+        // Annotated-chart export (issue #120): the SkiaSharp draw-op backend is stateless (singleton);
+        // the assembling service is scoped because it resolves the scoped track-record service.
+        services.AddSingleton<IAnnotatedChartRenderer, SkiaAnnotatedChartRenderer>();
+        services.AddScoped<IAnalysisChartService, AnalysisChartService>();
+
         services.AddHttpClient<TelegramDeliveryChannel>(client =>
             client.BaseAddress = new Uri("https://api.telegram.org/"))
             .AddStandardResilienceHandler();
