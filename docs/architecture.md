@@ -66,6 +66,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-015 | Route ATR through `IIndicatorCalculator`/Skender instead of a hand-rolled Wilder recurrence | #101 · ADR-016 | Fulfilled |
 | REQ-016 | Import a broker depot from a file via pluggable per-broker importers (Smartbroker+ PDF first) | #103 · ADR-017 · §6 Scenario 8 | Fulfilled |
 | REQ-017 | Deduplicate the cron scheduler loops behind a shared `CronBackgroundService` base | #105 · ADR-018 | Fulfilled |
+| REQ-018 | Scalable Capital depot import from the transactions CSV (second `IDepotImporter`) | #107 · ADR-019 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -961,6 +962,23 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | A new scheduled job is a ~10-line subclass; harder to get the lifecycle subtly wrong |
 | (+) | The shared guard/cancellation branches are unit-tested via a probe subclass (the loop body was previously untested, being coverage-excluded plumbing) |
 | (-) | Behaviour is unchanged, so the win is maintainability, not features; the `*BackgroundService` names remain coverage-excluded (ADR-015) |
+
+---
+
+## ADR-019: Scalable Capital Depot Import from the Transactions CSV (aggregated to holdings)
+
+**Context:** Scalable Capital has no public portfolio API but offers an official **transactions** CSV export (semicolon-delimited: `date;time;status;…;type;isin;shares;price;amount;…;currency`) — the sanctioned path (ADR-017). Unlike the Smartbroker+ PDF, which is a holdings snapshot, this is a *transaction ledger*: there is no single row that states "you own N shares worth X".
+
+**Decision:** Add `ScalableCapitalCsvImporter : IDepotImporter` (Source = ScalableCapital), registered alongside the PDF importer — the router picks it via `CanHandle` (not-PDF + a Scalable header signature), no change to `IDepotImportService`, the endpoint or the UI (OCP). It **aggregates** transactions into current holdings: net quantity = Σ buy shares − Σ sell shares (savings-plan executions count as buys; dividends/deposits/fees don't change share count; cancelled rows skipped); cost is the **average** cost (Σ buy amount ÷ Σ buy shares). Market price/value and gain/loss are left null (a transaction carries its execution price, not the current market price); positions that net to ≤ 0 are dropped. Numbers are parsed tolerantly (German or invariant). The upload endpoint and Settings panel now accept CSV as well as PDF.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The second broker is a self-contained importer + one DI line; the routing/endpoint/UI were untouched — the abstraction paid off |
+| (+) | Uses the officially-supported export; no credentials, no unofficial API |
+| (-) | Average-cost, not lot-level FIFO — the cost basis is an approximation after partial sells; acceptable for a portfolio overview, documented in code |
+| (-) | No current market value / gain-loss from a transactions file (would need a live price lookup — a later enrichment step, shared with any importer) |
 
 ---
 

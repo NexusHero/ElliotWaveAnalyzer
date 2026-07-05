@@ -66,6 +66,29 @@ public sealed class DepotImportAcceptanceTests
     }
 
     [Test]
+    public async Task ImportDepot_ScalableCsv_Returns200WithAggregatedHoldings()
+    {
+        const string csv =
+            "date;time;status;reference;description;assetType;type;isin;shares;price;amount;fee;tax;currency\n" +
+            "2026-01-01;10:00:00;executed;R1;ACME Robotics;stock;Buy;US0000000001;10;100,00;1000,00;0;0;EUR\n" +
+            "2026-01-02;10:00:00;executed;R2;ACME Robotics;stock;Sell;US0000000001;4;120,00;480,00;0;0;EUR";
+        var content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(csv));
+        content.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        using var upload = new MultipartFormDataContent { { content, "file", "transactions.csv" } };
+
+        var response = await _client.PostAsync("/api/depot/import", upload);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(body.GetProperty("source").GetString(), Is.EqualTo("ScalableCapital"));
+            Assert.That(body.GetProperty("positions").GetArrayLength(), Is.EqualTo(1));
+            Assert.That(body.GetProperty("positions")[0].GetProperty("quantity").GetDecimal(), Is.EqualTo(6m));
+        });
+    }
+
+    [Test]
     public async Task ImportDepot_EmptyUpload_Returns400()
     {
         using var empty = new MultipartFormDataContent

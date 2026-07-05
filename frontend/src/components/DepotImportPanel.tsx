@@ -43,19 +43,22 @@ export default function DepotImportPanel() {
       <div className="set-section-head">
         <div>
           <h2>Import depot</h2>
-          <p>Upload a Smartbroker+ PDF export to load your holdings. The file is parsed, not stored.</p>
+          <p>
+            Upload a Smartbroker+ PDF or a Scalable Capital CSV export to load your holdings. The
+            file is parsed, not stored.
+          </p>
         </div>
       </div>
 
       <label className="depot-upload">
         <input
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,text/csv,.csv"
           disabled={busy}
           aria-label="Depot file"
           onChange={(e) => void onFileChosen(e.target.files?.[0])}
         />
-        <span>{busy ? 'Parsing…' : 'Choose a Smartbroker+ PDF'}</span>
+        <span>{busy ? 'Parsing…' : 'Choose a Smartbroker+ PDF or Scalable CSV'}</span>
       </label>
 
       {error && (

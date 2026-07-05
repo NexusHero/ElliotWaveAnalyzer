@@ -16,6 +16,7 @@ internal static class DepotImportExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddSingleton<IDepotImporter, SmartbrokerPlusPdfImporter>();
+        services.AddSingleton<IDepotImporter, ScalableCapitalCsvImporter>();
         services.AddSingleton<IDepotImportService, DepotImportService>();
 
         return services;
