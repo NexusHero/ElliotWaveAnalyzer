@@ -9,6 +9,7 @@ import {
   type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
+  LineSeries,
   LineStyle,
   type MouseEventParams,
   type SeriesMarker,
@@ -17,6 +18,13 @@ import {
 import { useEffect, useRef } from 'react'
 import type { MarketCandle } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
+import type { WaveLinePoint } from './waveLine'
+
+/** A count's wave-line polyline through its pivots, coloured by whose count it is. */
+export interface WaveLine {
+  kind: 'user' | 'ai'
+  points: WaveLinePoint[]
+}
 
 /** A wave label pinned to a chart date. */
 export interface ChartMarker {
@@ -41,6 +49,8 @@ interface PriceChartProps {
   candles: MarketCandle[]
   /** Wave labels to draw above the candles. */
   annotations?: ChartMarker[]
+  /** Connected wave-line polylines (one per count) drawn through the pivots. */
+  waveLines?: WaveLine[]
   /** Horizontal level lines (invalidation / fib zones) to overlay. */
   priceLines?: PriceLineSpec[]
   /** Called when the user clicks a point on the chart (date + price at the click). */
@@ -57,6 +67,7 @@ interface PriceChartProps {
 export default function PriceChart({
   candles,
   annotations = [],
+  waveLines = [],
   priceLines = [],
   onPointClick,
   theme = 'dark',
@@ -68,6 +79,8 @@ export default function PriceChart({
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null)
   // Track created price lines so we can clear them before redrawing.
   const priceLinesRef = useRef<IPriceLine[]>([])
+  // Track the wave-line series so we can clear them before redrawing.
+  const waveLineSeriesRef = useRef<ISeriesApi<'Line'>[]>([])
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -127,6 +140,9 @@ export default function PriceChart({
       chartRef.current = null
       seriesRef.current = null
       markersRef.current = null
+      // The wave-line series were destroyed with the chart; drop the stale refs so a remount
+      // doesn't try to remove them from a new chart.
+      waveLineSeriesRef.current = []
     }
   }, [])
 
@@ -181,6 +197,34 @@ export default function PriceChart({
     }))
     markersApi.setMarkers(markers)
   }, [annotations, theme])
+
+  // ── Draw connected wave lines through the pivots when they (or theme) change ──
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+
+    // Clear the previous lines before redrawing (avoid leaking series on every edit).
+    for (const line of waveLineSeriesRef.current) {
+      chart.removeSeries(line)
+    }
+    waveLineSeriesRef.current = []
+
+    const colors = chartColors(theme)
+    for (const wave of waveLines) {
+      if (wave.points.length < 2) continue
+      const line = chart.addSeries(LineSeries, {
+        color: wave.kind === 'ai' ? colors.aiMarker : colors.marker,
+        lineWidth: 2,
+        // The line traces structure; keep it out of the axis/crosshair furniture so the
+        // markers on top stay legible.
+        lastValueVisible: false,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      line.setData(wave.points.map((p) => ({ time: p.time as Time, value: p.value })))
+      waveLineSeriesRef.current.push(line)
+    }
+  }, [waveLines, theme])
 
   // ── Draw level lines (invalidation / fib zones) when they (or theme) change ──
   useEffect(() => {
