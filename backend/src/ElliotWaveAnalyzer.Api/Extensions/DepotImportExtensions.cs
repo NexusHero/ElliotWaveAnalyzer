@@ -1,3 +1,4 @@
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Infrastructure.DepotImport;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -21,6 +22,10 @@ internal static class DepotImportExtensions
 
         // Persists the user's most recent import (uses the scoped AppDbContext).
         services.AddScoped<IDepotStore, DepotStore>();
+
+        // Portfolio review (REQ-027): resolves + analyzes + narrates each holding. Scoped — depends
+        // on the scoped depot store and per-user narrator.
+        services.AddScoped<IPortfolioReviewService, PortfolioReviewService>();
 
         return services;
     }

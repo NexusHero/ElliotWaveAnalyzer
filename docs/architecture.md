@@ -75,6 +75,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-024 | Scenario tree per saved analysis (primary + alternates) with calibrated probabilities (or an insufficient-data marker), zone-entry alerts, and auto-switch to the best alternate on invalidation with an append-only switch history | #119 · ADR-025 · §6 Scenario 12 | Fulfilled |
 | REQ-025 | Channel projections (base 0→2 and acceleration 2→4 with a projected wave-5 band) added to every projection, plus a publication-grade annotated chart PNG for any saved analysis (`GET /api/analyses/{id}/chart.png`) via a backend-agnostic draw-op seam and a confined SkiaSharp backend; the LLM still does no geometry | #120 · ADR-026 · §6 Scenario 13 | Fulfilled |
 | REQ-026 | Backtest harness that replays the whole deterministic pipeline over history with a structurally-enforced no-lookahead guarantee, aggregates measured scenario hit rates (by structure/confidence/confluence/timeframe), persists them idempotently, exposes `GET /api/backtest/summary`, and feeds the rates back as priors for scenario probabilities | #121 · ADR-027 · §6 Scenario 14 | Fulfilled |
+| REQ-027 | Portfolio auto-commentary: `GET /api/depot/analysis` reviews each imported holding — resolve ISIN → top-down count → scenario geometry → optional fact-checked LLM narrative — with a portfolio summary and an explicit unresolved list; narrative degrades gracefully (no key / failed fact-guard); results cached per (position, day); opt-in scheduled refresh | #122 · ADR-028 · §6 Scenario 15 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -749,6 +750,46 @@ sequenceDiagram
 
 ---
 
+## Scenario 15 — Portfolio Review of an Imported Depot (REQ-027) {#_runtime_scenario_15}
+
+A user with an imported depot opens the portfolio review. Each holding is resolved from its ISIN, analyzed top-down, and narrated from the deterministic facts (the narrative is fact-guarded and optional). Positions that can't be resolved or analyzed are surfaced with a reason; results are cached per (ISIN, day) so a re-open is cheap.
+
+```mermaid
+sequenceDiagram
+    participant UI as PortfolioReviewPanel
+    participant Ep as DepotEndpoints
+    participant Svc as PortfolioReviewService
+    participant Store as IDepotStore
+    participant Res as ISymbolResolver
+    participant Top as ITopDownAnalysisService (deterministic)
+    participant Nar as IPositionNarrator (LLM + fact-guard)
+
+    UI->>Ep: GET /api/depot/analysis (cookie auth)
+    Ep->>Svc: ReviewAsync(userId)
+    Svc->>Store: GetLatestAsync(userId)
+    loop each position (cached by ISIN+day)
+        Svc->>Res: SearchAsync(isin)
+        alt no match
+            Res-->>Svc: []  → Unresolved(reason)
+        else resolved
+            Svc->>Top: AnalyzeAsync(symbol)  %% pivots→parse→levels, no LLM
+            alt no timeframe analyzable
+                Top-->>Svc: throws → Unresolved(reason)
+            else count found
+                Top-->>Svc: chain + finest levels
+                Svc->>Nar: NarrateAsync(brief facts)
+                Nar->>Nar: PositionFactGuard (reject invented prices)
+                Nar-->>Svc: narrative | reason (no key / failed guard)
+            end
+        end
+    end
+    Svc->>Svc: PortfolioSummaryCalculator (above/below/in-zone/unresolved)
+    Svc-->>Ep: PortfolioReview
+    Ep-->>UI: 200 briefs + unresolved + summary
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1367,6 +1408,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The credibility feature: measured hit rates at scale, with lookahead made structurally impossible and enforced by adversarial tests — not a hand-wave |
 | (+) | Honest priors give a saved scenario a probability before the user's own record is large enough, without inventing one; runs are reproducible (dataset hash) and idempotent |
 | (-) | Confidence in the backtest is *score-derived* (the deterministic guideline score), a documented approximation of the live LLM confidence it priors; backtesting is single-config by design (no optimization); long runs are dev-triggered, not a scheduled job (revisitable) |
+
+---
+
+## ADR-028: Portfolio Auto-Commentary — Deterministic Review + Fact-Guarded Narrative
+
+**Context:** We had the two halves of a professional portfolio review — depot import/persistence (ISINs) and the analysis engine — but they were not connected. The reference analysts publish per-position reviews (chart + count + zones + invalidation) with a written note. The value is doing that automatically for a whole depot; the risk is the note: an LLM that "reviews" holdings will happily invent a price target, which is exactly the trust-destroying behavior the mission's core invariant forbids.
+
+**Decision:**
+
+- **Deterministic core, LLM only narrates.** `PortfolioReviewService` (pure orchestration over interfaces) walks each depot position: resolve the ISIN (`ISymbolResolver`), run the deterministic top-down analysis (`ITopDownAnalysisService`), take the scenario geometry from the finest timeframe that produced a count, and classify where current price sits (above/below invalidation, in entry zone). All numbers are computed. Portfolio-level counts come from the pure `PortfolioSummaryCalculator`.
+- **Fact-guarded narrative.** `IPositionNarrator` writes one paragraph from a fact sheet of the position's numbers; its output passes through the pure `PositionFactGuard`, which extracts price-like numbers from the text and **rejects the narrative if any is not a fact price** (within tolerance; wave numbers and `%` ratios are allowed). A rejected or key-less narrative degrades to an explicit reason (`narrativeUnavailableReason`) — the deterministic brief always stands.
+- **Nothing silent.** A position whose ISIN doesn't resolve, or whose instrument no timeframe can analyze, is returned in an explicit `Unresolved` list with a reason — never dropped.
+- **Cost control.** Per-position results are cached in-memory by (ISIN, UTC day), so re-opening the review the same day doesn't re-run the analyzer or the LLM; the endpoint is per-user rate-limited like the rest of the API. An **opt-in** scheduled refresh (`PortfolioReview:Enabled`) registers a `CronBackgroundService` subclass that warms every depot's review (ADR-018 pattern, one config-gated line); off by default.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The differentiator — an automatic, professional-style portfolio review — with the anti-hallucination guarantee enforced by a pure, unit-tested guard rather than trust in the model |
+| (+) | Graceful degradation everywhere: no LLM key still yields the full deterministic brief; unresolvable holdings are explicit; the day-cache keeps repeat opens cheap |
+| (-) | One LLM call per position on the first open of the day (bounded by the cache + rate limits); the narrative is a single paragraph, not a multi-section report; per-position mini-chart reuses the REQ-025 renderer on demand rather than being embedded in this payload |
 
 ---
 

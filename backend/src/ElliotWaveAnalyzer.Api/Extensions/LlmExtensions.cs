@@ -93,6 +93,9 @@ internal static class LlmExtensions
         // In-memory per instance; see InMemoryTokenTracker for the distributed seam.
         services.AddSingleton<ITokenTracker, InMemoryTokenTracker>();
 
+        // Portfolio-review narratives (fact-checked; degrades to null without a key).
+        services.AddScoped<IPositionNarrator, LlmPositionNarrator>();
+
         return services;
 
         // Standard middleware pipeline. Distributed caching short-circuits identical requests

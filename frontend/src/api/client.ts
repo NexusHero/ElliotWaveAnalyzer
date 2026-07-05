@@ -2,6 +2,7 @@ import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
   BacktestSummary,
+  PortfolioReview,
   CandleIntervalCode,
   DepotSnapshot,
   ResolvedSymbol,
@@ -168,6 +169,17 @@ export async function getBacktestSummary(signal?: AbortSignal): Promise<Backtest
   }
 
   return (await response.json()) as BacktestSummary
+}
+
+/** Reviews the user's imported depot via `GET /api/depot/analysis`. */
+export async function getPortfolioReview(signal?: AbortSignal): Promise<PortfolioReview> {
+  const response = await fetch('/api/depot/analysis', { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as PortfolioReview
 }
 
 /** Deletes a saved analysis via `DELETE /api/analyses/{id}`. */
