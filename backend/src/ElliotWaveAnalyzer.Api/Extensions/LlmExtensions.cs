@@ -96,6 +96,10 @@ internal static class LlmExtensions
         // Portfolio-review narratives (fact-checked; degrades to null without a key).
         services.AddScoped<IPositionNarrator, LlmPositionNarrator>();
 
+        // Vision import (REQ-028): a vision LLM extracts a claimed count; deterministic pipeline verifies it.
+        services.AddScoped<IChartVisionExtractor, LlmChartVisionExtractor>();
+        services.AddScoped<IImageVerificationService, ImageVerificationService>();
+
         return services;
 
         // Standard middleware pipeline. Distributed caching short-circuits identical requests

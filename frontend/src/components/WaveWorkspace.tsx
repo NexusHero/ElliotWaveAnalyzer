@@ -10,6 +10,7 @@ import {
   saveAnalysis,
   topDownAnalysis,
   validateWaveCount,
+  verifyChartImage,
 } from '../api/client'
 import {
   type CandleIntervalCode,
@@ -30,6 +31,7 @@ import SymbolSearch from './SymbolSearch'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
+import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { toTrackAnalysisRequest } from './trackRecord'
 
 /**
@@ -170,6 +172,17 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     : portfolioQuery.isError
       ? 'error'
       : 'result'
+  const verifyImageMutation = useMutation({
+    mutationFn: ({ file, symbol }: { file: File; symbol: string }) =>
+      verifyChartImage(file, symbol || undefined),
+  })
+  const verifyImageState: VerifyImageState = verifyImageMutation.isPending
+    ? 'verifying'
+    : verifyImageMutation.isError
+      ? 'error'
+      : verifyImageMutation.data
+        ? 'result'
+        : 'idle'
   const saveMutation = useMutation({
     mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
@@ -585,6 +598,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             error={trackRecordError}
             deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
             onDelete={handleDeleteAnalysis}
+          />
+
+          <VerifyImagePanel
+            state={verifyImageState}
+            report={verifyImageMutation.data ?? null}
+            error={verifyImageMutation.error instanceof Error ? verifyImageMutation.error.message : null}
+            onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
           />
 
           <PortfolioReviewPanel

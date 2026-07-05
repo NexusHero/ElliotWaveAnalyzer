@@ -444,6 +444,70 @@ export interface BacktestSummary {
   buckets: BacktestBucket[]
 }
 
+/** A pivot claimed by the vision model (mirrors backend `ClaimedPivot`). */
+export interface ClaimedPivot {
+  approxDate: string
+  approxPrice: number
+  label: string
+}
+
+/** A price box claimed by the vision model (mirrors backend `ClaimedZone`). */
+export interface ClaimedZone {
+  low: number
+  high: number
+  label: string | null
+}
+
+/** The vision model's raw extraction from a chart image (mirrors backend `ChartExtraction`). */
+export interface ChartExtraction {
+  symbol: string | null
+  timeframe: string | null
+  pivots: ClaimedPivot[]
+  levels: number[]
+  zones: ClaimedZone[]
+}
+
+/** A claimed pivot that snapped to a real candle (mirrors backend `SnappedPivot`). */
+export interface SnappedPivot {
+  label: string
+  date: string
+  price: number
+  claimedPrice: number
+}
+
+/** A claimed pivot that did not snap (mirrors backend `RejectedPivot`). */
+export interface RejectedPivot {
+  label: string
+  approxDate: string
+  approxPrice: number
+  reason: string
+}
+
+/** Side-by-side of the claimed and our own count (mirrors backend `CountComparison`). */
+export interface CountComparison {
+  claimedStructure: string
+  claimedScore: number | null
+  ourStructure: string | null
+  ourScore: number | null
+  ourZones: ConfluenceZone[]
+  agree: boolean
+  summary: string
+}
+
+/** Whether an uploaded chart could be reliably extracted (mirrors backend `ImageVerificationStatus`). */
+export type ImageVerificationStatus = 'Verified' | 'ExtractionUnreliable'
+
+/** The verification report for an uploaded analyst chart (mirrors backend `ImageVerificationReport`). */
+export interface ImageVerificationReport {
+  status: ImageVerificationStatus
+  extraction: ChartExtraction
+  snapped: SnappedPivot[]
+  rejected: RejectedPivot[]
+  claimedRules: WaveRuleReport | null
+  comparison: CountComparison | null
+  message: string
+}
+
 /** A per-position Elliott Wave brief (mirrors backend `PositionBrief`). */
 export interface PositionBrief {
   isin: string

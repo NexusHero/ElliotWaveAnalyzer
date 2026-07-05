@@ -24,6 +24,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 [JsonSerializable(typeof(ConfidenceCalibration))]
 [JsonSerializable(typeof(BacktestSummary))]
 [JsonSerializable(typeof(PortfolioReview))]
+[JsonSerializable(typeof(ImageVerificationReport))]
 [JsonSerializable(typeof(RunBacktestRequest))]
 [JsonSerializable(typeof(SavedApiKey))]
 [JsonSerializable(typeof(IReadOnlyList<SavedApiKey>))]

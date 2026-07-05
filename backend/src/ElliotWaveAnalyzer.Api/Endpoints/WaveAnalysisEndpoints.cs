@@ -72,6 +72,27 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("ip-global");
 
+        // ── POST /api/wave-analysis/verify-image ──────────────────────────────
+        // Vision import: a vision LLM extracts the claimed count from an uploaded chart, then the
+        // deterministic pipeline verifies it against real data. Makes an LLM call → strict throttle.
+        group.MapPost("/wave-analysis/verify-image", VerifyImage)
+            .WithName("VerifyChartImage")
+            .WithSummary("Verify a claimed Elliott Wave count from an uploaded chart screenshot")
+            .WithDescription("""
+                Multipart upload with a single 'file' field (PNG/JPEG) and optional 'symbol' and
+                'timeframe' form fields (used if the image doesn't make them legible). A vision model
+                extracts the claimed count; every claimed pivot is then snapped to a real candle
+                extreme (±0.5% / ±1 bar) — pivots that don't snap are reported, not trusted — and the
+                deterministic rules verify what survives, side-by-side with our own count. When too
+                few pivots snap, the report says the image couldn't be reliably extracted rather than
+                guessing. The image is parsed in-request and never stored.
+                """)
+            .DisableAntiforgery()
+            .Produces<ImageVerificationReport>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .RequireRateLimiting("gemini-analysis");
+
         // ── GET /api/tokens ───────────────────────────────────────────────────
         group.MapGet("/tokens", GetTokenUsage)
             .WithName("GetTokenUsage")
@@ -86,6 +107,60 @@ public static class WaveAnalysisEndpoints
             .RequireRateLimiting("ip-global");
 
         return app;
+    }
+
+    // Chart screenshots are small; cap the upload and restrict to images.
+    private const long MaxImageBytes = 8 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedImageTypes =
+        new(StringComparer.OrdinalIgnoreCase) { "image/png", "image/jpeg", "image/jpg", "image/webp" };
+
+    private static async Task<IResult> VerifyImage(
+        IFormFile? file,
+        HttpRequest request,
+        IImageVerificationService verification,
+        CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return Results.Problem("Upload a non-empty image in the 'file' field.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (file.Length > MaxImageBytes)
+        {
+            return Results.Problem("Image is too large (max 8 MB).", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var contentType = file.ContentType ?? "application/octet-stream";
+        if (!AllowedImageTypes.Contains(contentType))
+        {
+            return Results.Problem(
+                "Unsupported image type; upload a PNG, JPEG or WebP.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        using var buffer = new MemoryStream();
+        await file.CopyToAsync(buffer, cancellationToken);
+
+        var symbol = request.Form.TryGetValue("symbol", out var s) ? s.ToString() : null;
+        var timeframe = request.Form.TryGetValue("timeframe", out var t) ? t.ToString() : null;
+
+        try
+        {
+            var report = await verification.VerifyAsync(
+                buffer.ToArray(), contentType, symbol, timeframe, cancellationToken);
+            return Results.Ok(report);
+        }
+        catch (ChartExtractionException ex)
+        {
+            return Results.Problem(
+                title: "Could not read the chart", detail: ex.Message,
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return Results.Problem(
+                title: "Could not verify the chart", detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
     }
 
     private static async Task<IResult> ValidateWaveCount(
