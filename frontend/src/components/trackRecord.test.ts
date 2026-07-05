@@ -14,6 +14,8 @@ const baseCount: RankedWaveCount = {
     supportZone: null,
     targetZones: [{ low: 60000, high: 65000, label: 't', basis: 'fib' }],
     alternative: null,
+    scale: 'Linear',
+    confluenceZones: [],
   },
   confidence: 'high',
   rationale: '',

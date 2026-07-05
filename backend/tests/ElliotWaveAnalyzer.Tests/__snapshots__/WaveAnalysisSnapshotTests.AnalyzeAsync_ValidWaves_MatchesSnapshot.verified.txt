@@ -56,7 +56,48 @@
     Alternative: {
       Name: Corrective B-wave,
       Note: If price reverses below Wave 2, the move up may be a corrective B-wave rather than Wave 3.
-    }
+    },
+    ConfluenceZones: [
+      {
+        Low: 47146.000,
+        High: 47146.000,
+        Score: 1.0,
+        Kind: Target,
+        Contributions: [
+          {
+            Price: 47146.000,
+            Weight: 1.0,
+            Basis: 1.618× extension of Wave 1, linear scale
+          }
+        ]
+      },
+      {
+        Low: 48184.000,
+        High: 48184.000,
+        Score: 1.0,
+        Kind: Target,
+        Contributions: [
+          {
+            Price: 48184.000,
+            Weight: 1.0,
+            Basis: 1.272× extension of Wave 1, linear scale
+          }
+        ]
+      },
+      {
+        Low: 49000.0,
+        High: 49000.0,
+        Score: 1.0,
+        Kind: Target,
+        Contributions: [
+          {
+            Price: 49000.0,
+            Weight: 1.0,
+            Basis: 1× extension of Wave 1, linear scale
+          }
+        ]
+      }
+    ]
   },
   Usage: {
     Provider: Gemini,

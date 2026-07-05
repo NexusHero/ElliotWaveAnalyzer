@@ -953,3 +953,65 @@
 .level-row.target .level-v {
   color: var(--text);
 }
+.levels-scale {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 1px 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: 99px;
+}
+.confluence {
+  border-top: 1px solid var(--line-soft);
+  padding: 9px 12px;
+}
+.confluence-head {
+  font-weight: 700;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.confluence-zone {
+  display: grid;
+  grid-template-columns: 54px auto max-content;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--line-soft);
+  font-size: 12.5px;
+}
+.confluence-zone:first-of-type {
+  border-top: none;
+}
+.confluence-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.confluence-zone.entry .confluence-range {
+  color: var(--acc-strong);
+}
+.confluence-zone.target .confluence-range {
+  color: var(--text);
+  font-weight: 600;
+}
+.confluence-score {
+  font-weight: 700;
+  color: var(--acc-strong);
+  font-size: 11.5px;
+}
+.confluence-contribs {
+  grid-column: 1 / -1;
+  margin: 3px 0 0;
+  padding: 0 0 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}

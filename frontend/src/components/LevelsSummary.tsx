@@ -33,6 +33,9 @@ export default function LevelsSummary({ levels, currentPrice }: LevelsSummaryPro
         <span className={`levels-dir ${levels.bullish ? 'bull' : 'bear'}`}>
           {levels.bullish ? 'bullish' : 'bearish'}
         </span>
+        <span className="levels-scale" title="Fibonacci price scale (auto-selected)">
+          {levels.scale === 'Log' ? 'log scale' : 'linear scale'}
+        </span>
       </div>
 
       {inv && (
@@ -71,6 +74,28 @@ export default function LevelsSummary({ levels, currentPrice }: LevelsSummaryPro
           <span className="level-note">{z.label}</span>
         </div>
       ))}
+
+      {levels.confluenceZones.length > 0 && (
+        <div className="confluence" data-testid="confluence-zones">
+          <div className="confluence-head">Confluence zones</div>
+          {levels.confluenceZones.map((z, i) => (
+            <div key={i} className={`confluence-zone ${z.kind === 'Entry' ? 'entry' : 'target'}`}>
+              <span className="confluence-kind">{z.kind === 'Entry' ? 'Entry' : 'Target'}</span>
+              <span className="confluence-range mono">{zoneRange(z.low, z.high)}</span>
+              <span className="confluence-score" title="Sum of contributing degree weights">
+                ×{z.score.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+              </span>
+              <ul className="confluence-contribs">
+                {z.contributions.map((c, j) => (
+                  <li key={j}>
+                    <span className="mono">{fmt(c.price)}</span> — {c.basis}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       {levels.alternative && (
         <div className="level-row alt">

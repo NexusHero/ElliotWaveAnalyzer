@@ -19,4 +19,20 @@ public sealed record WaveLevels(
     PriceLevel? Invalidation,
     PriceZone? SupportZone,
     IReadOnlyList<PriceZone> TargetZones,
-    AlternativeScenario? Alternative);
+    AlternativeScenario? Alternative)
+{
+    /// <summary>
+    /// The price scale the Fibonacci levels were computed in. Auto-selected from the count's price
+    /// span (log once the span exceeds a few multiples of its low), always reported so the choice
+    /// is explicit rather than hidden. See <see cref="Application.FibMath.AutoSelect"/>.
+    /// </summary>
+    public FibScale Scale { get; init; } = FibScale.Linear;
+
+    /// <summary>
+    /// Scored Fibonacci confluence zones — the "green boxes" where several ratios (and degrees)
+    /// cluster — for the wave currently unfolding, strongest first. Computed log-correctly when
+    /// <see cref="Scale"/> is <see cref="FibScale.Log"/>. Empty when no legs are available.
+    /// See <see cref="Application.FibConfluenceCalculator"/>.
+    /// </summary>
+    public IReadOnlyList<ConfluenceZone> ConfluenceZones { get; init; } = [];
+}

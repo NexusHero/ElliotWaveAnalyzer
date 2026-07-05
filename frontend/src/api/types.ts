@@ -121,6 +121,29 @@ export interface AlternativeScenario {
   note: string
 }
 
+/** Price scale the Fibonacci levels were computed in (mirrors backend `FibScale`). */
+export type FibScale = 'Linear' | 'Log'
+
+/** Whether a confluence zone is a pullback entry or a forward target (mirrors backend `ZoneKind`). */
+export type ZoneKind = 'Entry' | 'Target'
+
+/** One Fibonacci level feeding a confluence zone (mirrors backend `ContributingLevel`). */
+export interface ContributingLevel {
+  price: number
+  weight: number
+  basis: string
+}
+
+/** A scored Fibonacci confluence zone — a "green box" (mirrors backend `ConfluenceZone`). */
+export interface ConfluenceZone {
+  low: number
+  high: number
+  score: number
+  kind: ZoneKind
+  scale: FibScale
+  contributions: ContributingLevel[]
+}
+
 /** Deterministic forward levels for the unfolding wave (mirrors backend `WaveLevels`). */
 export interface WaveLevels {
   unfoldingWave: string
@@ -129,6 +152,8 @@ export interface WaveLevels {
   supportZone: PriceZone | null
   targetZones: PriceZone[]
   alternative: AlternativeScenario | null
+  scale: FibScale
+  confluenceZones: ConfluenceZone[]
 }
 
 /** Response of `POST /api/wave-analysis` — mirrors the backend `WaveAnalysisResponse`. */
