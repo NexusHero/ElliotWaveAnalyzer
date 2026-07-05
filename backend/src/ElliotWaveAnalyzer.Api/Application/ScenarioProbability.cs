@@ -17,17 +17,39 @@ public static class ScenarioProbability
     public readonly record struct Estimate(decimal? Probability, ProbabilityBasis Basis);
 
     /// <summary>
-    /// The probability for a scenario whose confidence matches <paramref name="bucket"/>. Returns
-    /// the bucket's measured hit-rate when it has enough concluded analyses, otherwise
-    /// <see cref="ProbabilityBasis.InsufficientData"/>.
+    /// The probability for a scenario whose confidence matches <paramref name="bucket"/>, optionally
+    /// informed by a <paramref name="backtestPrior"/> (the hit-rate the harness measured for this
+    /// confidence over history, REQ-026):
+    /// <list type="bullet">
+    /// <item>enough concluded analyses → the measured hit-rate, blended toward the prior when one is
+    /// available (<see cref="ProbabilityBasis.Calibrated"/>);</item>
+    /// <item>too few, but a prior exists → the prior (<see cref="ProbabilityBasis.Backtested"/>);</item>
+    /// <item>neither → <see cref="ProbabilityBasis.InsufficientData"/>.</item>
+    /// </list>
     /// </summary>
-    public static Estimate From(CalibrationBucket? bucket, int minimumSample = DefaultMinimumSample)
+    public static Estimate From(
+        CalibrationBucket? bucket, decimal? backtestPrior = null, int minimumSample = DefaultMinimumSample)
     {
-        if (bucket is null || bucket.Concluded < minimumSample || bucket.HitRate is null)
+        var measured = bucket is not null && bucket.Concluded >= minimumSample ? bucket.HitRate : null;
+        if (measured is { } m)
         {
-            return new Estimate(null, ProbabilityBasis.InsufficientData);
+            var blended = backtestPrior is { } prior
+                ? (MeasuredWeight * m) + ((1m - MeasuredWeight) * prior)
+                : m;
+            return new Estimate(blended, ProbabilityBasis.Calibrated);
         }
 
-        return new Estimate(bucket.HitRate, ProbabilityBasis.Calibrated);
+        if (backtestPrior is { } p)
+        {
+            return new Estimate(p, ProbabilityBasis.Backtested);
+        }
+
+        return new Estimate(null, ProbabilityBasis.InsufficientData);
     }
+
+    /// <summary>
+    /// Weight given to the user's own measured hit-rate when it is blended with the backtest prior.
+    /// The measured rate leads (it is the user's real record); the prior only stabilizes it.
+    /// </summary>
+    private const decimal MeasuredWeight = 0.7m;
 }

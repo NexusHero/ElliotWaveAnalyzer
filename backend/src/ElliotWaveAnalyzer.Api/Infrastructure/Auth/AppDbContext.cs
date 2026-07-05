@@ -15,6 +15,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AnalysisSnapshot> AnalysisSnapshots => Set<AnalysisSnapshot>();
     public DbSet<UserApiKey> UserApiKeys => Set<UserApiKey>();
     public DbSet<SavedDepot> SavedDepots => Set<SavedDepot>();
+    public DbSet<BacktestRun> BacktestRuns => Set<BacktestRun>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -94,6 +95,29 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(p => p.Name).HasMaxLength(128).IsRequired();
             entity.Property(p => p.Exchange).HasMaxLength(32);
             entity.HasIndex(p => p.SavedDepotId);
+        });
+
+        builder.Entity<BacktestRun>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.DatasetHash).HasMaxLength(64).IsRequired();
+            entity.Property(r => r.EngineVersion).HasMaxLength(16).IsRequired();
+            entity.Property(r => r.Symbol).HasMaxLength(32).IsRequired();
+            entity.Property(r => r.Config).HasMaxLength(256).IsRequired();
+            // One run per dataset — the hash is the idempotency key for a re-run.
+            entity.HasIndex(r => r.DatasetHash).IsUnique();
+            entity.HasMany(r => r.Buckets)
+                .WithOne()
+                .HasForeignKey(b => b.BacktestRunId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BacktestBucketRow>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Dimension).HasMaxLength(16).IsRequired();
+            entity.Property(b => b.Key).HasMaxLength(32).IsRequired();
+            entity.HasIndex(b => b.BacktestRunId);
         });
     }
 }

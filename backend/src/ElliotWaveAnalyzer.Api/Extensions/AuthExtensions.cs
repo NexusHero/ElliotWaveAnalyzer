@@ -42,6 +42,11 @@ internal static class AuthExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ITrackRecordService, TrackRecordService>();
 
+        // Backtest harness (REQ-026): runs the pipeline over history and feeds priors into scenario
+        // probabilities. Both read/write the shared AppDbContext, so scoped.
+        services.AddScoped<IBacktestService, BacktestService>();
+        services.AddScoped<IScenarioPriorProvider, BacktestScenarioPriorProvider>();
+
         // Encrypt per-user API keys at rest with ASP.NET Core Data Protection (no bespoke crypto).
         services.AddDataProtection();
         services.AddScoped<IUserKeyStore, UserKeyStore>();

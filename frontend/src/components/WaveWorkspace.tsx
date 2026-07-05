@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   autoAnalyzeWaves,
   deleteAnalysis,
+  getBacktestSummary,
   getMarketData,
   listAnalyses,
   saveAnalysis,
@@ -25,6 +26,7 @@ import { Trash } from './Icons'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
 import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
 import SymbolSearch from './SymbolSearch'
+import BacktestSummaryPanel from './BacktestSummaryPanel'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest } from './trackRecord'
 
@@ -151,6 +153,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const trackRecordQuery = useQuery({
     queryKey: ['analyses'],
     queryFn: ({ signal }) => listAnalyses(signal),
+  })
+  const backtestQuery = useQuery({
+    queryKey: ['backtest-summary'],
+    queryFn: ({ signal }) => getBacktestSummary(signal),
   })
   const saveMutation = useMutation({
     mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
@@ -568,6 +574,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
             onDelete={handleDeleteAnalysis}
           />
+
+          <BacktestSummaryPanel summary={backtestQuery.data ?? null} />
         </div>
       </div>
     </div>
