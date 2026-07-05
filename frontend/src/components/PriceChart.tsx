@@ -20,6 +20,8 @@ import { useEffect, useRef } from 'react'
 import type { MarketCandle } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import type { WaveLinePoint } from './waveLine'
+import { type ZoneBandColors, ZoneBandsPrimitive } from './zoneBandsPrimitive'
+import type { ZoneBand } from './zoneOverlay'
 
 /** A count's wave-line polyline through its pivots, coloured by whose count it is. */
 export interface WaveLine {
@@ -52,6 +54,8 @@ interface PriceChartProps {
   annotations?: ChartMarker[]
   /** Connected wave-line polylines (one per count) drawn through the pivots. */
   waveLines?: WaveLine[]
+  /** Shaded price bands (entry/target/confluence zones) to draw behind the candles. */
+  zoneBands?: ZoneBand[]
   /** Horizontal level lines (invalidation / fib zones) to overlay. */
   priceLines?: PriceLineSpec[]
   /** Render the price axis logarithmically (so the log-correct Fibonacci levels line up). */
@@ -71,6 +75,7 @@ export default function PriceChart({
   candles,
   annotations = [],
   waveLines = [],
+  zoneBands = [],
   priceLines = [],
   logScale = false,
   onPointClick,
@@ -85,6 +90,8 @@ export default function PriceChart({
   const priceLinesRef = useRef<IPriceLine[]>([])
   // Track the wave-line series so we can clear them before redrawing.
   const waveLineSeriesRef = useRef<ISeriesApi<'Line'>[]>([])
+  // The shaded-zone primitive attached to the candle series (draws entry/target/confluence bands).
+  const zoneBandsRef = useRef<ZoneBandsPrimitive | null>(null)
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -120,6 +127,11 @@ export default function PriceChart({
     seriesRef.current = series
     markersRef.current = createSeriesMarkers(series, [])
 
+    // Attach the shaded-zone primitive once; its bands + colours are fed by the effect below.
+    const zonePrimitive = new ZoneBandsPrimitive(zoneColors(colors))
+    series.attachPrimitive(zonePrimitive)
+    zoneBandsRef.current = zonePrimitive
+
     const handleClick = (param: MouseEventParams) => {
       const callback = onPointClickRef.current
       if (!callback || !param.point || param.time === undefined) return
@@ -144,6 +156,8 @@ export default function PriceChart({
       chartRef.current = null
       seriesRef.current = null
       markersRef.current = null
+      // The primitive was destroyed with the chart; drop the stale ref so a remount re-attaches fresh.
+      zoneBandsRef.current = null
       // The wave-line series were destroyed with the chart; drop the stale refs so a remount
       // doesn't try to remove them from a new chart.
       waveLineSeriesRef.current = []
@@ -208,6 +222,11 @@ export default function PriceChart({
     }))
     markersApi.setMarkers(markers)
   }, [annotations, theme])
+
+  // ── Update the shaded zone bands when they (or theme) change ───────────────
+  useEffect(() => {
+    zoneBandsRef.current?.update(zoneBands, zoneColors(chartColors(theme)))
+  }, [zoneBands, theme])
 
   // ── Draw connected wave lines through the pivots when they (or theme) change ──
   useEffect(() => {
@@ -285,10 +304,22 @@ interface ChartColors {
   invalid: string
   support: string
   target: string
+  zoneEntryFill: string
+  zoneEntryBorder: string
+  zoneTargetFill: string
+  zoneTargetBorder: string
 }
 
 function levelColor(colors: ChartColors, kind: LevelKind): string {
   return kind === 'invalid' ? colors.invalid : kind === 'support' ? colors.support : colors.target
+}
+
+/** The entry/target band palettes for the shaded-zone primitive, from the active theme. */
+function zoneColors(colors: ChartColors): ZoneBandColors {
+  return {
+    entry: { fill: colors.zoneEntryFill, border: colors.zoneEntryBorder },
+    target: { fill: colors.zoneTargetFill, border: colors.zoneTargetBorder },
+  }
 }
 
 // Palettes mirror the oklch theme tokens in index.css (approximated to hex so the
@@ -306,6 +337,11 @@ const DARK_COLORS: ChartColors = {
   invalid: '#e0655c', // --down: danger / count-dead line
   support: '#e0b34e', // --acc amber: expected support zone
   target: '#5b9bd5', // blue: forward target zone (never collides with candles)
+  // Shaded zone bands — mirror the annotated-PNG fills (#120): entry blue, target green.
+  zoneEntryFill: 'rgba(66, 165, 245, 0.16)',
+  zoneEntryBorder: 'rgba(66, 165, 245, 0.55)',
+  zoneTargetFill: 'rgba(102, 187, 106, 0.16)',
+  zoneTargetBorder: 'rgba(102, 187, 106, 0.55)',
 }
 
 const LIGHT_COLORS: ChartColors = {
@@ -320,6 +356,11 @@ const LIGHT_COLORS: ChartColors = {
   invalid: '#d6473d', // --down
   support: '#cf9438', // --acc amber
   target: '#2f6fb0', // blue
+  // Shaded zone bands — a touch more opaque on the lighter background so they stay legible.
+  zoneEntryFill: 'rgba(47, 111, 176, 0.15)',
+  zoneEntryBorder: 'rgba(47, 111, 176, 0.60)',
+  zoneTargetFill: 'rgba(45, 158, 110, 0.15)',
+  zoneTargetBorder: 'rgba(45, 158, 110, 0.60)',
 }
 
 function chartColors(theme: Theme): ChartColors {

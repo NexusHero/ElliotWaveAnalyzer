@@ -11,9 +11,12 @@ vi.mock('lightweight-charts', () => ({
     addSeries: vi.fn(() => ({
       setData: vi.fn(),
       coordinateToPrice: vi.fn(() => 100),
+      priceToCoordinate: vi.fn(() => 50),
       applyOptions: vi.fn(),
       createPriceLine: vi.fn(() => ({})),
       removePriceLine: vi.fn(),
+      attachPrimitive: vi.fn(),
+      detachPrimitive: vi.fn(),
     })),
     removeSeries: vi.fn(),
     timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
@@ -61,6 +64,21 @@ describe('PriceChart', () => {
   it('renders with a logarithmic price axis without throwing', () => {
     const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
     expect(() => render(<PriceChart candles={candles} logScale />)).not.toThrow()
+  })
+
+  it('renders shaded zone bands without throwing', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() =>
+      render(
+        <PriceChart
+          candles={candles}
+          zoneBands={[
+            { low: 95, high: 105, kind: 'entry', score: null },
+            { low: 130, high: 140, kind: 'target', score: 3.5 },
+          ]}
+        />
+      )
+    ).not.toThrow()
   })
 
   it('renders connected wave lines without throwing', () => {

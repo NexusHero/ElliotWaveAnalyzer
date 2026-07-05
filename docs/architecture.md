@@ -1755,6 +1755,28 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 
 ---
 
+## ADR-036: Client-Side Zone-Band Rendering via a Confined Lightweight-Charts Primitive
+
+**Context:** The deterministic engine computes scored confluence zones and entry/target zones (`FibConfluenceCalculator`/`ProjectionService`, ADR-023/ADR-025), and the annotated-PNG export already shades them as filled boxes (`AnnotatedChartComposer` → `ChartScene`, ADR-026). On the *live* chart, though, a zone showed only as two bare horizontal axis lines plus a text list — the "green boxes" the whole method turns on were invisible where the analyst actually reads price. Lightweight Charts has no built-in filled-rectangle-across-price primitive; drawing one means reaching into its canvas layer.
+
+**Decision:** Render the zones as semi-transparent bands through a **confined series primitive** (`ZoneBandsPrimitive`, an `ISeriesPrimitive`) attached to the candle series, and keep all *geometry* in a pure, unit-tested builder:
+
+- **`levelsToZoneBands(levels, layers)`** (pure) maps a `WaveLevels` into `ZoneBand[]` — the support zone as an entry band, each target zone as a target band, and each confluence zone under the layer-toggle matching its `kind` — with `low ≤ high` normalised. This is the tested unit (mirrors the `levelsToPriceLines` seam); the chart consumes it.
+- **`ZoneBandsPrimitive`** does drawing only: it maps each band's price bounds to pixels via the host series' `priceToCoordinate` and fills a full-width rectangle, so bands track the axis — including the log/linear switch (ADR follows the same `FibScale` the backend already reports) — and repaint on data/theme/scale change via the primitive's `requestUpdate`, with no leaked state (the primitive is destroyed with the chart).
+- **Fills mirror the PNG composer** (entry blue `#42A5F5`, target green `#66BB6A`, low alpha) so the live chart and the exported image agree on the same geometry (the parity the analyst expects between what they see and what they export/share).
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The zones the engine computes are finally visible on the live chart as bands, not just two lines + text; live and PNG render the same geometry from the same source |
+| (+) | Geometry stays deterministic and unit-tested (`levelsToZoneBands`); the LLM does no geometry; the canvas-touching code is isolated to one primitive file (the chart stays a thin renderer) |
+| (+) | Bands honour the existing layer toggles and the log/linear scale, so nothing new to learn and the fills always line up with the drawn levels |
+| (-) | The primitive reaches into Lightweight Charts' canvas layer, so it is coupled to that library's primitive API (`ISeriesPrimitive`) — a change there is contained to one file, but it is a real dependency on an evolving API |
+| (-) | The band fill is a full-width shade (not clipped to the zone's active time span), a deliberate simplification — a zone is a price expectation that holds across the visible window, and clipping would need the time geometry the PNG uses |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}

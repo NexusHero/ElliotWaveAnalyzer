@@ -31,6 +31,7 @@ import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
+import { type ZoneBand, levelsToZoneBands } from './zoneOverlay'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
@@ -334,6 +335,11 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     () => levelsToPriceLines(activeLevels, effectiveLayers),
     [activeLevels, effectiveLayers]
   )
+  // The shaded zone bands fill between the same edges the price lines mark (the "green boxes").
+  const zoneBands = useMemo<ZoneBand[]>(
+    () => levelsToZoneBands(activeLevels, effectiveLayers),
+    [activeLevels, effectiveLayers]
+  )
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -623,6 +629,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 candles={candles}
                 annotations={markers}
                 waveLines={waveLines}
+                zoneBands={zoneBands}
                 priceLines={priceLines}
                 logScale={logScale}
                 onPointClick={handlePointClick}
