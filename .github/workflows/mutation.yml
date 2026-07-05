@@ -1,0 +1,82 @@
+name: Mutation testing
+
+# Coverage proves code *ran*; mutation testing proves the tests *catch bugs*. Stryker mutates the
+# pure deterministic core (Application + Domain — the geometry/rules/math the LLM must never touch)
+# and fails if too few mutants are killed. It is heavier than the per-PR suite, so it runs nightly
+# (and on demand) rather than on every push — the score is the "do our tests actually bite?" gate.
+on:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC nightly
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    name: Stryker — deterministic core
+    runs-on: ubuntu-latest
+
+    # Same Postgres the backend job uses: Stryker runs the full test project once to map coverage,
+    # and the acceptance tests need a real database (each fixture isolates itself in its own schema).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ewa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: backend
+
+      - name: Restore local tools (dotnet-stryker)
+        run: dotnet tool restore
+        working-directory: backend
+
+      - name: Run Stryker mutation testing
+        # The scope (Application + Domain), reporters, and the break threshold live in
+        # stryker-config.json so a local `dotnet stryker` run and CI enforce exactly the same gate.
+        run: dotnet stryker
+        working-directory: backend/tests/ElliotWaveAnalyzer.Tests
+        env:
+          EWA_TEST_POSTGRES: "Host=localhost;Port=5432;Database=ewa_test;Username=postgres;Password=postgres"
+          ACCEPTANCE_PG_CONNSTRING: "Host=localhost;Port=5432;Database=ewa_test;Username=postgres;Password=postgres"
+
+      - name: Publish mutation report to the job summary
+        # The markdown reporter lists every surviving mutant with its file, line and the mutation —
+        # i.e. exactly which behaviour no test pins down. Surface it in the run summary (AC4).
+        if: always()
+        shell: bash
+        run: |
+          report=$(find backend/tests/ElliotWaveAnalyzer.Tests/StrykerOutput -name '*.md' | head -n1)
+          if [ -n "$report" ]; then
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Stryker markdown report was produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Stryker HTML + JSON report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: mutation-report
+          path: backend/tests/ElliotWaveAnalyzer.Tests/StrykerOutput/**/reports/**
+          if-no-files-found: warn
+          retention-days: 14
