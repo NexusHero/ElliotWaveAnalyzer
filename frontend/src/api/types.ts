@@ -659,3 +659,35 @@ export interface DepotSnapshot {
   positions: DepotPosition[]
   totals: DepotTotals | null
 }
+
+/** Aggregate, measured resolution of a setup's historical analogs (mirrors backend `AnalogStats`). */
+export interface AnalogStats {
+  sampleCount: number
+  targetReached: number
+  invalidated: number
+  hitRate: number | null
+  medianResolutionDays: number | null
+  sufficient: boolean
+}
+
+/** One historical analog as sent to the client (mirrors backend `AnalogItem`). */
+export interface AnalogItem {
+  symbol: string
+  formedAt: string
+  concludedAt: string | null
+  outcome: string
+  structure: string
+  bullish: boolean
+  similarity: number
+  resolutionDays: number | null
+}
+
+/** The historical-analog read for a symbol (mirrors backend `AnalogResponse`). */
+export interface AnalogResponse {
+  symbol: string
+  timeframe: string
+  stats: AnalogStats
+  analogs: AnalogItem[]
+  narrative: string | null
+  narrativeUnavailableReason: string | null
+}

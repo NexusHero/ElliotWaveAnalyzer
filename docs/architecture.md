@@ -82,7 +82,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-031 | Analyst-in-the-loop editing: the chart supports add/move/delete/relabel of pivots (placement + nudge snap to real candle extremes) and `POST /api/wave-analysis/verify` re-runs the **deterministic** pipeline on the edited set — snap, hard rules, projections/zones/invalidation/channels, guideline score — returning the objective read live on every (debounced) edit; no LLM in the loop (it only narrates afterwards); the edited count reuses the existing track-record persistence and annotated-chart export | #151 · ADR-033 · §6 Scenario 20 | Fulfilled |
 | REQ-032 | Test strategy: the safety invariants are encoded as **property-based + metamorphic** tests (CsCheck) that attack the pure deterministic core with thousands of generated, shrunk variants — sizing never negative/underflowing, no-valid-stop ⇔ the direction guard, verifier never throws + snapped pivots ⊆ real candles + valid ⇔ no hard-rule fail, snap idempotence, determinism, rule-verdict invariance under price-scaling and time-shift, **no-lookahead** (poisoned future candles never change the windowed analysis), and **LLM-swap invariance** (swapping the model's entire output leaves the deterministic fields byte-identical, proving I1 end to end); generators emit only valid fixtures; the wider layers (adversarial corpus, mutation, browser-E2E, contract-drift, real-LLM eval, load) are tracked as their own issues | #192, #193 (epic #201) · ADR-034 | Fulfilled (foundation) |
 | REQ-033 | Mutation testing gate: **Stryker** runs **nightly** over the pure algorithmic core (`Application/**` minus the acceptance-tested orchestration services, plus `Domain/CandleWindow`), rewriting it with small faults and failing if the **mutation score** falls below an enforced **`thresholds.break` floor** — proving the suite would actually *catch* a regression, not merely execute the line (the answer coverage can't give). The pre-4.x config (invalid in Stryker 4.16) is corrected to the 4.16 schema so a local run and CI share one gate; the run is scoped (string/LINQ mutations ignored) to stay bounded, and every surviving mutant is surfaced (HTML/JSON artifact + Markdown into the job summary) with its file, line and mutation | #195 (epic #201) · ADR-035 (+ ADR-015) | Fulfilled |
-| REQ-034 | Historical-analog retrieval (deterministic core): for a formed count, a **deterministic feature vector** (structure, direction, guideline score, confluence strength, reward:risk, distance-to-invalidation, RSI/MACD regime) fingerprints the setup; a pure **k-nearest retrieval** finds the most similar *past* setups by cosine over those vectors, restricted to ones that **concluded strictly before** the query's as-of date (**no-lookahead**) and **only concluded** (pending never counted); a pure **aggregator** computes hit-rate, target/invalidated split and median resolution time **only from concluded analogs**, flagging "insufficient history" below a minimum; an **analog fact-guard** rejects any narrative citing a rate/count/date not in the computed report. The corpus wiring (from the no-lookahead backtest), the endpoint, the fact-guarded LLM narrator and the frontend panel are the follow-on integration | #182 (epic #191) · ADR-037 (+ ADR-009/ADR-027) | Fulfilled (core) |
+| REQ-034 | Historical-analog retrieval (deterministic core): for a formed count, a **deterministic feature vector** (structure, direction, guideline score, confluence strength, reward:risk, distance-to-invalidation, RSI/MACD regime) fingerprints the setup; a pure **k-nearest retrieval** finds the most similar *past* setups by cosine over those vectors, restricted to ones that **concluded strictly before** the query's as-of date (**no-lookahead**) and **only concluded** (pending never counted); a pure **aggregator** computes hit-rate, target/invalidated split and median resolution time **only from concluded analogs**, flagging "insufficient history" below a minimum; an **analog fact-guard** rejects any narrative citing a rate/count/date not in the computed report. Wired end to end: an on-demand corpus is swept from the symbol's own history (cached per day), **`GET /api/wave-analysis/analogs`** returns the ranked analogs + measured stats, a **fact-guarded** LLM narrator adds an optional grounded summary (degrading to a reason with no key), and a **Historical analogs** panel presents it | #182 (epic #191) · ADR-037 (+ ADR-009/ADR-027/ADR-028) · §6 Scenario 21 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -956,6 +956,37 @@ sequenceDiagram
 
 ---
 
+## Scenario 21 — Retrieve Historical Analogs of the Current Count (REQ-034) {#_runtime_scenario_21}
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant WS as Historical analogs panel
+    participant Ep as GET /api/wave-analysis/analogs
+    participant Svc as HistoricalAnalogService
+    participant Data as IMarketDataProvider
+    participant Eng as SetupHistoryBuilder + Retriever + Aggregator (pure)
+    participant N as IAnalogNarrator (fact-guarded)
+
+    User->>WS: Find historical analogs
+    WS->>Ep: symbol, interval (1d/1w)
+    Ep->>Svc: AnalyzeAsync
+    alt cached report for (symbol, tf, day)
+        Svc-->>Ep: (cached deterministic report)
+    else build
+        Svc->>Data: GetCandlesAsync(symbol)
+        Svc->>Eng: sweep corpus (CandleWindow per cutoff — no lookahead) + fingerprint current count
+        Eng-->>Svc: nearest concluded analogs + measured stats (hit-rate, median days)
+    end
+    Svc->>N: NarrateAsync(report)
+    Note over N: cites only computed facts; AnalogFactGuard rejects any invented rate/count/date;<br/>no key or too few analogs ⇒ explicit reason, deterministic read still stands
+    N-->>Svc: report + optional narrative
+    Svc-->>Ep: report
+    Ep-->>WS: 200 analogs + stats + summary
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1788,7 +1819,7 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 - **Retrieval (deterministic, no-lookahead):** `AnalogRetriever` returns the k nearest, filtered to setups that are **concluded** and **concluded strictly before the query's as-of date** — so the panel is valid at any historical moment and inside backtests without leaking the future (the same guarantee as ADR-027, enforced here by an as-of predicate rather than `CandleWindow`). Ties break deterministically (oldest, then symbol) so the set is reproducible byte-for-byte.
 - **Aggregation (deterministic):** `AnalogAggregator` computes hit-rate, the target/invalidated split and the median resolution time **only from concluded analogs**, and flags "insufficient history" below a minimum sample so a one- or two-sample rate is never presented as reliable.
 - **Fact-guard:** `AnalogFactGuard` (a sibling of `PositionFactGuard`, ADR-028) rejects any narrative that cites a percentage, count, day-figure or year not present in the computed report — so the LLM summary can contrast the analogs in prose but cannot move a single number.
-- **Staging:** this ADR covers the **deterministic core + guard** (pure Application, exhaustively unit-tested). The corpus wiring (built from the no-lookahead backtest sweep), the `GET /api/wave-analysis/analogs` endpoint, the fact-guarded narrator and the frontend panel are the follow-on integration behind these same seams.
+- **Wiring:** on a request, `HistoricalAnalogService` fetches the symbol's candles, sweeps the corpus with `SetupHistoryBuilder` (causal RSI/MACD read at each cutoff — no lookahead), fingerprints the current count, composes the report, and hands it to `IAnalogNarrator` for an optional summary. The sweep replays the parser at many cutoffs, so the deterministic report is **cached per (symbol, timeframe, day)** and only the narration runs on a hit. Exposed as **`GET /api/wave-analysis/analogs`** (daily/weekly), consumed by a **Historical analogs** panel. (Shipped in three governed slices: the deterministic core + guard, the corpus generator, and this end-to-end integration.)
 
 **Consequences:**
 
