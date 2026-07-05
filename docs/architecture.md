@@ -65,6 +65,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
 | REQ-015 | Route ATR through `IIndicatorCalculator`/Skender instead of a hand-rolled Wilder recurrence | #101 · ADR-016 | Fulfilled |
 | REQ-016 | Import a broker depot from a file via pluggable per-broker importers (Smartbroker+ PDF first) | #103 · ADR-017 · §6 Scenario 8 | Fulfilled |
+| REQ-017 | Deduplicate the cron scheduler loops behind a shared `CronBackgroundService` base | #105 · ADR-018 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -943,6 +944,23 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | PdfPig is isolated; a parser regression or library swap is a one-file change; tested against a **synthetic** fixture (no real PII committed) |
 | (-) | The PDF parser is calibrated to the current Smartbroker+ column layout; a statement redesign needs re-calibration (mitigated by the anchored, band-based approach and unit tests) |
 | (-) | Live/continuous sync is out of scope — import is a manual file upload; holdings are not yet persisted server-side (a follow-up) |
+
+---
+
+## ADR-018: Shared `CronBackgroundService` Base for Scheduled Jobs (Template Method)
+
+**Context:** The alert scheduler and the daily-report scheduler were two hosted services with the *same* body — parse the cron expression (and stop if invalid), compute the next occurrence, `Task.Delay` until then, open a DI scope, run the work, swallow a failed run — differing only in the log name, the options-bound cron string and the one service they invoked. Duplicated scheduling logic means a fix (e.g. to cancellation handling) has to be made twice and can drift.
+
+**Decision:** Extract an abstract `CronBackgroundService` (Infrastructure) that owns the scheduling loop once and exposes three abstract members — `SchedulerName`, `CronExpression`, `RunOnceAsync(scope, ct)` (Template Method). `AlertBackgroundService` and `DailyReportBackgroundService` become a handful of lines each: the schedule and which scoped service to run. DI registration (`AddHostedService<T>` behind the `Enabled` flags) is unchanged.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | One implementation of the cron loop: cancellation, invalid-cron handling and per-run scoping are fixed in one place (DRY) |
+| (+) | A new scheduled job is a ~10-line subclass; harder to get the lifecycle subtly wrong |
+| (+) | The shared guard/cancellation branches are unit-tested via a probe subclass (the loop body was previously untested, being coverage-excluded plumbing) |
+| (-) | Behaviour is unchanged, so the win is maintainability, not features; the `*BackgroundService` names remain coverage-excluded (ADR-015) |
 
 ---
 
