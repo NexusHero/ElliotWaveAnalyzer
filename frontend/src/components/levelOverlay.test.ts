@@ -9,6 +9,8 @@ const levels: WaveLevels = {
   supportZone: { low: 134, high: 140, label: 'support', basis: 'fib' },
   targetZones: [{ low: 160, high: 170, label: 'target', basis: 'fib' }],
   alternative: { name: 'Ending diagonal', note: 'note' },
+  scale: 'Linear',
+  confluenceZones: [],
 }
 
 describe('levelsToPriceLines', () => {

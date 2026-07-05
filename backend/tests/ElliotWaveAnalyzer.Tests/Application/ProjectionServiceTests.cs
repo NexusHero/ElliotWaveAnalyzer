@@ -208,4 +208,73 @@ public sealed class ProjectionServiceTests
             ProjectionService.ProjectCorrective(Pivots(100m, 130m), StructureKind.Impulse),
             Is.Null);
     }
+
+    [Test]
+    public void Project_SmallRange_UsesLinearScale_AndAttachesEntryConfluence()
+    {
+        // 100→120: span well under 3× its low → linear; Wave 2 unfolding → entry (retracement) zones.
+        var levels = ProjectionService.Project(Pivots(100m, 120m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.Scale, Is.EqualTo(FibScale.Linear));
+            Assert.That(levels.ConfluenceZones, Is.Not.Empty);
+            Assert.That(levels.ConfluenceZones.All(z => z.Kind == ZoneKind.Entry), Is.True);
+            Assert.That(levels.ConfluenceZones.All(z => z.Scale == FibScale.Linear), Is.True);
+        });
+    }
+
+    [Test]
+    public void Project_LargeRange_SwitchesToLogScale_ForConfluence()
+    {
+        // 10→100→40: max/min = 10× → log scale; Wave 3 unfolding → target (extension) zones.
+        var levels = ProjectionService.Project(Pivots(10m, 100m, 40m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.Scale, Is.EqualTo(FibScale.Log));
+            Assert.That(levels.ConfluenceZones, Is.Not.Empty);
+            Assert.That(levels.ConfluenceZones.All(z => z.Kind == ZoneKind.Target), Is.True);
+            Assert.That(levels.ConfluenceZones.All(z => z.Scale == FibScale.Log), Is.True);
+        });
+    }
+
+    [Test]
+    public void Project_Wave5_ConfluenceDrawsOnTwoLegs()
+    {
+        // Wave 5 unfolding (5 pivots): confluence targets project both Wave 1 and net Waves 1–3, so
+        // the contribution set references both legs (they need not cluster into one zone).
+        var levels = ProjectionService.Project(Pivots(100m, 120m, 110m, 150m, 130m))!;
+        var bases = levels.ConfluenceZones.SelectMany(z => z.Contributions).Select(c => c.Basis).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.UnfoldingWave, Is.EqualTo("Wave 5"));
+            Assert.That(bases.Any(b => b.Contains("Wave 1", StringComparison.Ordinal)), Is.True);
+            Assert.That(bases.Any(b => b.Contains("Waves 1–3", StringComparison.Ordinal)), Is.True);
+        });
+    }
+
+    [Test]
+    public void ProjectCorrective_Zigzag_UnfoldingC_AttachesTargetConfluence()
+    {
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(100m, 80m, 90m), StructureKind.Zigzag)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(levels.ConfluenceZones, Is.Not.Empty);
+            Assert.That(levels.ConfluenceZones.All(z => z.Kind == ZoneKind.Target), Is.True);
+        });
+    }
+
+    [Test]
+    public void ProjectCorrective_Triangle_UnfoldingLeg_AttachesEntryConfluence()
+    {
+        var levels = ProjectionService.ProjectCorrective(
+            Pivots(100m, 80m, 95m, 85m), StructureKind.Triangle)!;
+
+        Assert.That(levels.ConfluenceZones, Is.Not.Empty);
+        Assert.That(levels.ConfluenceZones.All(z => z.Kind == ZoneKind.Entry), Is.True);
+    }
 }

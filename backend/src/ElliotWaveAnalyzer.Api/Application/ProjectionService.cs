@@ -35,7 +35,7 @@ public static class ProjectionService
         var completedWaves = p.Count - 1; // P0 is the origin
         var unfolding = completedWaves + 1;
 
-        return unfolding switch
+        var levels = unfolding switch
         {
             2 => Wave2(p, bullish),
             3 => Wave3(p, bullish),
@@ -43,7 +43,24 @@ public static class ProjectionService
             5 => Wave5(p, bullish),
             _ => CompleteImpulseCorrection(p, bullish), // unfolding >= 6 (impulse complete)
         };
+
+        var scale = FibMath.AutoSelect(p);
+        return levels with { Scale = scale, ConfluenceZones = MotiveConfluence(p, unfolding, scale) };
     }
+
+    // Log-correct confluence zones for the wave currently unfolding, built from the legs that
+    // matter for that wave. Wave 5 draws on two legs (Wave 1 and net Waves 1–3) so its target
+    // box is a genuine multi-ratio cluster; the others project a single leg.
+    private static IReadOnlyList<ConfluenceZone> MotiveConfluence(
+        IReadOnlyList<decimal> p, int unfolding, FibScale scale) => unfolding switch
+    {
+        2 => FibConfluenceCalculator.EntryZones([new FibLeg(p[0], p[1], "Wave 1", 1.0m)], scale),
+        3 => FibConfluenceCalculator.TargetZones([new FibLeg(p[0], p[1], "Wave 1", 1.0m)], p[2], scale),
+        4 => FibConfluenceCalculator.EntryZones([new FibLeg(p[2], p[3], "Wave 3", 1.0m)], scale),
+        5 => FibConfluenceCalculator.TargetZones(
+            [new FibLeg(p[0], p[1], "Wave 1", 1.0m), new FibLeg(p[0], p[3], "Waves 1–3", 1.5m)], p[4], scale),
+        _ => FibConfluenceCalculator.EntryZones([new FibLeg(p[0], p[5], "Waves 1–5", 1.0m)], scale),
+    };
 
     // Wave 2 unfolding: retraces wave 1, must not pass the origin.
     private static WaveLevels Wave2(IReadOnlyList<decimal> p, bool bull)
@@ -157,7 +174,7 @@ public static class ProjectionService
         var bullish = p[1] > p[0];
         var unfolding = p.Count; // origin + k completed legs → leg k+1 unfolding
 
-        return kind switch
+        var levels = kind switch
         {
             StructureKind.Zigzag or StructureKind.Flat => unfolding switch
             {
@@ -170,6 +187,38 @@ public static class ProjectionService
                 : TriangleThrust(p, bullish),
             _ => null,
         };
+
+        if (levels is null)
+        {
+            return null;
+        }
+
+        var scale = FibMath.AutoSelect(p);
+        return levels with { Scale = scale, ConfluenceZones = CorrectiveConfluence(p, kind, unfolding, scale) };
+    }
+
+    // Confluence zones for a corrective leg. Wave B/C project Wave A; a completed ABC retraces the
+    // whole correction; triangle legs retrace the prior leg.
+    private static IReadOnlyList<ConfluenceZone> CorrectiveConfluence(
+        IReadOnlyList<decimal> p, StructureKind kind, int unfolding, FibScale scale)
+    {
+        if (kind is StructureKind.Zigzag or StructureKind.Flat)
+        {
+            return unfolding switch
+            {
+                2 => FibConfluenceCalculator.EntryZones([new FibLeg(p[0], p[1], "Wave A", 1.0m)], scale),
+                3 => FibConfluenceCalculator.TargetZones([new FibLeg(p[0], p[1], "Wave A", 1.0m)], p[2], scale),
+                _ => FibConfluenceCalculator.EntryZones([new FibLeg(p[0], p[3], "Waves A–C", 1.0m)], scale),
+            };
+        }
+
+        if (kind == StructureKind.Triangle && unfolding is >= 2 and <= 5)
+        {
+            return FibConfluenceCalculator.EntryZones(
+                [new FibLeg(p[unfolding - 2], p[unfolding - 1], "Prior leg", 1.0m)], scale);
+        }
+
+        return [];
     }
 
     // Wave B unfolding: retraces A. A zigzag B must hold A's origin (hard); a flat B is

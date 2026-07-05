@@ -70,6 +70,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-019 | One top-level type per file, enforced by an architecture test | #109 · ADR-020 | Fulfilled |
 | REQ-020 | Persist the imported depot per user (upsert) + read it back | #111 · ADR-021 | Fulfilled |
 | REQ-021 | Resolve arbitrary instruments (ticker/name/ISIN) and analyze them on 1H/4H/1D/1W | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
+| REQ-022 | Log-correct Fibonacci math and scored confluence zones ("green boxes") attached to every projection; scale auto-selected and always reported | #117 · ADR-023 · §6 Scenario 10 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -559,6 +560,38 @@ sequenceDiagram
         Tas-->>MdApi: TechnicalAnalysisResult (candles + RSI + MACD)
         MdApi-->>Browser: 200 result
     end
+```
+
+---
+
+## Scenario 10 — Project a Count with Log-Correct Confluence Zones (REQ-022) {#_runtime_scenario_10}
+
+After a deterministic count is chosen, `ProjectionService` derives forward levels. It auto-selects the price scale from the pivots, then asks the pure `FibConfluenceCalculator` to cluster the relevant legs' Fibonacci levels into scored zones. All geometry is deterministic; the LLM only narrates the resulting zones (ADR-009 invariant preserved).
+
+```mermaid
+sequenceDiagram
+    participant Was as WaveAnalysisService
+    participant Proj as ProjectionService (pure)
+    participant Fm as FibMath.AutoSelect
+    participant Fcc as FibConfluenceCalculator (pure)
+    participant Fib as FibMath.Retrace/Extend
+    participant Levels as WaveLevels
+    participant Llm as LLM (narrate only)
+
+    Was->>Proj: Project(annotations)
+    Proj->>Fm: AutoSelect(pivot prices)
+    Fm-->>Proj: FibScale (Linear | Log)
+    Proj->>Fcc: EntryZones / TargetZones(legs, scale)
+    loop each leg × ratio
+        Fcc->>Fib: Retrace/Extend(leg, ratio, scale)
+        Fib-->>Fcc: level (log-correct in ln-space)
+    end
+    Fcc->>Fcc: sort → cluster within tolerance → score by Σ degree weight
+    Fcc-->>Proj: ConfluenceZone[] (strongest first, labelled)
+    Proj->>Levels: with { Scale, ConfluenceZones }
+    Levels-->>Was: WaveLevels (levels + scored zones)
+    Was->>Llm: prompt(count, levels)
+    Llm-->>Was: ranking + explanation (no geometry)
 ```
 
 ---
@@ -1074,6 +1107,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | One free source (Yahoo) covers search + daily + hourly; ISP keeps daily-only sources honest; abuse guard replaces the allow-list without opening an injection surface |
 | (-) | **Crypto intraday** (BTC/ETH 1H/4H) needs CoinGecko intraday and is deferred — a documented follow-up; crypto still works on daily/weekly |
 | (-) | Hourly depth is bounded by Yahoo's ~2-year window (a paid feed removes this); per-instrument intraday availability isn't probed up-front, so an unsupported 1H/4H request surfaces as the chart's error state rather than a pre-disabled button |
+
+---
+
+## ADR-023: Log-Scale Fibonacci Math and Scored Confluence Zones (the LLM still never does geometry)
+
+**Context:** Fibonacci retracements/extensions were computed only in **linear** price space. On instruments that span multiples of their base price (a stock from €10 to €100, a metal over a multi-year cycle) linear ratios are visibly wrong — the "50% of the move" a professional draws on a log chart is not the arithmetic midpoint. Professionals also don't trade single ratios: they trade **confluence** — the "green box" where several ratios, ideally from different wave degrees, stack up. The app produced one support band and one target band per count, with no notion of overlap strength. Both gaps are pure geometry, so they belong on the deterministic side of the mission's core invariant (ADR-009): the LLM ranks and narrates, it never computes levels.
+
+**Decision:**
+
+- **`FibMath` (pure):** `Retrace`/`Extend` take an explicit `FibScale` (Linear|Log). Log math is done in ln-space — `exp(ln(to) − f·(ln(to) − ln(from)))` for retracements, `exp(ln(base) + m·(ln(to) − ln(from)))` for extensions — so equal *percentage* moves are equal distances. `AutoSelect` picks Log once a series spans more than ~3× its low, Linear otherwise; the chosen scale is **always reported**, never implicit.
+- **`FibConfluenceCalculator` (pure):** turns one or more `FibLeg`s (each carrying a `DegreeWeight`) into scored `ConfluenceZone`s. Candidate levels are generated per leg/ratio, sorted, greedily clustered within a tolerance band, and each cluster scored by the **sum of its contributors' degree weights** — so more ratios, and higher degrees, make a stronger zone. Zones carry their `ContributingLevel`s (price + labelled basis, e.g. *"61.8% retracement of (1)→(2), log scale"*) and are returned strongest-first. Entry zones = clustered retracements (wave 2/4/B); target zones = clustered extensions (wave 3/5/C).
+- **Integration:** `ProjectionService` auto-selects the scale from the count's pivots and attaches `Scale` + `ConfluenceZones` to `WaveLevels` (non-breaking `init` properties). Wave 5 draws confluence from two legs (Wave 1 and net Waves 1–3), so its target box is a genuine multi-degree cluster. The existing linear guideline bands are unchanged; the confluence zones are the log-correct, scored layer on top.
+- **API/UI:** `WaveLevels` gains `scale` and `confluenceZones` in the OpenAPI contract and the mirrored frontend types; `LevelsSummary` badges the scale and renders each zone with its score (×weight) and contributing levels.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Fib levels are correct on multi-multiple ranges (log), and the choice is visible rather than hidden; confluence turns "a band" into "a *ranked* band with a reason" |
+| (+) | All new logic is pure/static and unit-tested against hand-computed values — the LLM gains richer deterministic inputs to narrate without ever doing the arithmetic |
+| (-) | `AutoSelect`'s 3× threshold is a heuristic; a caller can still force a scale. The linear guideline bands and the log confluence zones coexist, so the UI shows two related-but-distinct level layers until a later phase consolidates them |
 
 ---
 
