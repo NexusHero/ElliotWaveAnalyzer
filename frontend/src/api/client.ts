@@ -7,6 +7,7 @@ import type {
   SavedAnalysisResponse,
   SavedApiKey,
   TechnicalAnalysisResult,
+  TopDownAnalysis,
   TrackAnalysisRequest,
   TrackedAnalysis,
   WaveAnalysisResponse,
@@ -61,6 +62,30 @@ export async function autoAnalyzeWaves(
 }
 
 /**
+ * Deterministic top-down, multi-timeframe analysis via `GET /api/wave-analysis/topdown`. No LLM:
+ * the backend counts each timeframe (weekly → daily → 4H) and constrains each finer count to the
+ * wave unfolding above it, returning the chain and a consistency verdict per link.
+ */
+export async function topDownAnalysis(
+  symbol: string,
+  threshold?: number,
+  signal?: AbortSignal
+): Promise<TopDownAnalysis> {
+  const query = new URLSearchParams({ symbol })
+  if (threshold !== undefined) {
+    query.set('threshold', String(threshold))
+  }
+
+  const response = await fetch(`/api/wave-analysis/topdown?${query.toString()}`, { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as TopDownAnalysis
+}
+
+/**
  * Fetches live OHLCV candles (+ indicators) for a symbol via `GET /api/market-data/{symbol}`.
  * `days` selects the lookback window (1–365); `interval` the timeframe ('1d' daily, '1w' weekly).
  */
@@ -86,7 +111,10 @@ export async function getMarketData(
  * Resolves a ticker, company name or ISIN to tradable instruments via
  * `GET /api/symbols/search?q=`. Best match first; empty when nothing matches.
  */
-export async function searchSymbols(query: string, signal?: AbortSignal): Promise<ResolvedSymbol[]> {
+export async function searchSymbols(
+  query: string,
+  signal?: AbortSignal
+): Promise<ResolvedSymbol[]> {
   const response = await fetch(`/api/symbols/search?q=${encodeURIComponent(query)}`, { signal })
 
   if (!response.ok) {
@@ -205,7 +233,9 @@ export async function deleteApiKey(provider: string): Promise<void> {
 
 /** Makes a configured provider the user's default. */
 export async function setDefaultApiKey(provider: string): Promise<void> {
-  const response = await fetch(`/api/keys/${encodeURIComponent(provider)}/default`, { method: 'PUT' })
+  const response = await fetch(`/api/keys/${encodeURIComponent(provider)}/default`, {
+    method: 'PUT',
+  })
   if (!response.ok && response.status !== 404) {
     throw new Error(await extractErrorDetail(response))
   }

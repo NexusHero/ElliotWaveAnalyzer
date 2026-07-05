@@ -231,6 +231,50 @@ export interface AutoWaveAnalysisResponse {
   searchTruncated?: boolean
 }
 
+/** Net price direction of a wave or timeframe move (mirrors backend `TrendDirection`). */
+export type TrendDirection = 'Up' | 'Down'
+
+/** Broad Elliott family a wave's substructure takes (mirrors backend `StructureClass`). */
+export type StructureClass = 'Motive' | 'Corrective'
+
+/** How a finer timeframe fits inside its parent wave (mirrors backend `ConsistencyVerdict`). */
+export type ConsistencyVerdict = 'Consistent' | 'Tension' | 'Contradiction'
+
+/** Constraint a coarse count imposes on the next finer timeframe (mirrors backend `WaveContext`). */
+export interface WaveContext {
+  parentWaveLabel: string
+  expectedDirection: TrendDirection
+  expectedClass: StructureClass
+  windowLow: number
+  windowHigh: number
+  parentDegree: string
+}
+
+/** Consistency verdict for one parent→child link (mirrors backend `TimeframeConsistency`). */
+export interface TimeframeConsistency {
+  parentInterval: string
+  childInterval: string
+  verdict: ConsistencyVerdict
+  reason: string
+}
+
+/** One rung of a top-down chain (mirrors backend `TimeframeCount`). */
+export interface TimeframeCount {
+  interval: string
+  degree: string
+  /** The best count for this timeframe; only the fields the breadcrumb needs are typed. */
+  bestCount: { structure: string; levels: WaveLevels | null } | null
+  imposedContext: WaveContext | null
+  searchTruncated: boolean
+}
+
+/** Deterministic multi-timeframe top-down read (mirrors backend `TopDownAnalysis`). */
+export interface TopDownAnalysis {
+  timeframes: TimeframeCount[]
+  links: TimeframeConsistency[]
+  summary: string
+}
+
 /** How a saved analysis has played out since it was saved (mirrors backend `AnalysisOutcome`). */
 export type AnalysisOutcome = 'Pending' | 'Invalidated' | 'TargetReached'
 

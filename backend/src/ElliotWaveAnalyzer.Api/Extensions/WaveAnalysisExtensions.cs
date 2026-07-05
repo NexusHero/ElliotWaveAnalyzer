@@ -16,6 +16,7 @@ internal static class WaveAnalysisExtensions
         services.AddTransient<ITechnicalAnalysisService, TechnicalAnalysisService>();
         services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();
         services.AddTransient<IAutoWaveAnalysisService, AutoWaveAnalysisService>();
+        services.AddTransient<ITopDownAnalysisService, TopDownAnalysisService>();
 
         // Input validation (FluentValidation). Scans this assembly for all
         // AbstractValidator<T> implementations and registers them.
