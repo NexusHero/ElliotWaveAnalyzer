@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { importDepot } from '../api/client'
+import { useEffect, useState } from 'react'
+import { getSavedDepot, importDepot } from '../api/client'
 import type { DepotSnapshot } from '../api/types'
 
 /** Formats a nullable amount in the snapshot's currency; renders an em dash for null. */
@@ -23,6 +23,19 @@ export default function DepotImportPanel() {
   const [snapshot, setSnapshot] = useState<DepotSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Load the previously-imported depot (if any) when the panel opens.
+  useEffect(() => {
+    const controller = new AbortController()
+    getSavedDepot(controller.signal)
+      .then((saved) => {
+        if (saved) setSnapshot(saved)
+      })
+      .catch(() => {
+        /* no saved depot / offline — the panel just starts empty */
+      })
+    return () => controller.abort()
+  }, [])
 
   async function onFileChosen(file: File | undefined) {
     if (!file) return

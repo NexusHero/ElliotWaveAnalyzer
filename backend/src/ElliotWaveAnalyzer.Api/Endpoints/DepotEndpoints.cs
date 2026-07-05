@@ -1,12 +1,13 @@
+using System.Security.Claims;
 using ElliotWaveAnalyzer.Api.Domain.Depot;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
 /// <summary>
-/// Endpoint group for importing a broker depot from an uploaded file. Authenticated and
-/// per-user rate limited like the rest of the API. The file is parsed and returned; nothing is
-/// persisted yet (that is a follow-up), so the upload never leaves the request.
+/// Endpoint group for a user's depot: import one from an uploaded broker file, and read back the
+/// most recently imported one. Authenticated and per-user rate limited like the rest of the API.
+/// An import replaces the user's previously saved depot.
 /// </summary>
 public static class DepotEndpoints
 {
@@ -23,21 +24,32 @@ public static class DepotEndpoints
 
         group.MapPost("/import", ImportAsync)
             .WithName("ImportDepot")
-            .WithSummary("Import a broker depot from an uploaded file (Smartbroker+ PDF export)")
+            .WithSummary("Import a broker depot from an uploaded file and save it")
             .WithDescription("""
                 Multipart form upload with a single 'file' field. The importer detects the broker
-                from the file and returns the parsed holdings (ISIN, name, quantity, cost/market
-                price and value, gain/loss, exchange) plus depot totals. Nothing is stored.
+                (Smartbroker+ PDF or Scalable Capital CSV) and returns the parsed holdings (ISIN,
+                name, quantity, cost/market price and value, gain/loss, exchange) plus depot totals.
+                The result is saved as your current depot, replacing any previous import.
                 """)
             .DisableAntiforgery()
             .Produces<DepotSnapshot>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
+        group.MapGet("/", GetAsync)
+            .WithName("GetDepot")
+            .WithSummary("Get your most recently imported depot")
+            .Produces<DepotSnapshot>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status204NoContent);
+
         return app;
     }
 
     private static async Task<IResult> ImportAsync(
-        IFormFile? file, IDepotImportService importer, CancellationToken cancellationToken)
+        IFormFile? file,
+        ClaimsPrincipal user,
+        IDepotImportService importer,
+        IDepotStore store,
+        CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
         {
@@ -56,9 +68,22 @@ public static class DepotEndpoints
             file.FileName, file.ContentType ?? "application/octet-stream", buffer.ToArray());
 
         var result = await importer.ImportAsync(importFile, cancellationToken);
+        if (!result.Success)
+        {
+            return Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest);
+        }
 
-        return result.Success
-            ? Results.Ok(result.Snapshot)
-            : Results.Problem(result.Error, statusCode: StatusCodes.Status400BadRequest);
+        await store.SaveAsync(UserId(user), result.Snapshot!, cancellationToken);
+        return Results.Ok(result.Snapshot);
     }
+
+    private static async Task<IResult> GetAsync(
+        ClaimsPrincipal user, IDepotStore store, CancellationToken cancellationToken)
+    {
+        var snapshot = await store.GetLatestAsync(UserId(user), cancellationToken);
+        return snapshot is null ? Results.NoContent() : Results.Ok(snapshot);
+    }
+
+    private static Guid UserId(ClaimsPrincipal user)
+        => Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 }

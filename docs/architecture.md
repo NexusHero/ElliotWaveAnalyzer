@@ -68,6 +68,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-017 | Deduplicate the cron scheduler loops behind a shared `CronBackgroundService` base | #105 · ADR-018 | Fulfilled |
 | REQ-018 | Scalable Capital depot import from the transactions CSV (second `IDepotImporter`) | #107 · ADR-019 | Fulfilled |
 | REQ-019 | One top-level type per file, enforced by an architecture test | #109 · ADR-020 | Fulfilled |
+| REQ-020 | Persist the imported depot per user (upsert) + read it back | #111 · ADR-021 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -996,6 +997,23 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The file name is the type name — navigation and review are predictable; diffs stay scoped to one type |
 | (+) | The rule is enforced, not aspirational — a re-bundled file fails CI |
 | (-) | More, smaller files (≈28 added); mitigated by the naming convention making them trivial to locate |
+
+---
+
+## ADR-021: Persist the Imported Depot Per User (upsert)
+
+**Context:** Depot import (ADR-017/019) parsed a file and returned it, but stored nothing — the holdings vanished on refresh. Users expect their depot to still be there next time.
+
+**Decision:** Persist the most recent import per user in PostgreSQL. A `SavedDepot` (header: source, timestamps, currency, totals) owns its `SavedDepotPosition` rows (cascade delete). `IDepotStore` (Infrastructure `DepotStore` over `AppDbContext`) **upserts** — a unique index on `UserId` enforces one depot per user, and `SaveAsync` deletes the previous one before inserting the new, so a re-import replaces rather than accumulates. The import endpoint saves the parsed snapshot after a successful parse; `GET /api/depot` returns the saved snapshot (204 when none). The Settings panel loads it on open. This mirrors the existing per-user stores (`AnalysisSnapshot`, `UserApiKey`) — same context, an EF migration, impl types internal.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Imported holdings survive across sessions; the panel shows the current depot without re-uploading |
+| (+) | Upsert keeps it simple — always exactly the latest depot, no history to prune, no stale duplicates |
+| (-) | No import history is kept (only the latest); a time series of snapshots would be a larger, separate feature |
+| (-) | Stored market values are as-of the import (no live revaluation) — the price-enrichment follow-up (ADR-019) would refresh them |
 
 ---
 
