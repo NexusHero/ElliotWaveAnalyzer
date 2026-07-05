@@ -37,6 +37,7 @@ Closes #
 - [ ] Line coverage stays ≥ 90% (business logic in pure, testable classes)
 - [ ] No API keys or secrets are committed
 - [ ] **Architecture Governance** (for architecturally-relevant changes): ADR added to `docs/architecture.md` §9 · Requirements Register (§1) updated · sequence diagram added/updated in the Runtime View (§6) for a fulfilled requirement · affected §5/§6/§8 prose corrected
+- [ ] Any unrelated bug/defect found while working this task got its own issue — not silently fixed inline, not silently skipped
 - [ ] I have read and agree to the [Code of Conduct](../CODE_OF_CONDUCT.md)
 
 ## Screenshots / notes

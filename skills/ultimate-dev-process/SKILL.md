@@ -234,6 +234,24 @@ so "did you run the checks" is never a review question.
 - All CI checks green, all review threads resolved, branch up to date with base — all three,
   before merge.
 
+### Issue Discipline — nothing found gets silently dropped
+
+Every task, story, and bug fix gets its issue before work starts (§0) — no issue, no delivered
+feature, regardless of how small the change feels.
+
+This extends to anything surfaced *along the way*. If work on one task turns up an unrelated
+defect, risk, missing test, or piece of debt, it does not get silently folded into the current PR
+(scope creep) and it does not get silently ignored either. File an issue for it on the spot, then
+pick one of two honest paths:
+
+- **Fix it now**, in its own commit or a small follow-up PR that links the new issue — reasonable
+  when it's small and separable from the current change.
+- **Defer it**, leaving the issue open and prioritized — never closed as "not now" without a
+  one-line reason recorded on the issue itself.
+
+What never happens: a defect noticed and left with no trace, or quietly patched with no issue link
+so a future reader has no way to know it was ever a known risk.
+
 ### Reviewer Protocol — the gap most process docs leave implicit
 
 The PR template checklist is the *author's* self-check. The reviewer's job is a distinct pass, not
@@ -266,6 +284,8 @@ A change is done, and its PR mergeable, only when **all** hold:
       docs sections corrected — all in the same PR
 - [ ] Commit messages are Conventional Commits; branch follows the naming convention
 - [ ] PR links its issue; one logical change; all CI green; review threads resolved
+- [ ] Anything found along the way that's out of scope has its own issue — not silently fixed
+      inline, not silently skipped
 - [ ] `git status` clean — no file the change depends on is left untracked
 
 ---
