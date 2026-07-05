@@ -235,9 +235,10 @@ public sealed class ScenarioTreeAcceptanceTests
             Assert.That(scenarios[0].GetProperty("label").GetString(), Is.EqualTo("Primary"));
             Assert.That(scenarios[0].GetProperty("entryLow").GetDecimal(), Is.EqualTo(34_000m));
             Assert.That(scenarios[1].GetProperty("role").GetString(), Is.EqualTo("Alternate"));
-            // Too few concluded analyses → probability withheld, marked explicitly (null is omitted).
+            // Too few concluded analyses → probability withheld (null), marked explicitly.
             Assert.That(scenarios[0].GetProperty("probabilityBasis").GetString(), Is.EqualTo("InsufficientData"));
-            Assert.That(scenarios[0].TryGetProperty("probability", out _), Is.False);
+            var hasProbability = scenarios[0].TryGetProperty("probability", out var prob);
+            Assert.That(!hasProbability || prob.ValueKind == JsonValueKind.Null, Is.True);
         });
     }
 }

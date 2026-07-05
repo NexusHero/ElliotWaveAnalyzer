@@ -27,7 +27,7 @@ public sealed class AuthServiceTests
     [SetUp]
     public async Task SetUp()
     {
-        TestDocker.SkipIfUnavailable();
+        TestDocker.SkipUnlessDockerAvailable();
         _db = new PostgreSqlBuilder().WithImage("postgres:17-alpine").Build();
         await _db.StartAsync();
 

@@ -166,7 +166,10 @@ internal sealed class AlertService(
         snapshot.AlertedOutcome = AnalysisOutcome.Pending;
         snapshot.EntryZoneAlerted = false;
 
-        snapshot.SwitchEvents.Add(new AnalysisSwitchEventRow
+        // Add through the context, not the parent's navigation: the snapshot is already tracked, so
+        // a new child with a client-set key added via the collection is misread as Modified (→ an
+        // UPDATE that matches no row → DbUpdateConcurrencyException). db.Add forces the Added state.
+        db.Add(new AnalysisSwitchEventRow
         {
             Id = Guid.NewGuid(),
             AnalysisSnapshotId = snapshot.Id,
