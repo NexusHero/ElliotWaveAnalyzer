@@ -76,6 +76,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-025 | Channel projections (base 0→2 and acceleration 2→4 with a projected wave-5 band) added to every projection, plus a publication-grade annotated chart PNG for any saved analysis (`GET /api/analyses/{id}/chart.png`) via a backend-agnostic draw-op seam and a confined SkiaSharp backend; the LLM still does no geometry | #120 · ADR-026 · §6 Scenario 13 | Fulfilled |
 | REQ-026 | Backtest harness that replays the whole deterministic pipeline over history with a structurally-enforced no-lookahead guarantee, aggregates measured scenario hit rates (by structure/confidence/confluence/timeframe), persists them idempotently, exposes `GET /api/backtest/summary`, and feeds the rates back as priors for scenario probabilities | #121 · ADR-027 · §6 Scenario 14 | Fulfilled |
 | REQ-027 | Portfolio auto-commentary: `GET /api/depot/analysis` reviews each imported holding — resolve ISIN → top-down count → scenario geometry → optional fact-checked LLM narrative — with a portfolio summary and an explicit unresolved list; narrative degrades gracefully (no key / failed fact-guard); results cached per (position, day); opt-in scheduled refresh | #122 · ADR-028 · §6 Scenario 15 | Fulfilled |
+| REQ-028 | Vision import: `POST /api/wave-analysis/verify-image` extracts a claimed count from an uploaded chart with a vision LLM (strict JSON + one retry), snaps every claimed pivot to a real candle extreme (hallucination guard; too few → `ExtractionUnreliable`), runs the deterministic rules on what survives, and compares side-by-side with our own count; image never persisted | #123 · ADR-029 · §6 Scenario 16 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -790,6 +791,45 @@ sequenceDiagram
 
 ---
 
+## Scenario 16 — Verify an Analyst's Chart from a Screenshot (REQ-028) {#_runtime_scenario_16}
+
+A user uploads an analyst's annotated chart. A vision model extracts the claimed count (perception only); every claimed pivot must snap to a real candle extreme (the hallucination guard) before any rule touches it; the deterministic rules then verify what survives, side-by-side with our own count. Too few snapped pivots → the report says the image couldn't be reliably extracted rather than guessing. The image is parsed in-request and never stored.
+
+```mermaid
+sequenceDiagram
+    participant UI as VerifyImagePanel
+    participant Ep as WaveAnalysisEndpoints
+    participant Svc as ImageVerificationService
+    participant Vis as IChartVisionExtractor (vision LLM)
+    participant Md as ITechnicalAnalysisService
+    participant Snap as PivotSnapper (pure)
+    participant Asm as ChartVerificationAssembler (pure)
+
+    UI->>Ep: POST /api/wave-analysis/verify-image (multipart: file, symbol?)
+    Ep->>Svc: VerifyAsync(image, symbol, timeframe)
+    Svc->>Vis: ExtractAsync(image)  %% strict JSON + one retry
+    alt output invalid after retry
+        Vis-->>Svc: throws ChartExtractionException → 422
+    else claim parsed
+        Vis-->>Svc: ChartExtraction (claimed pivots/levels/zones)
+        Svc->>Md: GetAnalysisAsync(symbol, timeframe)  %% real candles
+        Svc->>Asm: Assemble(extraction, candles)
+        Asm->>Snap: Snap(claimed pivots ±0.5% / ±1 bar)
+        Snap-->>Asm: snapped[] + rejected[] (with reasons)
+        alt too few snapped
+            Asm-->>Svc: ExtractionUnreliable (no verdicts)
+        else enough snapped
+            Asm->>Asm: ElliottRuleChecker on snapped count
+            Asm->>Asm: our own best count + confluence zones
+            Asm-->>Svc: Verified report + comparison
+        end
+        Svc-->>Ep: ImageVerificationReport
+        Ep-->>UI: 200 report
+    end
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1429,6 +1469,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The differentiator — an automatic, professional-style portfolio review — with the anti-hallucination guarantee enforced by a pure, unit-tested guard rather than trust in the model |
 | (+) | Graceful degradation everywhere: no LLM key still yields the full deterministic brief; unresolvable holdings are explicit; the day-cache keeps repeat opens cheap |
 | (-) | One LLM call per position on the first open of the day (bounded by the cache + rate limits); the narrative is a single paragraph, not a multi-section report; per-position mini-chart reuses the REQ-025 renderer on demand rather than being embedded in this payload |
+
+---
+
+## ADR-029: Vision Import — LLM for Perception, Rules for Judgment, Pivots Must Snap to Real Data
+
+**Context:** Users follow analysts and receive annotated chart screenshots they must trust blindly. We can do better: extract the claimed count with a vision model and let our deterministic rule engine verify it against real market data. The whole value collapses if we trust the vision model's numbers — a vision LLM will confidently misread a pivot's price by 10%, or invent one — so the extracted geometry must be treated as a *claim* and reconciled with actual candles before any rule is applied. Same core invariant as the rest of the codebase: the LLM perceives, the deterministic engine judges.
+
+**Decision:**
+
+- **Vision behind an interface, strict JSON.** `IChartVisionExtractor` (impl `LlmChartVisionExtractor`) sends the image to a vision-capable `IChatClient` in JSON mode and parses a strict schema (`symbol?`, `timeframe?`, `pivots[{approxDate, approxPrice, label}]`, `levels[]`, `zones[]`) with **one retry** on malformed output, then throws `ChartExtractionException` (surfaced as 422). It returns claims, never verdicts.
+- **The hallucination guard is snapping.** `PivotSnapper` (pure) snaps every claimed pivot to a real candle extreme within tolerance (default ±0.5% price, ±1 bar). A pivot that doesn't snap is **rejected with a reason** (`"claimed pivot at 64.86 on Jul 3 — no such extreme within ±0.5%"`), never trusted. If fewer pivots survive than the claimed structure needs (6 for a 5-wave), the report is `ExtractionUnreliable` and **no rule verdicts are fabricated** — the honest "the image could not be reliably extracted" over a confident guess.
+- **Deterministic verification + comparison.** `ChartVerificationAssembler` (pure) runs the existing `ElliottRuleChecker` on the snapped count and parses our own best count on the same window, returning both side-by-side (structures, our score, our confluence zones, agree/differ). Judgment is entirely deterministic; the vision model never decides whether a count is valid.
+- **Privacy: images are not persisted.** The upload is parsed in-request and discarded (documented default); the endpoint enforces the same size/type limits as depot import and the strict LLM rate-limit policy.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | A genuine differentiator — "upload any analyst's chart, we re-check it against the rules and the real data" — with hallucination made impossible to hide: an un-snappable pivot is reported, not silently used |
+| (+) | The perception/judgment split holds end to end: swapping the vision model can't change a single verdict, and all geometry stays pure and unit-tested (snap, guard, rules, comparison) |
+| (-) | The claimed count is not independently *scored* (only rule-checked) — a score comparison would need to run the guideline scorer on an arbitrary flat count, deferred; zone overlap is reported as both sets rather than a computed intersection; a real analyst's copyrighted chart is never shipped as a fixture (the test image is script-generated) |
 
 ---
 

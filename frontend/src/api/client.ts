@@ -2,6 +2,7 @@ import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
   BacktestSummary,
+  ImageVerificationReport,
   PortfolioReview,
   CandleIntervalCode,
   DepotSnapshot,
@@ -180,6 +181,26 @@ export async function getPortfolioReview(signal?: AbortSignal): Promise<Portfoli
   }
 
   return (await response.json()) as PortfolioReview
+}
+
+/** Verifies an uploaded analyst chart via `POST /api/wave-analysis/verify-image` (multipart). */
+export async function verifyChartImage(
+  file: File,
+  symbol?: string,
+  timeframe?: string
+): Promise<ImageVerificationReport> {
+  const form = new FormData()
+  form.append('file', file)
+  if (symbol) form.append('symbol', symbol)
+  if (timeframe) form.append('timeframe', timeframe)
+
+  const response = await fetch('/api/wave-analysis/verify-image', { method: 'POST', body: form })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as ImageVerificationReport
 }
 
 /** Deletes a saved analysis via `DELETE /api/analyses/{id}`. */
