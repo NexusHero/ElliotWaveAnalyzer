@@ -29,7 +29,7 @@
          Microsoft.AspNetCore.OpenApi has a known high-severity advisory
          (GHSA-v5pm-xwqc-g5wc), which fails restore under TreatWarningsAsErrors.
          Remove once Microsoft.AspNetCore.OpenApi references a patched version. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.7.0" />
 
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
