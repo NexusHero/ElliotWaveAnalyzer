@@ -9,6 +9,10 @@ Claude → also read the `elliottwave-claude` skill.
 Gemini → also read the `elliottwave-gemini` skill.
 OpenAI → also read the `elliottwave-openai` skill.
 
+This repo's process is one implementation of the cross-project standard in
+[`ultimate-dev-process`](../ultimate-dev-process/SKILL.md) — that skill's "Recommended Upgrades"
+section lists the two gaps worth closing here (PR issue-linking, local git hooks).
+
 ---
 
 ## Purpose
