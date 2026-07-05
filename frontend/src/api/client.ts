@@ -1,6 +1,7 @@
 import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
+  BacktestSummary,
   CandleIntervalCode,
   DepotSnapshot,
   ResolvedSymbol,
@@ -152,6 +153,21 @@ export async function listAnalyses(signal?: AbortSignal): Promise<TrackedAnalysi
   }
 
   return (await response.json()) as TrackedAnalysis[]
+}
+
+/** Latest measured backtest performance via `GET /api/backtest/summary`; null when none has run. */
+export async function getBacktestSummary(signal?: AbortSignal): Promise<BacktestSummary | null> {
+  const response = await fetch('/api/backtest/summary', { signal })
+
+  if (response.status === 404) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as BacktestSummary
 }
 
 /** Deletes a saved analysis via `DELETE /api/analyses/{id}`. */

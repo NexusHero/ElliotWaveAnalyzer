@@ -15,6 +15,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 internal sealed class TrackRecordService(
     AppDbContext db,
     IEnumerable<IMarketDataProvider> marketDataProviders,
+    IScenarioPriorProvider priorProvider,
     TimeProvider timeProvider,
     ILogger<TrackRecordService> logger) : ITrackRecordService
 {
@@ -103,7 +104,12 @@ internal sealed class TrackRecordService(
         var bucketByConfidence = calibration.Buckets.ToDictionary(
             b => b.Confidence, StringComparer.OrdinalIgnoreCase);
 
-        return [.. snapshots.Select(s => ToDto(s, evaluations[s.Id], bucketByConfidence))];
+        // Backtest priors stand in for a thin personal track record (REQ-026): when a confidence
+        // bucket has too few concluded analyses to calibrate, the harness's measured hit-rate for
+        // that confidence gives the scenario an honest probability instead of "insufficient data".
+        var priors = await priorProvider.GetConfidencePriorsAsync(cancellationToken);
+
+        return [.. snapshots.Select(s => ToDto(s, evaluations[s.Id], bucketByConfidence, priors))];
     }
 
     /// <inheritdoc/>
@@ -170,7 +176,10 @@ internal sealed class TrackRecordService(
     }
 
     private static TrackedAnalysis ToDto(
-        AnalysisSnapshot s, OutcomeEvaluation e, IReadOnlyDictionary<string, CalibrationBucket> buckets) => new(
+        AnalysisSnapshot s,
+        OutcomeEvaluation e,
+        IReadOnlyDictionary<string, CalibrationBucket> buckets,
+        IReadOnlyDictionary<string, decimal> priors) => new(
         s.Id,
         s.Symbol,
         s.CreatedAt,
@@ -186,17 +195,21 @@ internal sealed class TrackRecordService(
         e.Price,
         e.At)
     {
-        Scenarios = [.. s.Scenarios.OrderBy(r => r.OrderIndex).Select(r => ToScenario(r, buckets))],
+        Scenarios = [.. s.Scenarios.OrderBy(r => r.OrderIndex).Select(r => ToScenario(r, buckets, priors))],
         SwitchEvents = [.. s.SwitchEvents
             .OrderBy(x => x.At)
             .Select(x => new ScenarioSwitchEvent(x.At, x.FromLabel, x.ToLabel, x.Reason))],
     };
 
     private static Scenario ToScenario(
-        AnalysisScenarioRow r, IReadOnlyDictionary<string, CalibrationBucket> buckets)
+        AnalysisScenarioRow r,
+        IReadOnlyDictionary<string, CalibrationBucket> buckets,
+        IReadOnlyDictionary<string, decimal> priors)
     {
-        buckets.TryGetValue(NormalizeConfidence(r.Confidence), out var bucket);
-        var estimate = ScenarioProbability.From(bucket);
+        var confidence = NormalizeConfidence(r.Confidence);
+        buckets.TryGetValue(confidence, out var bucket);
+        decimal? prior = priors.TryGetValue(confidence, out var p) ? p : null;
+        var estimate = ScenarioProbability.From(bucket, prior);
         return new Scenario(
             r.Role, r.Label, r.Structure, r.Bullish, r.InvalidationPrice, r.InvalidationAbove,
             r.EntryLow, r.EntryHigh, r.TargetLow, r.TargetHigh, r.Confidence, r.Score,

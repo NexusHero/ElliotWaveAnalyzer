@@ -422,6 +422,28 @@ export interface ConfidenceCalibration {
   overallHitRate: number | null
 }
 
+/** One aggregated backtest hit-rate bucket (mirrors backend `BacktestBucket`). */
+export interface BacktestBucket {
+  dimension: string
+  key: string
+  total: number
+  concluded: number
+  targetReached: number
+  invalidated: number
+  /** targetReached ÷ concluded, or null when nothing concluded. */
+  hitRate: number | null
+}
+
+/** Latest measured backtest performance (mirrors backend `BacktestSummary`). */
+export interface BacktestSummary {
+  datasetHash: string
+  engineVersion: string
+  symbol: string
+  scenarioCount: number
+  createdAt: string
+  buckets: BacktestBucket[]
+}
+
 /** One holding in an imported depot (mirrors backend `DepotPosition`). Monetary fields nullable. */
 export interface DepotPosition {
   isin: string

@@ -74,6 +74,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-023 | Top-down multi-timeframe consistency: each finer count constrained to the wave unfolding on the timeframe above it (hard reject on wrong direction, soft penalty on class/window), with a per-link verdict | #118 · ADR-024 · §6 Scenario 11 | Fulfilled |
 | REQ-024 | Scenario tree per saved analysis (primary + alternates) with calibrated probabilities (or an insufficient-data marker), zone-entry alerts, and auto-switch to the best alternate on invalidation with an append-only switch history | #119 · ADR-025 · §6 Scenario 12 | Fulfilled |
 | REQ-025 | Channel projections (base 0→2 and acceleration 2→4 with a projected wave-5 band) added to every projection, plus a publication-grade annotated chart PNG for any saved analysis (`GET /api/analyses/{id}/chart.png`) via a backend-agnostic draw-op seam and a confined SkiaSharp backend; the LLM still does no geometry | #120 · ADR-026 · §6 Scenario 13 | Fulfilled |
+| REQ-026 | Backtest harness that replays the whole deterministic pipeline over history with a structurally-enforced no-lookahead guarantee, aggregates measured scenario hit rates (by structure/confidence/confluence/timeframe), persists them idempotently, exposes `GET /api/backtest/summary`, and feeds the rates back as priors for scenario probabilities | #121 · ADR-027 · §6 Scenario 14 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -710,6 +711,44 @@ sequenceDiagram
 
 ---
 
+## Scenario 14 — Backtest a Symbol with No Lookahead (REQ-026) {#_runtime_scenario_14}
+
+An operator runs a backtest. The harness slides a cutoff across history; at each step the analysis stage sees only a cutoff-bounded window (the guard type forbids reaching past it), and the following candles score the recorded scenario. Results are aggregated and persisted idempotently by dataset hash; the summary reads back for the track-record page and feeds priors into scenario probabilities.
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator (dev endpoint)
+    participant Svc as BacktestService
+    participant Md as IMarketDataProvider
+    participant Eng as BacktestEngine (pure)
+    participant Win as CandleWindow (guard)
+    participant Pipe as Pivots → Parse → Levels (pure)
+    participant Eval as AnalysisOutcomeEvaluator (pure)
+    participant Db as AppDbContext
+
+    Op->>Svc: RunAsync(symbol, config)
+    Svc->>Md: GetCandlesAsync(symbol)
+    Svc->>Svc: hash = DatasetHash(candles, config)
+    alt run with this hash exists
+        Svc->>Db: load existing run
+        Db-->>Svc: stored buckets (idempotent)
+    else new run
+        Svc->>Eng: Run(candles, config)
+        loop each cutoff
+            Eng->>Win: new CandleWindow(candles, cutoff)
+            Eng->>Pipe: analyze(window)  %% cannot see past cutoff
+            Pipe-->>Eng: best count + levels
+            Eng->>Eval: Evaluate(levels, candles after cutoff)
+            Eval-->>Eng: outcome
+        end
+        Eng-->>Svc: recorded scenarios
+        Svc->>Db: persist run + aggregated buckets
+    end
+    Svc-->>Op: BacktestSummary
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1305,6 +1344,29 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | All layout/geometry is pure and unit-testable without a rendering backend; SkiaSharp is a thin, confined leaf; determinism is provable by hashing |
 | (+) | Channel projections are now analytical output (base + acceleration + wave-5 band), computed deterministically and attached to every projection — the LLM still does no geometry |
 | (-) | Saved analyses persist no pivots, so their exported chart omits wave-degree labels and channel rays (it draws candles, zones, invalidation, scenario arrows, title); the composer supports both and the live-projection path can supply them. A richer PNG for saved analyses would require persisting the count's pivots — deferred |
+
+---
+
+## ADR-027: Backtest Harness with a Structurally-Enforced No-Lookahead Guarantee
+
+**Context:** Every Elliott Wave service claims skill; almost none proves it. We already evaluate *live* outcomes (track record + calibration), but the honest priors for scenario probabilities (ADR-025) and the credibility story both need measurement *at scale over history*. The single hazard that makes or breaks a backtest is **lookahead** — if the analysis at a cutoff can see even one future candle, the measured hit rates are fiction. So the design has to make lookahead not merely "avoided" but *structurally impossible* and *test-enforced*.
+
+**Decision:**
+
+- **A guard type, not a convention.** `CandleWindow` is a read-only `IReadOnlyList<MarketCandle>` whose `Count` is the cutoff and whose indexer throws for any index at or beyond it, even though later candles exist in the backing list. The analysis stage (pivots → parse → levels) is handed only this type, so it *cannot* reach the future — the compiler and a runtime guard both forbid it.
+- **A pure engine.** `BacktestEngine.Run(candles, config)` slides the cutoff forward; at each step it records the best count's geometry from the window, then scores it with the existing `AnalysisOutcomeEvaluator` against the candles *after* the cutoff (bounded by a horizon). No LLM, no I/O — deterministic given candles + config. `BacktestAggregator` buckets the results by structure/confidence/confluence/timeframe; open scenarios count toward totals but are excluded from the hit-rate denominator.
+- **No-lookahead is tested, two ways.** (1) *Poison:* a dataset whose post-cutoff candles are violently reversed must not change any scenario recorded at an earlier cutoff — asserted by comparing runs that share a prefix. (2) *Truncation:* a fully-scored result must be identical whether computed on the full series or a series truncated right after its horizon. Either fails on the smallest leak.
+- **Idempotent persistence.** A run is keyed by a `DatasetHash` over the candles + config + engine version (unique index). Re-running the same dataset returns the stored run instead of duplicating rows. Migration `AddBacktestRuns`. `GET /api/backtest/summary` (auth) reads the latest run; running is a **Development-only** `POST /api/backtest/run` (404 outside Development so its existence isn't advertised), cancellable via the request's token.
+- **Priors feed probabilities.** `ScenarioProbability.From` now takes an optional backtest prior: with a rich personal record it blends `0.7·measured + 0.3·prior` (the user's real record leads); with too thin a record it returns the prior as `ProbabilityBasis.Backtested`; with neither it still withholds a number. `BacktestScenarioPriorProvider` supplies the per-confidence hit-rates from the latest run.
+- **Overfitting stance.** Parameter optimization / auto-tuning is **explicitly out of scope** — a backtest that is tuned until it looks good measures the tuner, not the method. The harness reports one honest run per (dataset, config); choosing configs to flatter the numbers is a documented non-goal.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The credibility feature: measured hit rates at scale, with lookahead made structurally impossible and enforced by adversarial tests — not a hand-wave |
+| (+) | Honest priors give a saved scenario a probability before the user's own record is large enough, without inventing one; runs are reproducible (dataset hash) and idempotent |
+| (-) | Confidence in the backtest is *score-derived* (the deterministic guideline score), a documented approximation of the live LLM confidence it priors; backtesting is single-config by design (no optimization); long runs are dev-triggered, not a scheduled job (revisitable) |
 
 ---
 

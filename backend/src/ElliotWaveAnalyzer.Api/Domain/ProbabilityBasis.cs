@@ -10,6 +10,12 @@ public enum ProbabilityBasis
     /// <summary>Probability is the measured hit-rate of the matching calibration bucket.</summary>
     Calibrated,
 
+    /// <summary>
+    /// The user's own track record is too thin, so the probability is the backtest prior — the
+    /// hit-rate the harness measured for this confidence over history (REQ-026).
+    /// </summary>
+    Backtested,
+
     /// <summary>Too few concluded analyses in the bucket to publish a number.</summary>
     InsufficientData,
 }
