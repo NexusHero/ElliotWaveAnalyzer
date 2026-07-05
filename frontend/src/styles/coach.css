@@ -1254,6 +1254,109 @@
   line-height: 1.5;
 }
 
+/* ── Risk box (stop distance, R:R, position size) ────────────────────────── */
+.riskbox {
+  border-top: 1px solid var(--line-soft);
+  padding: 9px 12px;
+}
+.riskbox-head {
+  font-weight: 700;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.riskbox-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.riskbox-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.riskbox-form input {
+  width: 84px;
+  padding: 5px 7px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: var(--inset);
+  color: var(--text);
+  font-size: 12.5px;
+}
+.riskbox-form button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 7px;
+  background: var(--acc-strong);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.riskbox-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.riskbox-error,
+.riskbox-nostop {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fail);
+}
+.riskbox-result {
+  margin-top: 8px;
+}
+.risk-row {
+  display: grid;
+  grid-template-columns: 60px auto;
+  gap: 10px;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+.risk-k {
+  font-weight: 700;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  align-self: center;
+}
+.risk-v em {
+  color: var(--muted);
+  font-style: normal;
+}
+.risk-targets {
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 0;
+}
+.risk-targets li {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 12.5px;
+  border-top: 1px dashed var(--line-soft);
+}
+.risk-rr {
+  font-weight: 700;
+  color: var(--pass);
+}
+.riskbox-disclaimer {
+  margin: 8px 0 0;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* ── Top-down multi-timeframe breadcrumb ─────────────────────────────────── */
 .topdown {
   border: 1px solid var(--line-soft);
