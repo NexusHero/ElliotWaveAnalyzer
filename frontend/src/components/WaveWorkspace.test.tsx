@@ -18,6 +18,9 @@ vi.mock('./PriceChart', () => ({
       <button type="button" data-testid="pt2" onClick={() => onPointClick('2024-01-15', 35000)}>
         point 2
       </button>
+      <button type="button" data-testid="pt3" onClick={() => onPointClick('2024-01-25', 42000)}>
+        point 3
+      </button>
     </div>
   ),
 }))
@@ -106,5 +109,35 @@ describe('WaveWorkspace', () => {
 
     await waitFor(() => expect(mockClient.validateWaveCount).toHaveBeenCalled())
     expect(await screen.findByText('Analysis unavailable')).toBeInTheDocument()
+  })
+
+  it('places a corrective A B C count when Zigzag / Flat is selected', () => {
+    renderWorkspace()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zigzag / Flat' }))
+    fireEvent.click(screen.getByTestId('pt1'))
+    fireEvent.click(screen.getByTestId('pt2'))
+    fireEvent.click(screen.getByTestId('pt3'))
+
+    expect((screen.getByLabelText('Label for annotation 1') as HTMLSelectElement).value).toBe('A')
+    expect((screen.getByLabelText('Label for annotation 2') as HTMLSelectElement).value).toBe('B')
+    expect((screen.getByLabelText('Label for annotation 3') as HTMLSelectElement).value).toBe('C')
+  })
+
+  it('locks the count type once a label is placed (clear to switch)', () => {
+    renderWorkspace()
+
+    // Before placing anything, every type is selectable.
+    expect(screen.getByRole('button', { name: 'Zigzag / Flat' })).toBeEnabled()
+
+    fireEvent.click(screen.getByTestId('pt1'))
+
+    // Mid-count the other types are locked so labels can't mix; the active one stays.
+    expect(screen.getByRole('button', { name: 'Zigzag / Flat' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Impulse' })).toBeEnabled()
+
+    // Clearing re-enables the full palette.
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+    expect(screen.getByRole('button', { name: 'Zigzag / Flat' })).toBeEnabled()
   })
 })

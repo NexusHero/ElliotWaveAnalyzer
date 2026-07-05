@@ -51,7 +51,18 @@ import { toWaveLinePoints } from './waveLine'
  */
 const SYMBOLS = ['SP500', 'NASDAQ', 'BTC', 'ETH'] as const
 
-const IMPULSE: string[] = ['1', '2', '3', '4', '5']
+/**
+ * The count types the analyst can place by click, each walking its own label sequence. Corrective,
+ * complex and diagonal counts start from a correction, so the placement isn't impulse-only; the
+ * deterministic verifier infers the structure from the labels (A–C ⇒ corrective, etc.). Triangles
+ * (A–E) need the D/E labels added front and back, tracked separately.
+ */
+const COUNT_TYPES = [
+  { key: 'impulse', label: 'Impulse', seq: ['1', '2', '3', '4', '5'] },
+  { key: 'corrective', label: 'Zigzag / Flat', seq: ['A', 'B', 'C'] },
+  { key: 'complex', label: 'Complex', seq: ['W', 'X', 'Y'] },
+] as const
+type CountTypeKey = (typeof COUNT_TYPES)[number]['key']
 
 /** Lookback windows for the live chart, mapped to the market-data `days` parameter. */
 const RANGES = [
@@ -360,7 +371,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
 
-  const nextLabel = IMPULSE[annotations.length] ?? null
+  const [countType, setCountType] = useState<CountTypeKey>('impulse')
+  const activeSequence = (COUNT_TYPES.find((t) => t.key === countType) ?? COUNT_TYPES[0]).seq
+  const nextLabel = activeSequence[annotations.length] ?? null
 
   const resetCoach = useCallback(() => {
     setCoachState('empty')
@@ -371,8 +384,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const handlePointClick = useCallback(
     (time: string, price: number) => {
-      const label = IMPULSE[annotations.length]
-      if (!label) return // all five impulse labels placed
+      const seq = (COUNT_TYPES.find((t) => t.key === countType) ?? COUNT_TYPES[0]).seq
+      const label = seq[annotations.length]
+      if (!label) return // the selected count's labels are all placed
       // Snap the click onto the candle's real extreme so the pivot lands on real data (the backend
       // snaps again authoritatively on verify).
       const snapped = snapToCandle(candles, time, price) ?? { time, price }
@@ -384,7 +398,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       setAnnotations((prev) => [...prev, annotation].sort((a, b) => a.date.localeCompare(b.date)))
       resetCoach()
     },
-    [annotations.length, candles, resetCoach]
+    [annotations.length, candles, resetCoach, countType]
   )
 
   const handleNudge = useCallback(
@@ -607,12 +621,32 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
           <div className="chart-panel">
             <div className="chart-hint">
+              <div className="count-type" role="group" aria-label="Count type">
+                {COUNT_TYPES.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    className={`count-type-btn${countType === t.key ? ' on' : ''}`}
+                    aria-pressed={countType === t.key}
+                    // Locked mid-count so labels never mix; clear the count to switch type.
+                    disabled={annotations.length > 0 && countType !== t.key}
+                    title={
+                      annotations.length > 0 && countType !== t.key
+                        ? 'Clear the count to change type'
+                        : undefined
+                    }
+                    onClick={() => setCountType(t.key)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
               {nextLabel ? (
                 <span>
                   Click the chart to place <span className="next-label mono">{nextLabel}</span>
                 </span>
               ) : (
-                <span>All five impulse labels placed — relabel or clear to continue.</span>
+                <span>All labels placed — relabel or clear to continue.</span>
               )}
               {(annotations.length > 0 || aiAnnotations.length > 0) && (
                 <button type="button" className="chip-clear" onClick={handleClear}>

@@ -274,3 +274,28 @@ textarea {
   color: var(--muted);
   font-size: 0.76rem;
 }
+
+/* ── Count-type palette (#159): pick Impulse / Zigzag-Flat / Complex before placing ─ */
+.count-type {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-right: 0.6rem;
+}
+.count-type-btn {
+  font-size: 0.76rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.count-type-btn.on {
+  border-color: var(--acc-line);
+  background: var(--acc-soft);
+  color: var(--text, inherit);
+}
+.count-type-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
