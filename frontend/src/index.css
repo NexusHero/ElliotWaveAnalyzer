@@ -206,3 +206,71 @@ textarea {
 .fade-up {
   animation: ewa-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* ── Historical analogs (#182): measured resolution of past setups ────────── */
+.analogs {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--panel, transparent);
+}
+.analog-stats {
+  display: flex;
+  gap: 1rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.analog-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.analog-stat-val {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--acc);
+  line-height: 1.1;
+}
+.analog-stat-lbl {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.analog-narrative {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin: 0 0 0.75rem;
+}
+.analog-narrative.muted {
+  color: var(--muted);
+  font-style: italic;
+}
+.analog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.analog-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: 0.85rem;
+}
+.analog-when {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.analog-outcome.ok {
+  color: var(--up, oklch(0.72 0.14 155));
+}
+.analog-outcome.bad {
+  color: var(--down, oklch(0.66 0.16 25));
+}
+.analog-meta {
+  color: var(--muted);
+  font-size: 0.76rem;
+}

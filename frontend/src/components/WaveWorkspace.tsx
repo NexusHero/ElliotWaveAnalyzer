@@ -4,6 +4,7 @@ import {
   autoAnalyzeWaves,
   deleteAnalysis,
   getBacktestSummary,
+  getHistoricalAnalogs,
   getMarketData,
   getPortfolioReview,
   listAnalyses,
@@ -28,6 +29,7 @@ import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
+import HistoricalAnalogsPanel, { type AnalogsState } from './HistoricalAnalogsPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
@@ -173,6 +175,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const topDown = useMutation({
     mutationFn: () => topDownAnalysis(symbol, sensitivity),
   })
+
+  // Historical analogs (REQ-034): on-demand (the corpus sweep is heavy), daily/weekly only.
+  const analogs = useMutation({
+    mutationFn: () =>
+      getHistoricalAnalogs(symbol, timeframe.code === '1w' ? '1w' : '1d'),
+  })
+  const analogsState: AnalogsState = analogs.isPending
+    ? 'loading'
+    : analogs.isError
+      ? 'error'
+      : analogs.isSuccess
+        ? 'result'
+        : 'idle'
 
   // ── Track record: save a ranked count, list saved ones with their outcome ──
   const queryClient = useQueryClient()
@@ -736,6 +751,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             onOpenSettings={onOpenSettings}
             onSaveCount={handleSaveCount}
             savePending={saveMutation.isPending}
+          />
+
+          <HistoricalAnalogsPanel
+            symbol={symbol}
+            state={analogsState}
+            data={analogs.data ?? null}
+            error={analogs.error instanceof Error ? analogs.error.message : null}
+            onLoad={() => analogs.mutate()}
           />
 
           <TrackRecordPanel

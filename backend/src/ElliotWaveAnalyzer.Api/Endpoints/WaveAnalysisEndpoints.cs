@@ -92,6 +92,28 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("ip-global");
 
+        // ── GET /api/wave-analysis/analogs ────────────────────────────────────
+        // Historical-analog retrieval: fingerprint the current count, find the nearest PAST setups on
+        // the same symbol (no-lookahead), aggregate their measured resolution, and add a fact-guarded
+        // summary. Makes at most one small LLM call for the prose → strict throttle.
+        group.MapGet("/wave-analysis/analogs", HistoricalAnalogs)
+            .WithName("HistoricalAnalogs")
+            .WithSummary("Find historical analogs of the current count and how they resolved")
+            .WithDescription("""
+                Fingerprints the current deterministic count for a symbol (structure, direction, score,
+                confluence, reward:risk, distance-to-invalidation, momentum) and retrieves the most
+                similar PAST setups on the same instrument — restricted to ones that concluded before
+                now, so nothing leaks the future. Returns their measured resolution (hit-rate, median
+                days to resolution) and the ranked analogs, plus a short fact-guarded natural-language
+                summary. All statistics are deterministic; the LLM only narrates them and cannot cite a
+                figure the engine did not compute. Below a minimum sample the response is marked
+                insufficient rather than showing an unreliable rate. Daily or weekly timeframes.
+                """)
+            .Produces<AnalogResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
+
         // ── POST /api/wave-analysis/verify-image ──────────────────────────────
         // Vision import: a vision LLM extracts the claimed count from an uploaded chart, then the
         // deterministic pipeline verifies it against real data. Makes an LLM call → strict throttle.
@@ -330,6 +352,77 @@ public static class WaveAnalysisEndpoints
                 title: "Analysis unavailable",
                 detail: "The market-data service is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> HistoricalAnalogs(
+        string symbol,
+        string? interval,
+        IHistoricalAnalogService analogService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!Application.SymbolInput.IsValidSymbol(symbol))
+        {
+            return Results.Problem(
+                title: "Invalid symbol",
+                detail: "Symbol must be a short ticker of letters, digits and . - ^ = / characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!TryParseAnalogInterval(interval, out var candleInterval, out var timeframe))
+        {
+            return Results.Problem(
+                title: "Invalid interval",
+                detail: "interval must be '1d' (daily) or '1w' (weekly).",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var normalized = symbol.ToUpperInvariant();
+        try
+        {
+            var report = await analogService.AnalyzeAsync(normalized, candleInterval, cancellationToken);
+            return Results.Ok(report is null
+                ? AnalogResponse.Insufficient(
+                    normalized, timeframe, "No current count, or not enough history to compare.")
+                : AnalogResponse.From(normalized, timeframe, report));
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Historical analogs failed for {Symbol}", normalized);
+            return Results.Problem(
+                title: "Analysis unavailable",
+                detail: "The market-data service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    // Only daily and weekly are supported (both derive from the daily series); intraday analog history
+    // is out of scope for now. An unrecognised value is a 400 rather than a silent default.
+    private static bool TryParseAnalogInterval(string? interval, out CandleInterval candleInterval, out string timeframe)
+    {
+        switch ((interval ?? "1d").Trim().ToLowerInvariant())
+        {
+            case "1d" or "daily" or "1day":
+                candleInterval = CandleInterval.OneDay;
+                timeframe = "1D";
+                return true;
+            case "1w" or "weekly" or "1week":
+                candleInterval = CandleInterval.OneWeek;
+                timeframe = "1W";
+                return true;
+            default:
+                candleInterval = CandleInterval.OneDay;
+                timeframe = "1D";
+                return false;
         }
     }
 

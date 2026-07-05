@@ -1,4 +1,5 @@
 import type {
+  AnalogResponse,
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
   BacktestSummary,
@@ -91,6 +92,30 @@ export async function topDownAnalysis(
   }
 
   return (await response.json()) as TopDownAnalysis
+}
+
+/**
+ * Historical-analog retrieval via `GET /api/wave-analysis/analogs`. Fingerprints the current count
+ * and returns the nearest concluded PAST setups (no-lookahead) with their measured resolution and a
+ * fact-guarded summary. The statistics are deterministic; the LLM only narrates them.
+ */
+export async function getHistoricalAnalogs(
+  symbol: string,
+  interval?: string,
+  signal?: AbortSignal
+): Promise<AnalogResponse> {
+  const query = new URLSearchParams({ symbol })
+  if (interval) {
+    query.set('interval', interval)
+  }
+
+  const response = await fetch(`/api/wave-analysis/analogs?${query.toString()}`, { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as AnalogResponse
 }
 
 /**

@@ -21,6 +21,10 @@ internal static class WaveAnalysisExtensions
         // Analyst-in-the-loop re-verification (REQ-031): deterministic, no LLM.
         services.AddTransient<IWaveVerificationService, WaveVerificationService>();
 
+        // Historical-analog retrieval (REQ-034): deterministic retrieval/aggregation over a
+        // no-lookahead corpus; the narrator (registered in the LLM extensions) only summarises it.
+        services.AddTransient<IHistoricalAnalogService, HistoricalAnalogService>();
+
         // Setup scanner (REQ-029): deterministic sweep across symbols. Bind its options and register
         // the service scoped (it resolves the scoped/transient analysis service; the cache is shared).
         services.AddOptions<ScanOptions>().BindConfiguration(ScanOptions.SectionName);

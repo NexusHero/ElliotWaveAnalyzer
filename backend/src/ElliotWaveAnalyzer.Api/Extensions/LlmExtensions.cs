@@ -67,6 +67,9 @@ internal static class LlmExtensions
         // Portfolio-review narratives (fact-checked; degrades to null without a key).
         services.AddScoped<IPositionNarrator, LlmPositionNarrator>();
 
+        // Historical-analog summaries (REQ-034): fact-guarded; degrades to a reason without a key.
+        services.AddScoped<IAnalogNarrator, LlmAnalogNarrator>();
+
         // Vision import (REQ-028): a vision LLM extracts a claimed count; deterministic pipeline verifies it.
         services.AddScoped<IChartVisionExtractor, LlmChartVisionExtractor>();
         services.AddScoped<IImageVerificationService, ImageVerificationService>();
