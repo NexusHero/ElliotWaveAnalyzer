@@ -3,16 +3,20 @@ import type {
   RankedWaveCount,
   RuleResult,
   RuleStatus,
+  TopDownAnalysis,
   WaveNode,
 } from '../api/types'
 import { Alert, CheckCircle, Lock, Seal, Spark, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
+import TopDownBreadcrumb from './TopDownBreadcrumb'
 
 export type AutoState = 'idle' | 'needkey' | 'loading' | 'result' | 'error'
 
 interface AutoAnalysisPanelProps {
   state: AutoState
   data: AutoWaveAnalysisResponse | null
+  /** Deterministic top-down consistency chain; shown as a breadcrumb above the counts. */
+  topDown?: TopDownAnalysis | null
   error: string | null
   /** Current ZigZag sensitivity (reversal threshold, %). */
   sensitivity: number
@@ -71,6 +75,7 @@ function fmtScore(value: number): string {
 export default function AutoAnalysisPanel({
   state,
   data,
+  topDown,
   error,
   sensitivity,
   sensitivities,
@@ -155,6 +160,7 @@ export default function AutoAnalysisPanel({
       {state === 'result' && data && (
         <AutoResult
           data={data}
+          topDown={topDown ?? null}
           pro={pro}
           activeCount={activeCount}
           onSelectCount={onSelectCount}
@@ -169,6 +175,7 @@ export default function AutoAnalysisPanel({
 
 function AutoResult({
   data,
+  topDown,
   pro,
   activeCount,
   onSelectCount,
@@ -177,6 +184,7 @@ function AutoResult({
   savePending,
 }: {
   data: AutoWaveAnalysisResponse
+  topDown: TopDownAnalysis | null
   pro: boolean
   activeCount: number
   onSelectCount: (index: number) => void
@@ -187,6 +195,7 @@ function AutoResult({
   if (data.rankings.length === 0) {
     return (
       <div className="state-card fade-up">
+        <TopDownBreadcrumb analysis={topDown} />
         <h4>No clear structure found</h4>
         <p>{data.marketSummary}</p>
       </div>
@@ -198,6 +207,8 @@ function AutoResult({
 
   return (
     <div className="auto-result fade-up">
+      <TopDownBreadcrumb analysis={topDown} />
+
       <div className="reflection-block">
         <span className="rb-label">Market read</span>
         <p>{data.marketSummary}</p>

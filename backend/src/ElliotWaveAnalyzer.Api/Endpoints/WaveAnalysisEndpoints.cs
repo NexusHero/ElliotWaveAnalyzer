@@ -52,6 +52,26 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
 
+        // ── GET /api/wave-analysis/topdown ────────────────────────────────────
+        // Deterministic multi-timeframe read: no LLM, so it uses the cheaper per-user
+        // throttle rather than the strict LLM policy.
+        group.MapGet("/wave-analysis/topdown", TopDownAnalyze)
+            .WithName("TopDownWaveAnalysis")
+            .WithSummary("Deterministic top-down, multi-timeframe Elliott Wave consistency")
+            .WithDescription("""
+                Analyzes a symbol across a weekly → daily → 4-hour ladder and returns a chain:
+                the best count for each timeframe, each constrained to live inside the wave
+                unfolding on the timeframe above it, plus a consistency verdict per link
+                (Consistent / Tension / Contradiction). Finer counts that contradict the
+                higher-timeframe direction are rejected; class or price-window mismatches are
+                penalized. Fully deterministic — no LLM call, no token usage. Timeframes an
+                instrument cannot serve (e.g. no intraday source for 4H) are omitted honestly.
+                """)
+            .Produces<TopDownAnalysis>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("ip-global");
+
         // ── GET /api/tokens ───────────────────────────────────────────────────
         group.MapGet("/tokens", GetTokenUsage)
             .WithName("GetTokenUsage")
@@ -143,6 +163,47 @@ public static class WaveAnalysisEndpoints
             return Results.Problem(
                 title: "Analysis unavailable",
                 detail: "The analysis service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> TopDownAnalyze(
+        string symbol,
+        decimal? threshold,
+        ITopDownAnalysisService topDownAnalysisService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!Application.SymbolInput.IsValidSymbol(symbol))
+        {
+            return Results.Problem(
+                title: "Invalid symbol",
+                detail: "Symbol must be a short ticker of letters, digits and . - ^ = / characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var thresholdPercent = Math.Clamp(threshold ?? 3m, 0.5m, 25m);
+
+        try
+        {
+            var result = await topDownAnalysisService.AnalyzeAsync(
+                symbol.ToUpperInvariant(), thresholdPercent, cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Top-down analysis failed for {Symbol}", symbol);
+            return Results.Problem(
+                title: "Analysis unavailable",
+                detail: "The market-data service is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }

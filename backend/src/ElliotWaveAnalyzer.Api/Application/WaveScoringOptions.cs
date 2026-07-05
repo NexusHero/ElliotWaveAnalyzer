@@ -39,6 +39,25 @@ public sealed record WaveScoringOptions
     public int MaxCandidates { get; init; } = 6;
 
     /// <summary>
+    /// Top-down: multiplier applied to a finer count whose structure class (motive vs. corrective)
+    /// disagrees with the parent wave. A soft penalty — direction contradictions are hard-rejected,
+    /// not weighted.
+    /// </summary>
+    public double TopDownClassMismatchPenalty { get; init; } = 0.6;
+
+    /// <summary>
+    /// Top-down: multiplier applied to a finer count whose price range spills outside the parent
+    /// wave's price window (beyond <see cref="TopDownWindowTolerance"/>).
+    /// </summary>
+    public double TopDownOutOfWindowPenalty { get; init; } = 0.75;
+
+    /// <summary>
+    /// Top-down: fraction of the parent window's height a finer count may spill beyond either bound
+    /// before it counts as out-of-window (absorbs pivot noise at the edges).
+    /// </summary>
+    public double TopDownWindowTolerance { get; init; } = 0.15;
+
+    /// <summary>
     /// Parse at most this many trailing pivots. More pivots = quadratically more intervals;
     /// beyond ~60 the finest scale should be coarsened instead of parsed harder.
     /// </summary>

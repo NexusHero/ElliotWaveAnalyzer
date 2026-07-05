@@ -6,6 +6,7 @@ import {
   getMarketData,
   listAnalyses,
   saveAnalysis,
+  topDownAnalysis,
   validateWaveCount,
 } from '../api/client'
 import {
@@ -18,11 +19,11 @@ import {
 } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
-import SymbolSearch from './SymbolSearch'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
 import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
+import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest } from './trackRecord'
 
@@ -138,6 +139,11 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const auto = useMutation({
     mutationFn: () => autoAnalyzeWaves({ symbol, thresholdPercent: sensitivity }),
   })
+  // Deterministic top-down (weekly → daily → 4H) consistency — no LLM, no API key needed. Runs
+  // alongside the auto analysis so the breadcrumb sits above the counts.
+  const topDown = useMutation({
+    mutationFn: () => topDownAnalysis(symbol, sensitivity),
+  })
 
   // ── Track record: save a ranked count, list saved ones with their outcome ──
   const queryClient = useQueryClient()
@@ -176,8 +182,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       setSensitivity(value)
       setActiveCount(0)
       auto.reset() // the shown result is for the old sensitivity
+      topDown.reset()
     },
-    [auto]
+    [auto, topDown]
   )
 
   const handleAutoAnalyze = useCallback(() => {
@@ -188,7 +195,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     setAutoNeedKey(false)
     setActiveCount(0)
     auto.mutate()
-  }, [auto, hasApiKey])
+    topDown.mutate() // deterministic, independent of the LLM call
+  }, [auto, hasApiKey, topDown])
 
   const autoState: AutoState = autoNeedKey
     ? 'needkey'
@@ -532,6 +540,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
           <AutoAnalysisPanel
             state={autoState}
             data={auto.data ?? null}
+            topDown={topDown.data ?? null}
             error={autoError}
             sensitivity={sensitivity}
             sensitivities={SENSITIVITIES}

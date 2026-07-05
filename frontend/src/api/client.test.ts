@@ -6,6 +6,7 @@ import {
   importDepot,
   login,
   searchSymbols,
+  topDownAnalysis,
   validateWaveCount,
 } from './client'
 import type { DepotSnapshot, WaveAnalysisResponse, WaveValidationRequest } from './types'
@@ -163,7 +164,9 @@ describe('importDepot', () => {
 
 describe('searchSymbols', () => {
   it('GETs the query and returns the resolved instruments', async () => {
-    const resolved = [{ symbol: 'RKLB', name: 'Rocket Lab USA, Inc.', assetClass: 'EQUITY', exchange: 'NASDAQ' }]
+    const resolved = [
+      { symbol: 'RKLB', name: 'Rocket Lab USA, Inc.', assetClass: 'EQUITY', exchange: 'NASDAQ' },
+    ]
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(resolved) })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -172,6 +175,46 @@ describe('searchSymbols', () => {
     expect(result).toEqual(resolved)
     const [url] = fetchMock.mock.calls[0]! as [string]
     expect(url).toBe('/api/symbols/search?q=rocket%20lab')
+  })
+})
+
+describe('topDownAnalysis', () => {
+  it('GETs the symbol (and threshold) and returns the parsed chain', async () => {
+    const chain = {
+      timeframes: [
+        {
+          interval: '1W',
+          degree: 'Primary',
+          bestCount: null,
+          imposedContext: null,
+          searchTruncated: false,
+        },
+      ],
+      links: [],
+      summary: '1W: no count',
+    }
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(chain) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await topDownAnalysis('AAPL', 3)
+
+    expect(result).toEqual(chain)
+    const [url] = fetchMock.mock.calls[0]! as [string]
+    expect(url).toContain('/api/wave-analysis/topdown?')
+    expect(url).toContain('symbol=AAPL')
+    expect(url).toContain('threshold=3')
+  })
+
+  it('throws the problem detail on a non-ok response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ detail: 'Invalid symbol' }),
+      })
+    )
+
+    await expect(topDownAnalysis('  bad  ')).rejects.toThrow('Invalid symbol')
   })
 })
 

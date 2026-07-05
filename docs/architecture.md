@@ -71,6 +71,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-020 | Persist the imported depot per user (upsert) + read it back | #111 · ADR-021 | Fulfilled |
 | REQ-021 | Resolve arbitrary instruments (ticker/name/ISIN) and analyze them on 1H/4H/1D/1W | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
 | REQ-022 | Log-correct Fibonacci math and scored confluence zones ("green boxes") attached to every projection; scale auto-selected and always reported | #117 · ADR-023 · §6 Scenario 10 | Fulfilled |
+| REQ-023 | Top-down multi-timeframe consistency: each finer count constrained to the wave unfolding on the timeframe above it (hard reject on wrong direction, soft penalty on class/window), with a per-link verdict | #118 · ADR-024 · §6 Scenario 11 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -592,6 +593,48 @@ sequenceDiagram
     Levels-->>Was: WaveLevels (levels + scored zones)
     Was->>Llm: prompt(count, levels)
     Llm-->>Was: ranking + explanation (no geometry)
+```
+
+---
+
+## Scenario 11 — Top-Down Multi-Timeframe Consistency (REQ-023) {#_runtime_scenario_11}
+
+A user runs the auto analysis; alongside it, the deterministic top-down read parses weekly → daily → 4H, constraining each finer count to the wave unfolding above it and reporting a verdict per link. No LLM participates.
+
+```mermaid
+sequenceDiagram
+    participant Browser as Browser (auto-analyze)
+    participant Api as GET /api/wave-analysis/topdown
+    participant Svc as TopDownAnalysisService
+    participant Tas as ITechnicalAnalysisService
+    participant Det as SwingPivotDetector
+    participant Top as TopDownWaveAnalyzer (pure)
+    participant Con as WaveContextConstraint (pure)
+
+    Browser->>Api: symbol=AAPL
+    loop each rung 1W, 1D, 4H
+        Api->>Svc: AnalyzeAsync(symbol)
+        Svc->>Tas: GetAnalysisAsync(symbol, interval)
+        alt timeframe unavailable
+            Tas-->>Svc: throws (no intraday / range)
+            Svc->>Svc: skip rung (honest degradation)
+        else served
+            Tas-->>Svc: candles
+            Svc->>Det: Detect(candles, threshold)
+            Det-->>Svc: pivots
+        end
+    end
+    Svc->>Top: Analyze(pivots per timeframe)
+    Top->>Top: parse coarsest → derive WaveContext
+    loop each finer timeframe
+        Top->>Con: Apply(parent context, finer candidates)
+        Con->>Con: reject wrong-direction · penalize class/window
+        Con-->>Top: ranked survivors + verdict + reason
+        Top->>Top: re-derive context from constrained best
+    end
+    Top-->>Svc: TopDownAnalysis (chain + link verdicts)
+    Svc-->>Api: TopDownAnalysis
+    Api-->>Browser: 200 → breadcrumb 1W → 1D → 4H
 ```
 
 ---
@@ -1128,6 +1171,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | Fib levels are correct on multi-multiple ranges (log), and the choice is visible rather than hidden; confluence turns "a band" into "a *ranked* band with a reason" |
 | (+) | All new logic is pure/static and unit-tested against hand-computed values — the LLM gains richer deterministic inputs to narrate without ever doing the arithmetic |
 | (-) | `AutoSelect`'s 3× threshold is a heuristic; a caller can still force a scale. The linear guideline bands and the log confluence zones coexist, so the UI shows two related-but-distinct level layers until a later phase consolidates them |
+
+---
+
+## ADR-024: Top-Down Multi-Timeframe Consistency by Constraining the Finer Parse (the LLM still never does geometry)
+
+**Context:** The defining habit of professional Elliott Wave analysts is that a lower-timeframe count *lives inside* a higher-timeframe one — a 4-day wave [2] means the 2-hour chart should be counting a corrective structure downward. The parser already handles multi-scale pivots within one series, but nothing related the daily and weekly reads of the same instrument, so they could silently contradict each other. Deciding whether a finer count fits inside a coarser wave is pure geometry (direction, structure family, price window), so it belongs on the deterministic side of the core invariant (ADR-009): the LLM never chooses or rejects a count.
+
+**Decision:**
+
+- **`WaveContext` (derived, pure):** from a coarse count's deterministic forward levels (`ProjectionService` → `WaveLevels`) we derive what the finer timeframe must therefore be counting — the unfolding wave's **direction** (toward its support/target zone, so correct for bull and bear alike), its **class** (a pullback wave with a support zone ⇒ corrective; a thrust wave with a target zone ⇒ motive; a completing ABC ⇒ corrective), its **price window** (bounded by the wave's start, its destination and its invalidation line) and the **parent degree**.
+- **Constraint (`WaveContextConstraint`, pure):** finer candidates that net the *wrong direction* are **hard-rejected** — they cannot be that wave's substructure. Survivors are re-scored with **soft** penalties for a class mismatch or a price range that spills outside the window (weights in `WaveScoringOptions`), then re-ranked. The per-link verdict is **Consistent** (direction + class + window all fit), **Tension** (direction fits, class or window doesn't) or **Contradiction** (nothing fits).
+- **Orchestration (`TopDownWaveAnalyzer`, pure):** parses the coarsest timeframe freely, derives its context, constrains the next finer parse, records the link verdict, re-derives context from the constrained best, and repeats down the ladder. Degrees step Primary → Intermediate → Minor. No I/O and no LLM, so identical pivots serialize to an identical chain.
+- **Service + API/UI:** `TopDownAnalysisService` fetches candles per rung of a fixed weekly→daily→4-hour ladder (reusing `ITechnicalAnalysisService`, so provider selection and resampling are not duplicated), detects pivots and calls the pure analyzer; a timeframe an instrument can't serve (e.g. no intraday source for 4H) is skipped honestly rather than failing the whole read. `GET /api/wave-analysis/topdown` exposes it (deterministic, so no token cost); the auto-analysis panel renders a compact `1W → 1D → 4H` breadcrumb with a verdict badge per link.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The reads across timeframes can no longer silently contradict; a finer count is only surfaced if it can actually be the substructure of the wave above it, with the disagreement (Tension/Contradiction) named and explained |
+| (+) | All of it is pure/static and unit-tested (context derivation, constraint, orchestration, determinism); the LLM gains a consistent multi-scale skeleton to narrate without ever selecting or rejecting a count |
+| (-) | The ladder is fixed at three rungs (weekly/daily/4H); automatic timeframe selection and deeper chains are out of scope. The parser returns complete structures, so "the unfolding wave" is the one `ProjectionService` projects *next* from the coarse count, not a partially-drawn wave |
 
 ---
 
