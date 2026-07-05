@@ -32,13 +32,14 @@ import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
-import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
+import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
 import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
+import { toWaveLinePoints } from './waveLine'
 
 /**
  * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
@@ -456,6 +457,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     return [...user, ...ai]
   }, [annotations, aiAnnotations])
 
+  // Connected wave-line polylines through the pivots (a count needs ≥2 pivots to draw a line).
+  const waveLines = useMemo<WaveLine[]>(() => {
+    const lines: WaveLine[] = []
+    if (annotations.length >= 2) {
+      lines.push({ kind: 'user', points: toWaveLinePoints(annotations) })
+    }
+    if (aiAnnotations.length >= 2) {
+      lines.push({ kind: 'ai', points: toWaveLinePoints(aiAnnotations) })
+    }
+    return lines
+  }, [annotations, aiAnnotations])
+
   const liveVerifyState: LiveVerifyState =
     annotations.length < 2
       ? 'idle'
@@ -577,6 +590,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               <PriceChart
                 candles={candles}
                 annotations={markers}
+                waveLines={waveLines}
                 priceLines={priceLines}
                 onPointClick={handlePointClick}
                 theme={theme}

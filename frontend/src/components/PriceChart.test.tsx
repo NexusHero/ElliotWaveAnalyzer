@@ -12,7 +12,10 @@ vi.mock('lightweight-charts', () => ({
       setData: vi.fn(),
       coordinateToPrice: vi.fn(() => 100),
       applyOptions: vi.fn(),
+      createPriceLine: vi.fn(() => ({})),
+      removePriceLine: vi.fn(),
     })),
+    removeSeries: vi.fn(),
     timeScale: vi.fn(() => ({ fitContent: vi.fn() })),
     subscribeClick: vi.fn(),
     unsubscribeClick: vi.fn(),
@@ -22,6 +25,8 @@ vi.mock('lightweight-charts', () => ({
   })),
   // v5: series type passed to addSeries, and markers are a separate primitive.
   CandlestickSeries: 'Candlestick',
+  LineSeries: 'Line',
+  LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
   createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
   ColorType: { Solid: 'solid' },
   CrosshairMode: { Normal: 'normal' },
@@ -50,5 +55,27 @@ describe('PriceChart', () => {
   it('accepts multiple candles without throwing', () => {
     const candles = Array.from({ length: 30 }, (_, i) => makeCandle(i))
     expect(() => render(<PriceChart candles={candles} />)).not.toThrow()
+  })
+
+  it('renders connected wave lines without throwing', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() =>
+      render(
+        <PriceChart
+          candles={candles}
+          waveLines={[
+            {
+              kind: 'user',
+              points: [
+                { time: '2024-01-01', value: 100 },
+                { time: '2024-01-05', value: 130 },
+                { time: '2024-01-08', value: 115 },
+              ],
+            },
+            { kind: 'ai', points: [{ time: '2024-01-01', value: 90 }] },
+          ]}
+        />
+      )
+    ).not.toThrow()
   })
 })
