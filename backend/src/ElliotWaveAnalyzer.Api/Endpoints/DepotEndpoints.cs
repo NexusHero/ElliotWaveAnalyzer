@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Domain.Depot;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -41,6 +42,19 @@ public static class DepotEndpoints
             .Produces<DepotSnapshot>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapGet("/analysis", GetAnalysisAsync)
+            .WithName("GetPortfolioReview")
+            .WithSummary("Review your imported depot — per-position Elliott Wave briefs + a summary")
+            .WithDescription("""
+                For each holding: the instrument resolved from its ISIN, the deterministic top-down
+                count chain, the scenario geometry (invalidation, entry and target zones), where current
+                price sits, and an optional fact-checked narrative (null when no LLM key is configured or
+                the text failed the fact-guard). Plus a portfolio summary (above/below invalidation, in
+                entry zone) and an explicit list of positions that couldn't be resolved. Empty review
+                when you have no imported depot.
+                """)
+            .Produces<PortfolioReview>(StatusCodes.Status200OK);
+
         return app;
     }
 
@@ -82,6 +96,13 @@ public static class DepotEndpoints
     {
         var snapshot = await store.GetLatestAsync(UserId(user), cancellationToken);
         return snapshot is null ? Results.NoContent() : Results.Ok(snapshot);
+    }
+
+    private static async Task<IResult> GetAnalysisAsync(
+        ClaimsPrincipal user, IPortfolioReviewService review, CancellationToken cancellationToken)
+    {
+        var result = await review.ReviewAsync(UserId(user), cancellationToken);
+        return Results.Ok(result);
     }
 
     private static Guid UserId(ClaimsPrincipal user)

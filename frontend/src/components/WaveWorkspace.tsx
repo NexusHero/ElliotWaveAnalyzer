@@ -5,6 +5,7 @@ import {
   deleteAnalysis,
   getBacktestSummary,
   getMarketData,
+  getPortfolioReview,
   listAnalyses,
   saveAnalysis,
   topDownAnalysis,
@@ -27,6 +28,7 @@ import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverl
 import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
 import SymbolSearch from './SymbolSearch'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
+import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest } from './trackRecord'
 
@@ -158,6 +160,16 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     queryKey: ['backtest-summary'],
     queryFn: ({ signal }) => getBacktestSummary(signal),
   })
+  const portfolioQuery = useQuery({
+    queryKey: ['portfolio-review'],
+    queryFn: ({ signal }) => getPortfolioReview(signal),
+    staleTime: 5 * 60_000,
+  })
+  const portfolioState: PortfolioReviewState = portfolioQuery.isLoading
+    ? 'loading'
+    : portfolioQuery.isError
+      ? 'error'
+      : 'result'
   const saveMutation = useMutation({
     mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
@@ -573,6 +585,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             error={trackRecordError}
             deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
             onDelete={handleDeleteAnalysis}
+          />
+
+          <PortfolioReviewPanel
+            state={portfolioState}
+            review={portfolioQuery.data ?? null}
+            error={portfolioQuery.error instanceof Error ? portfolioQuery.error.message : null}
           />
 
           <BacktestSummaryPanel summary={backtestQuery.data ?? null} />

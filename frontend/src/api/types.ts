@@ -444,6 +444,50 @@ export interface BacktestSummary {
   buckets: BacktestBucket[]
 }
 
+/** A per-position Elliott Wave brief (mirrors backend `PositionBrief`). */
+export interface PositionBrief {
+  isin: string
+  symbol: string
+  name: string
+  chainSummary: string
+  bullish: boolean
+  currentPrice: number | null
+  invalidation: PriceLevel | null
+  entryZone: PriceZone | null
+  targetZones: PriceZone[]
+  scale: FibScale
+  aboveInvalidation: boolean
+  inEntryZone: boolean
+  /** Fact-checked narrative, or null when unavailable. */
+  narrative: string | null
+  /** Why the narrative is absent (no key / failed fact-guard), or null when present. */
+  narrativeUnavailableReason: string | null
+}
+
+/** A depot position that could not be reviewed (mirrors backend `UnresolvedPosition`). */
+export interface UnresolvedPosition {
+  isin: string
+  name: string
+  reason: string
+}
+
+/** Portfolio-level aggregation (mirrors backend `PortfolioSummary`). */
+export interface PortfolioSummary {
+  positions: number
+  reviewed: number
+  aboveInvalidation: number
+  belowInvalidation: number
+  inEntryZone: number
+  unresolved: number
+}
+
+/** A full portfolio review (mirrors backend `PortfolioReview`). */
+export interface PortfolioReview {
+  briefs: PositionBrief[]
+  unresolved: UnresolvedPosition[]
+  summary: PortfolioSummary
+}
+
 /** One holding in an imported depot (mirrors backend `DepotPosition`). Monetary fields nullable. */
 export interface DepotPosition {
   isin: string

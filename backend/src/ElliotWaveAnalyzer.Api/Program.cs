@@ -23,6 +23,7 @@ try
     builder.Services.AddAppRateLimiting();
     builder.Services.AddReportingServices(builder.Configuration);
     builder.Services.AddDepotImport();
+    builder.Services.AddPortfolioReviewSchedule(builder.Configuration);
     builder.Services.AddAppTelemetry(builder.Configuration);
     builder.Services.AddProblemDetails(); // RFC 9457 for unhandled exceptions
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
