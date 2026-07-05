@@ -8,6 +8,7 @@ import {
   getPortfolioReview,
   listAnalyses,
   saveAnalysis,
+  scanSetups,
   topDownAnalysis,
   validateWaveCount,
   verifyChartImage,
@@ -16,6 +17,7 @@ import {
   type CandleIntervalCode,
   type MarketCandle,
   type RankedWaveCount,
+  type ScanFilters,
   type TrackAnalysisRequest,
   WAVE_LABELS,
   type WaveAnnotation,
@@ -29,6 +31,7 @@ import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverl
 import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
 import SymbolSearch from './SymbolSearch'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
+import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
@@ -181,6 +184,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     : verifyImageMutation.isError
       ? 'error'
       : verifyImageMutation.data
+        ? 'result'
+        : 'idle'
+  const scanMutation = useMutation({ mutationFn: (filters: ScanFilters) => scanSetups(filters) })
+  const scannerState: ScannerState = scanMutation.isPending
+    ? 'scanning'
+    : scanMutation.isError
+      ? 'error'
+      : scanMutation.data
         ? 'result'
         : 'idle'
   const saveMutation = useMutation({
@@ -598,6 +609,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             error={trackRecordError}
             deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
             onDelete={handleDeleteAnalysis}
+          />
+
+          <ScannerPanel
+            state={scannerState}
+            result={scanMutation.data ?? null}
+            error={scanMutation.error instanceof Error ? scanMutation.error.message : null}
+            onScan={(filters) => scanMutation.mutate(filters)}
           />
 
           <VerifyImagePanel
