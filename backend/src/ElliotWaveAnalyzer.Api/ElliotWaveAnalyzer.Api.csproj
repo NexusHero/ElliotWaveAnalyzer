@@ -28,8 +28,11 @@
     <!-- Direct pin: the transitive Microsoft.OpenApi 2.0.0 pulled in by
          Microsoft.AspNetCore.OpenApi has a known high-severity advisory
          (GHSA-v5pm-xwqc-g5wc), which fails restore under TreatWarningsAsErrors.
-         Remove once Microsoft.AspNetCore.OpenApi references a patched version. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="3.7.0" />
+         Held on the 2.x line: Microsoft.OpenApi 3.x makes IOpenApiMediaType.Example
+         read-only, which the Microsoft.AspNetCore.OpenApi 10.0.x XML-comment source
+         generator still assigns to (CS0200). Do not let Dependabot bump this to 3.x
+         until Microsoft.AspNetCore.OpenApi references a 3.x-compatible generator. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
 
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
