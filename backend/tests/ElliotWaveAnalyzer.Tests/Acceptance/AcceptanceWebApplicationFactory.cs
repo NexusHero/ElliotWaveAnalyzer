@@ -63,9 +63,16 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
             services.RemoveAll<IChatClient>();
             services.AddSingleton<IChatClient>(Chat);
 
-            // Swap the (caching-decorated CoinGecko) market data for a deterministic fake.
+            // Swap the (caching-decorated CoinGecko/Yahoo) market data for deterministic fakes —
+            // daily, intraday (1H/4H) and symbol resolution — so no external HTTP is made.
             services.RemoveAll<IMarketDataProvider>();
             services.AddSingleton<IMarketDataProvider, FakeMarketDataProvider>();
+
+            services.RemoveAll<IIntradayMarketDataProvider>();
+            services.AddSingleton<IIntradayMarketDataProvider, FakeIntradayMarketDataProvider>();
+
+            services.RemoveAll<ISymbolResolver>();
+            services.AddSingleton<ISymbolResolver, FakeSymbolResolver>();
 
             // Point AppDbContext at the container's PostgreSQL. Remove every EF registration
             // tied to AppDbContext first so the production Npgsql config is fully replaced.

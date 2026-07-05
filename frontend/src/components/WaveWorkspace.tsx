@@ -9,6 +9,7 @@ import {
   validateWaveCount,
 } from '../api/client'
 import {
+  type CandleIntervalCode,
   type MarketCandle,
   type RankedWaveCount,
   WAVE_LABELS,
@@ -17,6 +18,7 @@ import {
 } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
+import SymbolSearch from './SymbolSearch'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
@@ -30,7 +32,6 @@ import { toTrackAnalysisRequest } from './trackRecord'
  * may be unavailable). Default to a Yahoo symbol so the workspace works out of the box.
  */
 const SYMBOLS = ['SP500', 'NASDAQ', 'BTC', 'ETH'] as const
-type TickerSymbol = (typeof SYMBOLS)[number]
 
 const IMPULSE: string[] = ['1', '2', '3', '4', '5']
 
@@ -49,11 +50,16 @@ type Range = (typeof RANGES)[number]
 const SENSITIVITIES = [1.5, 2, 2.5, 3, 4] as const
 const DEFAULT_SENSITIVITY = 2.5
 
-/** Candle timeframe options. 4H needs an intraday data source and is a tracked follow-up. */
+/**
+ * Candle timeframe options. 1H/4H come from the intraday (hourly) source and work for
+ * intraday-capable instruments; when a source can't serve them the chart shows an error state.
+ */
 const TIMEFRAMES = [
+  { label: '1H', code: '1h' },
+  { label: '4H', code: '4h' },
   { label: 'Daily', code: '1d' },
   { label: 'Weekly', code: '1w' },
-] as const
+] as const satisfies readonly { label: string; code: CandleIntervalCode }[]
 type Timeframe = (typeof TIMEFRAMES)[number]
 
 interface WaveWorkspaceProps {
@@ -106,9 +112,10 @@ function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
  * their own count or ask the AI to count for them.
  */
 export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: WaveWorkspaceProps) {
-  const [symbol, setSymbol] = useState<TickerSymbol>('SP500')
+  const [symbol, setSymbol] = useState<string>('SP500')
   const [range, setRange] = useState<Range>(RANGES[2])
-  const [timeframe, setTimeframe] = useState<Timeframe>(TIMEFRAMES[0])
+  // Default to Daily (index 2) — it works for every instrument; 1H/4H need intraday data.
+  const [timeframe, setTimeframe] = useState<Timeframe>(TIMEFRAMES[2])
   const marketQuery = useQuery({
     queryKey: ['market-data', symbol, range.days, timeframe.code],
     queryFn: ({ signal }) => getMarketData(symbol, range.days, timeframe.code, signal),
@@ -295,7 +302,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   )
 
   const handleSymbol = useCallback(
-    (next: TickerSymbol) => {
+    (next: string) => {
       setSymbol(next)
       setAnnotations([])
       setAutoNeedKey(false)
@@ -358,18 +365,23 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
         <div className="chart-col">
           <div className="chart-head">
             <div className="symbol">
-              <select
-                className="sym-select mono"
-                aria-label="Symbol"
-                value={symbol}
-                onChange={(e) => handleSymbol(e.target.value as TickerSymbol)}
-              >
+              <div className="sym-current mono" aria-label="Selected symbol">
+                {symbol}
+              </div>
+              <SymbolSearch value={symbol} onSelect={handleSymbol} />
+              <div className="sym-quick" role="group" aria-label="Quick symbols">
                 {SYMBOLS.map((s) => (
-                  <option key={s} value={s}>
-                    {s} / USD
-                  </option>
+                  <button
+                    key={s}
+                    type="button"
+                    className={symbol === s ? 'on' : ''}
+                    aria-pressed={symbol === s}
+                    onClick={() => handleSymbol(s)}
+                  >
+                    {s}
+                  </button>
                 ))}
-              </select>
+              </div>
               <span className="sym-sub mono">
                 {marketQuery.isError
                   ? 'Live data unavailable'

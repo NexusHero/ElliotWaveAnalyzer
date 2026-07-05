@@ -1,3 +1,4 @@
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -22,11 +23,12 @@ public static class MarketDataEndpoints
             .WithName("GetMarketData")
             .WithSummary("Returns OHLCV candles + MACD + RSI for the requested symbol")
             .WithDescription("""
-                Supported symbols: BTC, ETH (CoinGecko free tier);
-                NASDAQ, SP500 (Yahoo Finance).
-                Optional 'interval' selects the timeframe: '1d' (daily, default) or '1w'
-                (weekly, resampled from the daily candles). Indicators are computed on the
-                selected timeframe.
+                Symbol is any data-source ticker (resolve one via /api/symbols/search): BTC, ETH
+                (CoinGecko); any equity/ETF/index/metal ticker (Yahoo, e.g. RKLB, ^IXIC, SI=F).
+                Optional 'interval' selects the timeframe: '1d' (daily, default), '1w' (weekly,
+                resampled from daily), '4h' or '1h' (from hourly candles — intraday-capable
+                instruments only; a request past the source's hourly lookback returns 400 with the
+                supported range). Indicators are computed on the selected timeframe.
                 """)
             .Produces<TechnicalAnalysisResult>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -47,6 +49,14 @@ public static class MarketDataEndpoints
         string interval = "1d",
         CancellationToken cancellationToken = default)
     {
+        if (!SymbolInput.IsValidSymbol(symbol))
+        {
+            return Results.Problem(
+                title: "Invalid symbol",
+                detail: "symbol must be a short ticker (letters, digits and . - ^ = / only).",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         if (days is < 1 or > 365)
         {
             return Results.Problem(
@@ -59,7 +69,7 @@ public static class MarketDataEndpoints
         {
             return Results.Problem(
                 title: "Invalid interval",
-                detail: "interval must be '1d' (daily) or '1w' (weekly).",
+                detail: "interval must be '1h', '4h', '1d' (daily) or '1w' (weekly).",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
@@ -69,6 +79,14 @@ public static class MarketDataEndpoints
                 symbol.ToUpperInvariant(), days, candleInterval, cancellationToken);
 
             return Results.Ok(result);
+        }
+        catch (MarketDataRangeException ex)
+        {
+            // Honest degradation: tell the caller the supported range instead of truncating.
+            return Results.Problem(
+                title: "Range exceeds intraday history",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
         }
         catch (ArgumentException ex)
         {
@@ -95,6 +113,14 @@ public static class MarketDataEndpoints
     {
         switch (interval.ToLowerInvariant())
         {
+            case "1h":
+            case "60m":
+                candleInterval = CandleInterval.OneHour;
+                return true;
+            case "4h":
+            case "240m":
+                candleInterval = CandleInterval.FourHours;
+                return true;
             case "1d":
                 candleInterval = CandleInterval.OneDay;
                 return true;

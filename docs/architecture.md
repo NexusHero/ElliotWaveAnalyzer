@@ -59,7 +59,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-008 | LLM-confidence calibration against recorded track-record outcomes | #91 · §6 Scenario 7 | Fulfilled |
 | REQ-009 | SOLID, TDD and documented+tested API endpoints as enforced Quality Gates | #85 · ADR-011 | Fulfilled |
 | REQ-010 | Timeframe selector (Daily/Weekly via resampling; 4H needs an intraday source) | #93 · ADR-013 | Fulfilled |
-| REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #94 (planned) | Proposed |
+| REQ-011 | 4-hour timeframe via an intraday-capable market-data provider | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
 | REQ-012 | Per-user encrypted API-key vault (replace the localStorage facade) | #96 · ADR-014 | Fulfilled |
 | REQ-013 | Consume the per-user stored key in the LLM pipeline (per-user provider) | #97 (planned) | Proposed |
 | REQ-014 | Genuinely reach ≥90% line coverage and make the CI coverage gate blocking (with a documented exclusion policy) | #99 (PR #100) · ADR-015 | Fulfilled |
@@ -69,6 +69,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-018 | Scalable Capital depot import from the transactions CSV (second `IDepotImporter`) | #107 · ADR-019 | Fulfilled |
 | REQ-019 | One top-level type per file, enforced by an architecture test | #109 · ADR-020 | Fulfilled |
 | REQ-020 | Persist the imported depot per user (upsert) + read it back | #111 · ADR-021 | Fulfilled |
+| REQ-021 | Resolve arbitrary instruments (ticker/name/ISIN) and analyze them on 1H/4H/1D/1W | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -521,6 +522,43 @@ sequenceDiagram
     Imp-->>Svc: DepotImportResult.Ok(DepotSnapshot)
     Svc-->>API: result
     API-->>Browser: 200 DepotSnapshot (holdings + totals)
+```
+
+---
+
+## Scenario 9 — Resolve a Symbol, Analyze on 4H (REQ-011, REQ-021) {#_runtime_scenario_9}
+
+A user searches an instrument (ticker/name/ISIN), then charts it on 4H. Resolution is cached; 4H
+is resampled from hourly candles; a request past the source's hourly window fails honestly.
+
+```mermaid
+sequenceDiagram
+    participant Browser as Browser (SymbolSearch)
+    participant SymApi as GET /api/symbols/search
+    participant Res as ISymbolResolver (cached → Yahoo)
+    participant MdApi as GET /api/market-data/{symbol}?interval=4h
+    participant Tas as TechnicalAnalysisService
+    participant Intr as IIntradayMarketDataProvider (Yahoo 60m, cached)
+    participant Rs as CandleResampler
+
+    Browser->>SymApi: q = "rocket lab"
+    SymApi->>Res: SearchAsync(q)
+    Res-->>SymApi: [ResolvedSymbol(RKLB, …)]
+    SymApi-->>Browser: 200 instruments (best first)
+    Browser->>MdApi: symbol=RKLB, interval=4h
+    MdApi->>Tas: GetAnalysisAsync(RKLB, 4H)
+    Tas->>Intr: GetHourlyCandlesAsync(RKLB, days)
+    alt days beyond ~730
+        Intr-->>Tas: throw MarketDataRangeException
+        Tas-->>MdApi: (propagated)
+        MdApi-->>Browser: 400 with supported range
+    else within window
+        Intr-->>Tas: hourly candles
+        Tas->>Rs: Resample(hourly, FourHours)
+        Rs-->>Tas: 4H candles
+        Tas-->>MdApi: TechnicalAnalysisResult (candles + RSI + MACD)
+        MdApi-->>Browser: 200 result
+    end
 ```
 
 ---
@@ -1014,6 +1052,28 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | Upsert keeps it simple — always exactly the latest depot, no history to prune, no stale duplicates |
 | (-) | No import history is kept (only the latest); a time series of snapshots would be a larger, separate feature |
 | (-) | Stored market values are as-of the import (no live revaluation) — the price-enrichment follow-up (ADR-019) would refresh them |
+
+---
+
+## ADR-022: Symbol Resolution and Intraday Candles via Yahoo Finance (arbitrary instruments, 1H/4H)
+
+**Context:** Professional Elliott Wave analysis happens on 1H–4H charts of arbitrary instruments, but the app only served daily+ candles for a hardcoded five-symbol allow-list, and depot positions (ISINs) could not be analyzed at all. This is the prerequisite for every later phase of the professional-analysis mission (issue #116, unblocks #117–#123).
+
+**Decision:**
+
+- **Resolution:** `ISymbolResolver` turns a ticker, company name or **ISIN** into instruments. Implemented over Yahoo's search endpoint (`/v1/finance/search`), which already resolves ISINs to tickers — so no separate ISIN registry is needed for now (OpenFIGI remains a documented upgrade path if ISIN coverage proves insufficient). Results are cached 12h (`CachingSymbolResolver`, Decorator/OCP) since instrument metadata is static.
+- **Intraday:** a new capability interface `IIntradayMarketDataProvider` (ISP — a daily-only source doesn't implement it) serves **hourly** candles; **4H** is resampled from hourly into UTC-aligned buckets by the existing `CandleResampler`. The Yahoo provider implements it (`interval=60m`), cached like the daily path. Yahoo's hourly history reaches ~730 days; a request past that raises `MarketDataRangeException` (surfaced as 400 with the supported range) rather than silently truncating — honest degradation.
+- **Universe:** the Yahoo daily provider becomes the **catch-all** (registered last; earlier providers like CoinGecko claim their symbols first) and passes unmapped tickers straight through, so any resolved instrument charts. The symbol allow-list in `AnalysisRequestValidator` is replaced by an abuse guard only (`SymbolInput`: length cap + ticker character whitelist); existence is checked when data is fetched. `TechnicalAnalysisService` routes 1H/4H to the intraday provider, daily/weekly to the daily provider, and fails explicitly (no silent timeframe fallback) when no source can serve the requested timeframe.
+- **API/UI:** `GET /api/symbols/search` (documented, consumed by the new `SymbolSearch` frontend component); the timeframe selector gains 1H/4H.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Any resolvable stock/ETF/index/metal charts and auto-analyzes on 1H/4H/1D/1W; depot ISINs become analyzable (enables Phase 7) |
+| (+) | One free source (Yahoo) covers search + daily + hourly; ISP keeps daily-only sources honest; abuse guard replaces the allow-list without opening an injection surface |
+| (-) | **Crypto intraday** (BTC/ETH 1H/4H) needs CoinGecko intraday and is deferred — a documented follow-up; crypto still works on daily/weekly |
+| (-) | Hourly depth is bounded by Yahoo's ~2-year window (a paid feed removes this); per-instrument intraday availability isn't probed up-front, so an unsupported 1H/4H request surfaces as the chart's error state rather than a pre-disabled button |
 
 ---
 

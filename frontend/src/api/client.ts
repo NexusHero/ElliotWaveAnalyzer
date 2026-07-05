@@ -3,6 +3,7 @@ import type {
   AutoWaveAnalysisResponse,
   CandleIntervalCode,
   DepotSnapshot,
+  ResolvedSymbol,
   SavedAnalysisResponse,
   SavedApiKey,
   TechnicalAnalysisResult,
@@ -79,6 +80,20 @@ export async function getMarketData(
   }
 
   return (await response.json()) as TechnicalAnalysisResult
+}
+
+/**
+ * Resolves a ticker, company name or ISIN to tradable instruments via
+ * `GET /api/symbols/search?q=`. Best match first; empty when nothing matches.
+ */
+export async function searchSymbols(query: string, signal?: AbortSignal): Promise<ResolvedSymbol[]> {
+  const response = await fetch(`/api/symbols/search?q=${encodeURIComponent(query)}`, { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as ResolvedSymbol[]
 }
 
 /** Saves an analysis to the track record via `POST /api/analyses`. */

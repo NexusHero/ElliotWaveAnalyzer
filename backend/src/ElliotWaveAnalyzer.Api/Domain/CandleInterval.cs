@@ -1,10 +1,12 @@
 namespace ElliotWaveAnalyzer.Api.Domain;
 
 /// <summary>
-/// The candle timeframe an analysis is presented at. Both values are produced by resampling the
-/// daily candles the providers fetch (see <see cref="Application.CandleResampler"/>), so no
-/// intraday data source is required. A 4-hour timeframe needs an intraday-capable provider and
-/// is a separate concern — deliberately not modelled here yet.
+/// The candle timeframe an analysis is presented at. Daily and weekly derive from the providers'
+/// daily candles (weekly by resampling, see <see cref="Application.CandleResampler"/>). One-hour
+/// comes from an intraday-capable provider (<see cref="Interfaces.IIntradayMarketDataProvider"/>)
+/// and four-hour is resampled from those hourly bars. Intraday availability and lookback depth
+/// depend on the data source and are reported honestly when exceeded
+/// (<see cref="MarketDataRangeException"/>) — never silently substituted.
 /// </summary>
 public enum CandleInterval
 {
@@ -13,4 +15,10 @@ public enum CandleInterval
 
     /// <summary>Weekly candles, aggregated from the daily series by ISO week.</summary>
     OneWeek,
+
+    /// <summary>Hourly candles from an intraday-capable provider.</summary>
+    OneHour,
+
+    /// <summary>Four-hour candles, aggregated from hourly bars into UTC-aligned buckets.</summary>
+    FourHours,
 }

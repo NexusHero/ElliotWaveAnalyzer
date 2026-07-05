@@ -5,6 +5,7 @@ import {
   getSavedDepot,
   importDepot,
   login,
+  searchSymbols,
   validateWaveCount,
 } from './client'
 import type { DepotSnapshot, WaveAnalysisResponse, WaveValidationRequest } from './types'
@@ -157,6 +158,20 @@ describe('importDepot', () => {
 
     const file = new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' })
     await expect(importDepot(file)).rejects.toThrow('Smartbroker+')
+  })
+})
+
+describe('searchSymbols', () => {
+  it('GETs the query and returns the resolved instruments', async () => {
+    const resolved = [{ symbol: 'RKLB', name: 'Rocket Lab USA, Inc.', assetClass: 'EQUITY', exchange: 'NASDAQ' }]
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(resolved) })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchSymbols('rocket lab')
+
+    expect(result).toEqual(resolved)
+    const [url] = fetchMock.mock.calls[0]! as [string]
+    expect(url).toBe('/api/symbols/search?q=rocket%20lab')
   })
 })
 
