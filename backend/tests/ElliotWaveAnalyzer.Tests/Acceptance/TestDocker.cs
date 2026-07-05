@@ -1,24 +1,40 @@
 namespace ElliotWaveAnalyzer.Tests.Acceptance;
 
 /// <summary>
-/// Detects whether a Docker daemon is reachable so container-backed tests can skip cleanly
-/// on machines without Docker (keeping local runs green) while still executing in CI, where
-/// a Docker socket is present.
+/// Gates database-backed tests. Most run through <see cref="AcceptanceWebApplicationFactory"/>,
+/// which uses Testcontainers by default but can target an existing PostgreSQL via the
+/// <c>ACCEPTANCE_PG_CONNSTRING</c> env var — so those tests run whenever <em>either</em> Docker or
+/// an external database is available (<see cref="SkipIfUnavailable"/>). A few tests spin up their
+/// own container directly and therefore need Docker specifically (<see cref="SkipUnlessDockerAvailable"/>).
 /// </summary>
 internal static class TestDocker
 {
-    public static readonly bool IsAvailable = Detect();
+    /// <summary>True when Docker is reachable.</summary>
+    public static readonly bool DockerAvailable = DetectDocker();
 
-    /// <summary>Marks the current test inconclusive/ignored when Docker is unavailable.</summary>
+    /// <summary>True when a database is reachable — Docker or an explicit connection string.</summary>
+    public static readonly bool IsAvailable = DockerAvailable
+        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ACCEPTANCE_PG_CONNSTRING"));
+
+    /// <summary>Skips when no database (Docker or external Postgres) is reachable.</summary>
     public static void SkipIfUnavailable()
     {
         if (!IsAvailable)
+        {
+            Assert.Ignore("No database available (need Docker or ACCEPTANCE_PG_CONNSTRING); skipping.");
+        }
+    }
+
+    /// <summary>Skips when Docker specifically is unavailable (for tests that start their own container).</summary>
+    public static void SkipUnlessDockerAvailable()
+    {
+        if (!DockerAvailable)
         {
             Assert.Ignore("Docker is not available; skipping container-backed test.");
         }
     }
 
-    private static bool Detect()
+    private static bool DetectDocker()
     {
         if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_HOST")))
         {

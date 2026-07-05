@@ -48,9 +48,10 @@ internal sealed class TrackRecordService(
         };
 
         // Scenario tree: the primary is the flat request, alternates (capped at two) are the backups.
+        // Alternates may be null when the JSON omits it (source-gen skips the property initializer).
         snapshot.Scenarios.Add(PrimaryRow(snapshot.Id, request));
         var index = 1;
-        foreach (var alternate in request.Alternates.Take(MaxAlternates))
+        foreach (var alternate in (request.Alternates ?? []).Take(MaxAlternates))
         {
             snapshot.Scenarios.Add(AlternateRow(snapshot.Id, index, alternate));
             index++;

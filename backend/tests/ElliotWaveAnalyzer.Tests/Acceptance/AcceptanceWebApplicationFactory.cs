@@ -29,10 +29,20 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
     public const string TestEmail = "tester@example.com";
     public const string TestPassword = "Str0ng!Passw0rd";
 
-    // Throwaway PostgreSQL instance per factory instance — full isolation between fixtures.
-    private readonly PostgreSqlContainer _db = new PostgreSqlBuilder()
-        .WithImage("postgres:17-alpine")
-        .Build();
+    // An explicit connection string (env ACCEPTANCE_PG_CONNSTRING) targets an existing PostgreSQL —
+    // a fresh schema per factory (a random search_path) keeps fixtures isolated. Otherwise a
+    // throwaway Testcontainers instance is used, giving full isolation on machines with Docker.
+    private static readonly string? ExternalConnectionString =
+        Environment.GetEnvironmentVariable("ACCEPTANCE_PG_CONNSTRING");
+
+    private readonly PostgreSqlContainer? _db = ExternalConnectionString is null
+        ? new PostgreSqlBuilder().WithImage("postgres:17-alpine").Build()
+        : null;
+
+    private readonly string _schema = "acc_" + Guid.NewGuid().ToString("N");
+
+    private string ConnectionString => _db?.GetConnectionString()
+        ?? $"{ExternalConnectionString};Search Path={_schema}";
 
     /// <summary>The faked LLM. Tests can tweak its canned response before calling the API.</summary>
     public FakeChatClient Chat { get; } = new();
@@ -40,16 +50,28 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
     /// <summary>Starts the PostgreSQL container and applies EF migrations against it.</summary>
     public async Task InitializeAsync()
     {
-        await _db.StartAsync();
+        if (_db is not null)
+        {
+            await _db.StartAsync();
+        }
 
         using var scope = Services.CreateScope();
         var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (_db is null)
+        {
+            await ctx.Database.ExecuteSqlRawAsync($"CREATE SCHEMA IF NOT EXISTS \"{_schema}\";");
+        }
+
         await ctx.Database.MigrateAsync();
     }
 
     public override async ValueTask DisposeAsync()
     {
-        await _db.DisposeAsync();
+        if (_db is not null)
+        {
+            await _db.DisposeAsync();
+        }
+
         await base.DisposeAsync();
     }
 
@@ -87,7 +109,7 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<AppDbContext>(options => options.UseNpgsql(_db.GetConnectionString()));
+            services.AddDbContext<AppDbContext>(options => options.UseNpgsql(ConnectionString));
         });
     }
 
