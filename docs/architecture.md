@@ -72,6 +72,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-021 | Resolve arbitrary instruments (ticker/name/ISIN) and analyze them on 1H/4H/1D/1W | #116 · ADR-022 · §6 Scenario 9 | Fulfilled |
 | REQ-022 | Log-correct Fibonacci math and scored confluence zones ("green boxes") attached to every projection; scale auto-selected and always reported | #117 · ADR-023 · §6 Scenario 10 | Fulfilled |
 | REQ-023 | Top-down multi-timeframe consistency: each finer count constrained to the wave unfolding on the timeframe above it (hard reject on wrong direction, soft penalty on class/window), with a per-link verdict | #118 · ADR-024 · §6 Scenario 11 | Fulfilled |
+| REQ-024 | Scenario tree per saved analysis (primary + alternates) with calibrated probabilities (or an insufficient-data marker), zone-entry alerts, and auto-switch to the best alternate on invalidation with an append-only switch history | #119 · ADR-025 · §6 Scenario 12 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -639,6 +640,40 @@ sequenceDiagram
 
 ---
 
+## Scenario 12 — Scenario Tree Auto-Switch on Invalidation (REQ-024) {#_runtime_scenario_12}
+
+A saved analysis's primary invalidation breaks during the scheduled alert pass. The system delivers the invalidation alert, promotes the best alternate, records the switch, and re-opens the analysis under the new primary. All decisions are deterministic (no LLM).
+
+```mermaid
+sequenceDiagram
+    participant Cron as AlertBackgroundService
+    participant Svc as AlertService
+    participant Eval as AnalysisOutcomeEvaluator (pure)
+    participant Sw as ScenarioSwitch (pure)
+    participant Ch as IReportDeliveryChannel
+    participant Db as AppDbContext
+
+    Cron->>Svc: RunAsync()
+    Svc->>Db: load pending snapshots (Include Scenarios, SwitchEvents)
+    loop each snapshot
+        Svc->>Eval: Evaluate(flat primary fields, candles since save)
+        Eval-->>Svc: Invalidated
+        Svc->>Ch: deliver "⚠️ invalidated"
+        Svc->>Sw: SelectPromotion(alternates)
+        alt an alternate survives
+            Sw-->>Svc: best alternate
+            Svc->>Svc: retire old primary · promote alternate · sync flat fields
+            Svc->>Svc: append switch event · re-open as Pending
+        else none
+            Sw-->>Svc: null
+            Svc->>Svc: AlertedOutcome = Invalidated (concluded)
+        end
+    end
+    Svc->>Db: SaveChanges (tree + history persisted)
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1192,6 +1227,27 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The reads across timeframes can no longer silently contradict; a finer count is only surfaced if it can actually be the substructure of the wave above it, with the disagreement (Tension/Contradiction) named and explained |
 | (+) | All of it is pure/static and unit-tested (context derivation, constraint, orchestration, determinism); the LLM gains a consistent multi-scale skeleton to narrate without ever selecting or rejecting a count |
 | (-) | The ladder is fixed at three rungs (weekly/daily/4H); automatic timeframe selection and deeper chains are out of scope. The parser returns complete structures, so "the unfolding wave" is the one `ProjectionService` projects *next* from the coarse count, not a partially-drawn wave |
+
+---
+
+## ADR-025: Scenario Tree with Calibrated Probabilities, Zone-Entry Alerts and Invalidation Auto-Switch
+
+**Context:** Professionals never publish one count — they publish a **primary plus alternates**, each with zones and a hard invalidation, and they *switch* when the invalidation breaks. Our saved analysis held a single flattened count; alerts fired on invalidation/target but nothing happened to the analysis afterwards, and `AlternativeScenario` was a two-string stub. We needed a persisted tree, honest probabilities, an entry-zone alert, and an auto-switch — all deterministic (no LLM decides which count wins).
+
+**Decision:**
+
+- **Model.** A saved analysis carries a scenario tree: a `Scenario` for the primary plus up to two alternates, each with direction, entry/target zone bounds, a hard invalidation, and a probability. Persisted as a child `AnalysisScenarioRow` collection (FK + cascade, mirroring `SavedDepot`→`SavedDepotPosition`) alongside an append-only `AnalysisSwitchEventRow` audit trail; the snapshot gains the primary's entry-zone bounds and an `EntryZoneAlerted` idempotency flag. Migration `AddScenarioTree`.
+- **Probability from measured calibration.** Not stored — computed on read. `ScenarioProbability.From` maps a confidence `CalibrationBucket` (the user's own concluded analyses, by confidence) to a probability **only** when the bucket has ≥ 10 concluded analyses (`ProbabilityBasis.Calibrated`, probability = the bucket's hit-rate = target-reached ÷ concluded); below that it returns `InsufficientData` with no number. So the figure always reflects the latest outcomes and is never invented.
+- **Zone-entry alert.** A new alert, decided by the pure `ZoneEntryDecision.ShouldAlert` (any candle's range overlaps the entry band, wick-aware), fired at most once per analysis via `EntryZoneAlerted` — the same fire-once idempotency model as the outcome alert.
+- **Auto-switch.** When the alert pass sees the primary invalidated it delivers the invalidation alert and then runs `ScenarioSwitch.SelectPromotion` (highest-scored surviving alternate). If one exists it is promoted to primary, the old primary is **retired** (kept in the tree for history), a switch event is appended, the flat snapshot fields are synced to the promoted scenario, and the analysis re-opens as `Pending` so the new primary is tracked afresh. If no alternate remains, the analysis concludes `Invalidated` (existing semantics). All three decisions are pure and unit-tested; `AlertService` only orchestrates and persists.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | A saved call is now a living tree: it enters a zone with an alert, and on invalidation it self-promotes the best alternate and records why — the audit trail is never overwritten |
+| (+) | Probabilities are honest (measured, or explicitly withheld) and the switch/zone/probability logic is pure and fully unit-tested; the full lifecycle is covered by a PostgreSQL acceptance test |
+| (-) | Capped at two alternates and one entry zone per analysis (issue scope); position sizing/order suggestions are out of scope. The promoted primary re-evaluates from the original save time, not the switch instant — acceptable now, revisitable if double-fires appear |
 
 ---
 

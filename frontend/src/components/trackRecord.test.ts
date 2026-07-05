@@ -34,11 +34,43 @@ describe('toTrackAnalysisRequest', () => {
       bullish: true,
       invalidationPrice: 30000,
       invalidationAbove: false,
+      entryLow: null,
+      entryHigh: null,
       targetLow: 60000,
       targetHigh: 65000,
       confidence: 'high',
       score: 0.82,
+      alternates: [],
     })
+  })
+
+  it('carries the entry confluence zone and up to two alternates', () => {
+    const withEntry: RankedWaveCount = {
+      ...baseCount,
+      levels: {
+        ...baseCount.levels!,
+        confluenceZones: [
+          {
+            low: 34000,
+            high: 36000,
+            score: 3,
+            kind: 'Entry',
+            scale: 'Linear',
+            contributions: [{ price: 35000, weight: 3, basis: '61.8% retracement' }],
+          },
+        ],
+      },
+    }
+    const alt1: RankedWaveCount = { ...baseCount, structure: 'Diagonal', isBest: false }
+    const alt2: RankedWaveCount = { ...baseCount, structure: 'Zigzag', isBest: false }
+    const alt3: RankedWaveCount = { ...baseCount, structure: 'Flat', isBest: false }
+
+    const req = toTrackAnalysisRequest('BTC', withEntry, [alt1, alt2, alt3])
+
+    expect(req.entryLow).toBe(34000)
+    expect(req.entryHigh).toBe(36000)
+    expect(req.alternates).toHaveLength(2) // capped at two
+    expect(req.alternates?.map((a) => a.structure)).toEqual(['Diagonal', 'Zigzag'])
   })
 
   it('sets invalidationAbove from the level side', () => {

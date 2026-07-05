@@ -29,12 +29,27 @@ internal sealed class AnalysisSnapshot
     public decimal? TargetLow { get; set; }
     public decimal? TargetHigh { get; set; }
 
+    /// <summary>Entry (pullback) zone of the current primary — the band that fires a zone-entry alert.</summary>
+    public decimal? EntryLow { get; set; }
+    public decimal? EntryHigh { get; set; }
+
     public string Confidence { get; set; } = string.Empty;
     public decimal? Score { get; set; }
 
     /// <summary>
     /// The outcome this analysis was last alerted on. Starts at <see cref="AnalysisOutcome.Pending"/>;
     /// advanced to a terminal outcome once an alert has fired, so a transition alerts exactly once.
+    /// The auto-switch resets it to Pending when it promotes an alternate, so the new primary is
+    /// evaluated afresh.
     /// </summary>
     public AnalysisOutcome AlertedOutcome { get; set; } = AnalysisOutcome.Pending;
+
+    /// <summary>True once a "price entered the entry zone" alert has fired — idempotency, no re-fire.</summary>
+    public bool EntryZoneAlerted { get; set; }
+
+    /// <summary>The scenario tree: the primary in force plus its alternates and any retired former primaries.</summary>
+    public List<AnalysisScenarioRow> Scenarios { get; set; } = [];
+
+    /// <summary>Append-only auto-switch audit trail.</summary>
+    public List<AnalysisSwitchEventRow> SwitchEvents { get; set; } = [];
 }

@@ -13,6 +13,7 @@ import {
   type CandleIntervalCode,
   type MarketCandle,
   type RankedWaveCount,
+  type TrackAnalysisRequest,
   WAVE_LABELS,
   type WaveAnnotation,
   type WaveLevels,
@@ -152,7 +153,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     queryFn: ({ signal }) => listAnalyses(signal),
   })
   const saveMutation = useMutation({
-    mutationFn: (count: RankedWaveCount) => saveAnalysis(toTrackAnalysisRequest(symbol, count)),
+    mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
   })
   const deleteMutation = useMutation({
@@ -161,8 +162,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   })
 
   const handleSaveCount = useCallback(
-    (count: RankedWaveCount) => saveMutation.mutate(count),
-    [saveMutation]
+    (count: RankedWaveCount) => {
+      // Carry the other ranked counts (up to two) as alternates so the saved analysis is a full
+      // scenario tree the backend can auto-switch through.
+      const alternates = (auto.data?.rankings ?? []).filter((c) => c !== count)
+      saveMutation.mutate(toTrackAnalysisRequest(symbol, count, alternates))
+    },
+    [auto.data, saveMutation, symbol]
   )
   const handleDeleteAnalysis = useCallback(
     (id: string) => deleteMutation.mutate(id),

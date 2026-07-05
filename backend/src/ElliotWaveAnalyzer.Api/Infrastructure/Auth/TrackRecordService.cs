@@ -20,6 +20,9 @@ internal sealed class TrackRecordService(
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
 
+    /// <summary>At most two alternates per tree (issue scope).</summary>
+    private const int MaxAlternates = 2;
+
     /// <inheritdoc/>
     public async Task<Guid> SaveAsync(
         Guid userId, TrackAnalysisRequest request, CancellationToken cancellationToken = default)
@@ -38,9 +41,20 @@ internal sealed class TrackRecordService(
             InvalidationAbove = request.InvalidationAbove,
             TargetLow = request.TargetLow,
             TargetHigh = request.TargetHigh,
+            EntryLow = request.EntryLow,
+            EntryHigh = request.EntryHigh,
             Confidence = request.Confidence,
             Score = request.Score,
         };
+
+        // Scenario tree: the primary is the flat request, alternates (capped at two) are the backups.
+        snapshot.Scenarios.Add(PrimaryRow(snapshot.Id, request));
+        var index = 1;
+        foreach (var alternate in request.Alternates.Take(MaxAlternates))
+        {
+            snapshot.Scenarios.Add(AlternateRow(snapshot.Id, index, alternate));
+            index++;
+        }
 
         db.AnalysisSnapshots.Add(snapshot);
         await db.SaveChangesAsync(cancellationToken);
@@ -57,31 +71,38 @@ internal sealed class TrackRecordService(
     {
         var snapshots = await db.AnalysisSnapshots
             .Where(s => s.UserId == userId)
+            .Include(s => s.Scenarios)
+            .Include(s => s.SwitchEvents)
             .OrderByDescending(s => s.CreatedAt)
             .ToListAsync(cancellationToken);
 
         // Fetch candles once per distinct symbol (the caching provider dedupes anyway), then
         // evaluate every snapshot of that symbol against the candles that followed its save.
-        var results = new List<TrackedAnalysis>(snapshots.Count);
         var candlesBySymbol = new Dictionary<string, IReadOnlyList<MarketCandle>>(StringComparer.OrdinalIgnoreCase);
+        var evaluations = new Dictionary<Guid, OutcomeEvaluation>(snapshots.Count);
 
         foreach (var snapshot in snapshots)
         {
             var candles = await GetCandlesSinceAsync(snapshot.Symbol, snapshot.CreatedAt, candlesBySymbol, cancellationToken);
             var after = candles.Where(c => c.OpenTime > snapshot.CreatedAt).ToList();
 
-            var evaluation = AnalysisOutcomeEvaluator.Evaluate(
+            evaluations[snapshot.Id] = AnalysisOutcomeEvaluator.Evaluate(
                 snapshot.Bullish,
                 snapshot.InvalidationPrice,
                 snapshot.InvalidationAbove,
                 snapshot.TargetLow,
                 snapshot.TargetHigh,
                 after);
-
-            results.Add(ToDto(snapshot, evaluation));
         }
 
-        return results;
+        // Scenario probabilities come from the user's own measured calibration (by confidence), so
+        // they always reflect the latest outcomes; buckets below the minimum sample say so.
+        var calibration = CalibrationCalculator.Calculate(
+            snapshots.Select(s => (s.Confidence, evaluations[s.Id].Outcome)));
+        var bucketByConfidence = calibration.Buckets.ToDictionary(
+            b => b.Confidence, StringComparer.OrdinalIgnoreCase);
+
+        return [.. snapshots.Select(s => ToDto(s, evaluations[s.Id], bucketByConfidence))];
     }
 
     /// <inheritdoc/>
@@ -137,7 +158,8 @@ internal sealed class TrackRecordService(
         return candles;
     }
 
-    private static TrackedAnalysis ToDto(AnalysisSnapshot s, OutcomeEvaluation e) => new(
+    private static TrackedAnalysis ToDto(
+        AnalysisSnapshot s, OutcomeEvaluation e, IReadOnlyDictionary<string, CalibrationBucket> buckets) => new(
         s.Id,
         s.Symbol,
         s.CreatedAt,
@@ -151,5 +173,64 @@ internal sealed class TrackRecordService(
         s.Score,
         e.Outcome,
         e.Price,
-        e.At);
+        e.At)
+    {
+        Scenarios = [.. s.Scenarios.OrderBy(r => r.OrderIndex).Select(r => ToScenario(r, buckets))],
+        SwitchEvents = [.. s.SwitchEvents
+            .OrderBy(x => x.At)
+            .Select(x => new ScenarioSwitchEvent(x.At, x.FromLabel, x.ToLabel, x.Reason))],
+    };
+
+    private static Scenario ToScenario(
+        AnalysisScenarioRow r, IReadOnlyDictionary<string, CalibrationBucket> buckets)
+    {
+        buckets.TryGetValue(NormalizeConfidence(r.Confidence), out var bucket);
+        var estimate = ScenarioProbability.From(bucket);
+        return new Scenario(
+            r.Role, r.Label, r.Structure, r.Bullish, r.InvalidationPrice, r.InvalidationAbove,
+            r.EntryLow, r.EntryHigh, r.TargetLow, r.TargetHigh, r.Confidence, r.Score,
+            estimate.Probability, estimate.Basis, r.Retired);
+    }
+
+    // Mirrors CalibrationCalculator's bucket keying so a scenario maps to the right bucket.
+    private static string NormalizeConfidence(string confidence)
+        => string.IsNullOrWhiteSpace(confidence) ? "unknown" : confidence.Trim().ToLowerInvariant();
+
+    private static AnalysisScenarioRow PrimaryRow(Guid snapshotId, TrackAnalysisRequest r) => new()
+    {
+        Id = Guid.NewGuid(),
+        AnalysisSnapshotId = snapshotId,
+        Role = ScenarioRole.Primary,
+        OrderIndex = 0,
+        Label = "Primary",
+        Structure = r.Structure,
+        Bullish = r.Bullish,
+        InvalidationPrice = r.InvalidationPrice,
+        InvalidationAbove = r.InvalidationAbove,
+        EntryLow = r.EntryLow,
+        EntryHigh = r.EntryHigh,
+        TargetLow = r.TargetLow,
+        TargetHigh = r.TargetHigh,
+        Confidence = r.Confidence,
+        Score = r.Score,
+    };
+
+    private static AnalysisScenarioRow AlternateRow(Guid snapshotId, int index, ScenarioInput a) => new()
+    {
+        Id = Guid.NewGuid(),
+        AnalysisSnapshotId = snapshotId,
+        Role = ScenarioRole.Alternate,
+        OrderIndex = index,
+        Label = $"Alt {index}",
+        Structure = a.Structure,
+        Bullish = a.Bullish,
+        InvalidationPrice = a.InvalidationPrice,
+        InvalidationAbove = a.InvalidationAbove,
+        EntryLow = a.EntryLow,
+        EntryHigh = a.EntryHigh,
+        TargetLow = a.TargetLow,
+        TargetHigh = a.TargetHigh,
+        Confidence = a.Confidence,
+        Score = a.Score,
+    };
 }

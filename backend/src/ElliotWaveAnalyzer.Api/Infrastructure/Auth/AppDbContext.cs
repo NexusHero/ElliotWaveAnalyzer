@@ -36,6 +36,32 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(s => s.Confidence).HasMaxLength(16).IsRequired();
             // List the newest first per user — the history's natural order.
             entity.HasIndex(s => new { s.UserId, s.CreatedAt });
+            entity.HasMany(s => s.Scenarios)
+                .WithOne()
+                .HasForeignKey(r => r.AnalysisSnapshotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(s => s.SwitchEvents)
+                .WithOne()
+                .HasForeignKey(e => e.AnalysisSnapshotId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<AnalysisScenarioRow>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Label).HasMaxLength(32).IsRequired();
+            entity.Property(r => r.Structure).HasMaxLength(64).IsRequired();
+            entity.Property(r => r.Confidence).HasMaxLength(16).IsRequired();
+            entity.HasIndex(r => r.AnalysisSnapshotId);
+        });
+
+        builder.Entity<AnalysisSwitchEventRow>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FromLabel).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.ToLabel).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.Reason).HasMaxLength(128).IsRequired();
+            entity.HasIndex(e => e.AnalysisSnapshotId);
         });
 
         builder.Entity<UserApiKey>(entity =>
