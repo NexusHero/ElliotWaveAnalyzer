@@ -98,6 +98,8 @@
     <!-- Infrastructure implementation types are internal (enforced by ArchitectureTests);
          expose them to the test project so it can wire them directly. -->
     <InternalsVisibleTo Include="ElliotWaveAnalyzer.Tests" />
+    <!-- NSubstitute/Castle DynamicProxy needs this to mock internal interfaces (e.g. IUserChatClientFactory). -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
 </Project>
