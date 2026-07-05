@@ -44,3 +44,6 @@ appsettings.*.json
 
 # Verify snapshot tooling — received files are transient
 *.received.*
+
+# Stryker mutation testing output (reports/logs are CI artifacts, not source)
+StrykerOutput/

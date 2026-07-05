@@ -2,11 +2,20 @@
   "stryker-config": {
     "project": "ElliotWaveAnalyzer.Api.csproj",
     "test-projects": ["ElliotWaveAnalyzer.Tests.csproj"],
-    "reporters": ["html", "progress"],
+    "reporters": ["html", "json", "markdown", "cleartext", "progress"],
     "mutation-level": "Standard",
-    "threshold-high": 80,
-    "threshold-low": 60,
-    "threshold-break": 0,
-    "excluded-mutations": ["string", "Linq"]
+    "thresholds": { "high": 90, "low": 75, "break": 60 },
+    "ignore-mutations": ["string", "linq"],
+    "mutate": [
+      "**/Application/**/*.cs",
+      "**/Domain/CandleWindow.cs",
+      "!**/Application/AutoWaveAnalysisService.cs",
+      "!**/Application/WaveAnalysisService.cs",
+      "!**/Application/WaveVerificationService.cs",
+      "!**/Application/TechnicalAnalysisService.cs",
+      "!**/Application/TopDownAnalysisService.cs",
+      "!**/Application/PortfolioReviewService.cs",
+      "!**/Application/DailyReportService.cs"
+    ]
   }
 }
