@@ -144,11 +144,14 @@ jobs:
         working-directory: frontend
 
   # ── Docker image (production artifact) ───────────────────────────────────
-  # Builds the production image on every PR/push so the Dockerfile can't silently break.
-  # Build-only (no registry push, no secrets); flip `push` + add a login step to publish.
+  # Builds the production image on every PR/push so the Dockerfile can't silently break, and
+  # publishes it to GHCR on pushes to main (PRs stay build-only — no push, no login, no secrets).
   docker:
     name: Docker image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # required to push to ghcr.io
 
     steps:
       - uses: actions/checkout@v5
@@ -156,12 +159,28 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
+      # GHCR image names must be lowercase; the owner/repo slug may not be.
+      - name: Resolve image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      # Only authenticate when we intend to push (pushes to main); never on PRs (incl. forks).
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build API image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
-          push: false
-          tags: elliotwaveanalyzer-api:ci
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ steps.image.outputs.name }}:latest
+            ${{ steps.image.outputs.name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
