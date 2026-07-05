@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render as rtlRender, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { WaveVerification } from '../api/types'
 import LiveVerifyPanel from './LiveVerifyPanel'
 
@@ -87,5 +88,50 @@ describe('LiveVerifyPanel', () => {
     render(<LiveVerifyPanel state="error" verification={null} error="boom" currentPrice={null} />)
     expect(screen.getByText('Verification failed')).toBeInTheDocument()
     expect(screen.getByText('boom')).toBeInTheDocument()
+  })
+
+  it('calls onSave when the save button is clicked', async () => {
+    const onSave = vi.fn()
+    render(
+      <LiveVerifyPanel
+        state="result"
+        verification={verification()}
+        error={null}
+        currentPrice={null}
+        onSave={onSave}
+      />
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save to track record' }))
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a Saved state and a chart download once saved', () => {
+    render(
+      <LiveVerifyPanel
+        state="result"
+        verification={verification()}
+        error={null}
+        currentPrice={null}
+        onSave={vi.fn()}
+        savedId="abc-123"
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Saved ✓' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: 'Download chart' })).toHaveAttribute(
+      'href',
+      '/api/analyses/abc-123/chart.png'
+    )
+  })
+
+  it('does not render the save action without an onSave handler', () => {
+    render(
+      <LiveVerifyPanel
+        state="result"
+        verification={verification()}
+        error={null}
+        currentPrice={null}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /save/i })).not.toBeInTheDocument()
   })
 })

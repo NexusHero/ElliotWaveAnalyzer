@@ -37,7 +37,7 @@ import { nudgePivot, snapToCandle } from './pivotSnap'
 import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
-import { toTrackAnalysisRequest } from './trackRecord'
+import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { toWaveLinePoints } from './waveLine'
 
@@ -216,6 +216,17 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
   })
+  // Persisting the analyst's OWN edited count (separate from the ranked-count save so the manual
+  // editor can show its own saved id / export link).
+  const manualSave = useMutation({
+    mutationFn: (request: TrackAnalysisRequest) => saveAnalysis(request),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
+  })
+  const { reset: manualSaveReset } = manualSave
+  // Any edit to the count invalidates a prior save, so the button re-enables for the new count.
+  useEffect(() => {
+    manualSaveReset()
+  }, [annotations, manualSaveReset])
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteAnalysis(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analyses'] }),
@@ -230,6 +241,11 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     },
     [auto.data, saveMutation, symbol]
   )
+  const handleSaveManualCount = useCallback(() => {
+    if (liveVerify.data) {
+      manualSave.mutate(verificationToTrackRequest(symbol, liveVerify.data))
+    }
+  }, [liveVerify.data, manualSave, symbol])
   const handleDeleteAnalysis = useCallback(
     (id: string) => deleteMutation.mutate(id),
     [deleteMutation]
@@ -674,6 +690,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             verification={liveVerify.data ?? null}
             error={liveVerifyError}
             currentPrice={lastPrice}
+            onSave={handleSaveManualCount}
+            savePending={manualSave.isPending}
+            saveError={manualSave.error instanceof Error ? manualSave.error.message : null}
+            savedId={manualSave.data?.id ?? null}
           />
 
           <AutoAnalysisPanel

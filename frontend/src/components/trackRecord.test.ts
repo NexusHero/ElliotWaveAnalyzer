@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { RankedWaveCount } from '../api/types'
-import { outcomeClass, outcomeLabel, toTrackAnalysisRequest } from './trackRecord'
+import type { RankedWaveCount, WaveVerification } from '../api/types'
+import {
+  MANUAL_CONFIDENCE,
+  outcomeClass,
+  outcomeLabel,
+  toTrackAnalysisRequest,
+  verificationToTrackRequest,
+} from './trackRecord'
 
 const baseCount: RankedWaveCount = {
   structure: 'Impulse',
@@ -98,6 +104,53 @@ describe('toTrackAnalysisRequest', () => {
     expect(req.targetLow).toBeNull()
     expect(req.targetHigh).toBeNull()
     expect(req.score).toBeNull()
+  })
+})
+
+describe('verificationToTrackRequest', () => {
+  const verification: WaveVerification = {
+    structure: 'Impulse',
+    bullish: true,
+    isValid: true,
+    snapped: [],
+    rejected: [],
+    rules: { bullishAssumed: true, rules: [], ratios: [] },
+    levels: {
+      unfoldingWave: 'Wave 5',
+      bullish: true,
+      invalidation: { price: 30000, side: 'Below', label: 'inv', basis: 'end of 4' },
+      supportZone: { low: 44000, high: 46000, label: 's', basis: 'fib' },
+      targetZones: [{ low: 60000, high: 65000, label: 't', basis: 'fib' }],
+      alternative: null,
+      scale: 'Linear',
+      confluenceZones: [],
+      channels: [],
+    },
+    score: 0.7,
+  }
+
+  it("maps the analyst's edited count to the save payload with 'manual' confidence", () => {
+    const req = verificationToTrackRequest('BTC', verification)
+
+    expect(req.symbol).toBe('BTC')
+    expect(req.structure).toBe('Impulse')
+    expect(req.bullish).toBe(true)
+    expect(req.invalidationPrice).toBe(30000)
+    expect(req.invalidationAbove).toBe(false)
+    expect(req.targetLow).toBe(60000)
+    expect(req.targetHigh).toBe(65000)
+    // entry zone falls back to the support zone when there's no confluence Entry box
+    expect(req.entryLow).toBe(44000)
+    expect(req.confidence).toBe(MANUAL_CONFIDENCE)
+    expect(req.score).toBe(0.7)
+    expect(req.alternates).toEqual([])
+  })
+
+  it('tolerates a count with no levels', () => {
+    const req = verificationToTrackRequest('ETH', { ...verification, levels: null })
+    expect(req.invalidationPrice).toBeNull()
+    expect(req.targetLow).toBeNull()
+    expect(req.confidence).toBe(MANUAL_CONFIDENCE)
   })
 })
 
