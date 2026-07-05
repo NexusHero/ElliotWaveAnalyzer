@@ -12,6 +12,7 @@ import {
   topDownAnalysis,
   validateWaveCount,
   verifyChartImage,
+  verifyEditedCount,
 } from '../api/client'
 import {
   type CandleIntervalCode,
@@ -25,17 +26,19 @@ import {
 } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
+import BacktestSummaryPanel from './BacktestSummaryPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import { Trash } from './Icons'
+import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
-import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
-import SymbolSearch from './SymbolSearch'
-import BacktestSummaryPanel from './BacktestSummaryPanel'
-import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
+import PriceChart, { type ChartMarker, type PriceLineSpec } from './PriceChart'
+import { nudgePivot, snapToCandle } from './pivotSnap'
+import ScannerPanel, { type ScannerState } from './ScannerPanel'
+import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
-import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { toTrackAnalysisRequest } from './trackRecord'
+import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 
 /**
  * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
@@ -142,6 +145,20 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const validation = useMutation({
     mutationFn: (payload: WaveAnnotation[]) => validateWaveCount({ symbol, annotations: payload }),
   })
+
+  // Analyst-in-the-loop: a deterministic re-verification (no LLM) runs on every edit, debounced.
+  const liveVerify = useMutation({
+    mutationFn: (payload: WaveAnnotation[]) => verifyEditedCount({ symbol, annotations: payload }),
+  })
+  const { mutate: verifyMutate, reset: verifyReset } = liveVerify
+  useEffect(() => {
+    if (annotations.length < 2) {
+      verifyReset()
+      return
+    }
+    const handle = setTimeout(() => verifyMutate(annotations), 400)
+    return () => clearTimeout(handle)
+  }, [annotations, verifyMutate, verifyReset])
 
   // Full-auto ("magic button"): hits the live server-side analysis endpoint.
   const [autoNeedKey, setAutoNeedKey] = useState(false)
@@ -311,11 +328,36 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     (time: string, price: number) => {
       const label = IMPULSE[annotations.length]
       if (!label) return // all five impulse labels placed
-      const annotation: WaveAnnotation = { date: `${time}T00:00:00Z`, price, label }
+      // Snap the click onto the candle's real extreme so the pivot lands on real data (the backend
+      // snaps again authoritatively on verify).
+      const snapped = snapToCandle(candles, time, price) ?? { time, price }
+      const annotation: WaveAnnotation = {
+        date: `${snapped.time}T00:00:00Z`,
+        price: snapped.price,
+        label,
+      }
       setAnnotations((prev) => [...prev, annotation].sort((a, b) => a.date.localeCompare(b.date)))
       resetCoach()
     },
-    [annotations.length, resetCoach]
+    [annotations.length, candles, resetCoach]
+  )
+
+  const handleNudge = useCallback(
+    (index: number, direction: -1 | 1) => {
+      setAnnotations((prev) => {
+        const target = prev[index]
+        if (!target) return prev
+        const day = target.date.split('T')[0] ?? target.date
+        const moved = nudgePivot(candles, { time: day, price: target.price }, direction)
+        return prev
+          .map((a, i) =>
+            i === index ? { ...a, date: `${moved.time}T00:00:00Z`, price: moved.price } : a
+          )
+          .sort((a, b) => a.date.localeCompare(b.date))
+      })
+      resetCoach()
+    },
+    [candles, resetCoach]
   )
 
   const handleRelabel = useCallback(
@@ -413,6 +455,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     }))
     return [...user, ...ai]
   }, [annotations, aiAnnotations])
+
+  const liveVerifyState: LiveVerifyState =
+    annotations.length < 2
+      ? 'idle'
+      : liveVerify.isPending
+        ? 'verifying'
+        : liveVerify.isError
+          ? 'error'
+          : liveVerify.data
+            ? 'result'
+            : 'idle'
+  const liveVerifyError = liveVerify.error instanceof Error ? liveVerify.error.message : null
 
   return (
     <div className="ws">
@@ -560,6 +614,22 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                       {a.date.split('T')[0]} · {fmtMoney(a.price)}
                     </span>
                     <button
+                      className="anno-nudge"
+                      type="button"
+                      aria-label={`Move annotation ${i + 1} earlier`}
+                      onClick={() => handleNudge(i, -1)}
+                    >
+                      ◀
+                    </button>
+                    <button
+                      className="anno-nudge"
+                      type="button"
+                      aria-label={`Move annotation ${i + 1} later`}
+                      onClick={() => handleNudge(i, 1)}
+                    >
+                      ▶
+                    </button>
+                    <button
                       className="anno-del"
                       type="button"
                       aria-label={`Remove annotation ${i + 1}`}
@@ -583,6 +653,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             onValidate={handleValidate}
             onAnalyze={handleAnalyze}
             onOpenSettings={onOpenSettings}
+          />
+
+          <LiveVerifyPanel
+            state={liveVerifyState}
+            verification={liveVerify.data ?? null}
+            error={liveVerifyError}
+            currentPrice={lastPrice}
           />
 
           <AutoAnalysisPanel
@@ -621,7 +698,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
           <VerifyImagePanel
             state={verifyImageState}
             report={verifyImageMutation.data ?? null}
-            error={verifyImageMutation.error instanceof Error ? verifyImageMutation.error.message : null}
+            error={
+              verifyImageMutation.error instanceof Error ? verifyImageMutation.error.message : null
+            }
             onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
           />
 

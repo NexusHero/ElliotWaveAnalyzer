@@ -33,6 +33,26 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
 
+        // ── POST /api/wave-analysis/verify ────────────────────────────────────
+        // Analyst-in-the-loop re-verification: takes an EDITED annotation set and returns the full
+        // DETERMINISTIC read (snapped pivots, hard rules, projections, score). No LLM — geometry never
+        // depends on a model — so it uses the cheaper per-user throttle and can run on every edit.
+        group.MapPost("/wave-analysis/verify", VerifyEditedCount)
+            .WithName("VerifyEditedWaveCount")
+            .WithSummary("Deterministically re-verify an analyst-edited wave count (no LLM)")
+            .WithDescription("""
+                Submit an edited annotation set (date + price + label) for a symbol. Each pivot is
+                snapped to a real candle extreme (so a dragged pivot lands on real data; ones that
+                don't snap are reported, not trusted), then the hard Elliott rules, the forward
+                projections (invalidation, support/target zones, confluence, channels) and a guideline
+                score are computed in code and returned. Fully deterministic — no LLM, no token usage —
+                so the analyst-in-the-loop sees the objective verdict of their own count live.
+                """)
+            .Produces<WaveVerification>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("per-user");
+
         // ── POST /api/wave-analysis/auto ──────────────────────────────────────
         // Full-auto ("magic button"): the system detects swing pivots, generates
         // rule-valid candidate counts, and the LLM ranks + explains them. Same strict
@@ -196,6 +216,36 @@ public static class WaveAnalysisEndpoints
             return Results.Problem(
                 title: "Analysis unavailable",
                 detail: "The analysis service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> VerifyEditedCount(
+        WaveValidationRequest request,
+        IWaveVerificationService verificationService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        // ~2y of daily context is plenty to snap any edited pivot and project levels.
+        const int lookbackDays = 730;
+        try
+        {
+            var result = await verificationService.VerifyAsync(
+                request.Symbol.ToUpperInvariant(), request.Annotations, lookbackDays, cancellationToken);
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request", detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Wave verification failed for {Symbol}", request.Symbol);
+            return Results.Problem(
+                title: "Verification unavailable",
+                detail: "The market-data service is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }

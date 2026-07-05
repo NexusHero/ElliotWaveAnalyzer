@@ -19,6 +19,7 @@ import type {
   TrackedAnalysis,
   WaveAnalysisResponse,
   WaveValidationRequest,
+  WaveVerification,
 } from './types'
 
 /**
@@ -208,6 +209,28 @@ export async function scanSetups(
   }
 
   return (await response.json()) as ScanResult
+}
+
+/**
+ * Deterministically re-verifies an analyst-edited count via `POST /api/wave-analysis/verify`.
+ * No LLM — snaps the edited pivots to real candles and returns the hard rules, projections and score.
+ */
+export async function verifyEditedCount(
+  request: WaveValidationRequest,
+  signal?: AbortSignal
+): Promise<WaveVerification> {
+  const response = await fetch('/api/wave-analysis/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as WaveVerification
 }
 
 /** Assesses stop distance, reward:risk and position size via `POST /api/risk` (deterministic). */

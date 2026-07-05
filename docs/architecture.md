@@ -79,6 +79,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-028 | Vision import: `POST /api/wave-analysis/verify-image` extracts a claimed count from an uploaded chart with a vision LLM (strict JSON + one retry), snaps every claimed pivot to a real candle extreme (hallucination guard; too few → `ExtractionUnreliable`), runs the deterministic rules on what survives, and compares side-by-side with our own count; image never persisted | #123 · ADR-029 · §6 Scenario 16 | Fulfilled |
 | REQ-029 | Setup scanner: `GET /api/scan` sweeps a set of symbols (configured universe or request-supplied) with the deterministic pipeline and returns ranked hits (in-zone → higher score → tighter risk) with structure/score/zone flags; filters (structure/minScore/inZone); bounded concurrency + per-(symbol,day) cache; no LLM; coverage reported (scanned/matched) | #148 · ADR-030 · §6 Scenario 17 | Fulfilled |
 | REQ-030 | Risk layer: `POST /api/risk` turns a count's geometry (entry, the invalidation as the stop, target prices, direction) plus an account-risk input (percent of equity or absolute) into stop distance (abs + %), reward:risk per target, and the position size that risks exactly the chosen capital; direction-aware; an entry on the wrong side of the invalidation → explicit `hasValidStop:false` (never a negative/infinite size), non-positive risk keeps the stop/R:R but omits the size; pure arithmetic, no LLM; "not trading advice" | #150 · ADR-032 · §6 Scenario 19 | Fulfilled |
+| REQ-031 | Analyst-in-the-loop editing: the chart supports add/move/delete/relabel of pivots (placement + nudge snap to real candle extremes) and `POST /api/wave-analysis/verify` re-runs the **deterministic** pipeline on the edited set — snap, hard rules, projections/zones/invalidation/channels, guideline score — returning the objective read live on every (debounced) edit; no LLM in the loop (it only narrates afterwards); the edited count reuses the existing track-record persistence and annotated-chart export | #151 · ADR-033 · §6 Scenario 20 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -924,6 +925,34 @@ sequenceDiagram
 
 ---
 
+## Scenario 20 — Edit a Count and Re-verify Deterministically (REQ-031) {#_runtime_scenario_20}
+
+The analyst places, nudges, relabels or deletes a pivot. Each edit snaps to a real candle client-side, then a debounced call re-runs the deterministic pipeline server-side (which snaps again authoritatively) and returns the objective read — rules, projections, score — with no LLM. The verdict updates live; the LLM is only invoked later, on demand, to narrate the analyst's own count.
+
+```mermaid
+sequenceDiagram
+    participant User as Analyst
+    participant WS as WaveWorkspace
+    participant Ep as /wave-analysis/verify
+    participant Svc as WaveVerificationService
+    participant V as WaveVerifier (pure)
+
+    User->>WS: add / nudge / relabel / delete a pivot
+    WS->>WS: snapToCandle / nudgePivot  %% lands on a real extreme
+    WS->>WS: debounce (≈400ms)
+    WS->>Ep: POST edited annotations (no LLM)
+    Ep->>Svc: VerifyAsync(symbol, annotations)
+    Svc->>Svc: fetch candles
+    Svc->>V: Verify(annotations, candles)
+    V->>V: PivotSnapper → ElliottRuleChecker → ProjectionService → WaveGuidelineScorer
+    V-->>Svc: WaveVerification (snapped, rules, levels, score)
+    Svc-->>Ep: verification
+    Ep-->>WS: 200 live verdict (valid?, failing rules, levels, score)
+    Note over WS,User: LLM narration is a separate, optional step — never in this loop
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1650,6 +1679,29 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | Interactive by design: because entry and account-risk are endpoint inputs, the user can explore "what size at this entry / this risk?" without re-running the analysis |
 | (-) | R:R against a target *zone* collapses it to a single representative price (first-touch edge); the band's far side isn't surfaced as a separate reward — a deliberate simplification |
 | (-) | The endpoint trusts the geometry it is handed (the client re-sends the invalidation/targets); acceptable because it is arithmetic on the caller's own inputs, but it means the server does not re-derive the count for the risk call |
+
+---
+
+## ADR-033: Analyst-in-the-Loop Editing — A Separate Deterministic Verify Endpoint, Snap-on-Edit, LLM Never in the Loop
+
+**Context:** Everything before this made the tool *suggest* counts; a professional never just accepts an auto-count — they place, move and relabel pivots and want the objective verdict instantly. The manual coach already had add/relabel/delete + an **LLM** validation. Two forces shaped the design: the re-verify must fire on *every* edit (a live, debounced loop), and the geometry must stay deterministic (the LLM never decides whether an edited count is valid). Reusing the existing `POST /api/wave-analysis` was tempting but wrong — it makes an LLM call, so it is too slow/costly to fire per drag and would put a model in the geometry path.
+
+**Decision:**
+
+- **A dedicated deterministic endpoint.** `POST /api/wave-analysis/verify` runs the pure pipeline on the edited annotation set and returns a `WaveVerification` — snapped pivots, the hard-rule report, the forward projections (invalidation, support/target zones, confluence, channels) and a guideline score — with **no LLM and no token usage**, on the cheaper per-user throttle. The LLM validation endpoint stays as-is for the qualitative narrative the analyst can ask for *afterwards*.
+- **`WaveVerifier` is pure; the service only fetches candles.** All judgment lives in a static `WaveVerifier.Verify(annotations, candles)` (unit-tested with no I/O); `WaveVerificationService` just resolves the market-data provider and hands the candles in. It reuses the exact building blocks the rest of the app trusts — `PivotSnapper`, `ElliottRuleChecker`, `ProjectionService`, `WaveGuidelineScorer` — so an edited count is judged by the same rules as an auto-count.
+- **Snap on edit, both sides.** A dragged/placed pivot is snapped to a real candle extreme client-side for immediate feedback (`snapToCandle`/`nudgePivot`), and the server snaps again authoritatively (`PivotSnapper`) — pivots that don't land on a candle are reported, never silently trusted. "Move" is a deterministic nudge to an adjacent candle extreme rather than freehand dragging (out of scope: freehand tools, collaborative editing, undo-tree persistence).
+- **Reuse persistence and export.** The edited count saves through the existing track-record path and exports through the existing annotated-chart renderer — no new storage or rendering.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Turns the tool from a viewer into a workbench: the analyst edits and sees the objective rule/level/score verdict live, with the LLM demoted to optional narration — the "geometry is deterministic" invariant holds end-to-end |
+| (+) | The live loop is cheap (no LLM, debounced) and honest (a pivot off any candle is flagged, not fabricated onto real data) |
+| (+) | Zero new geometry: the verifier reuses the same snap/rules/projection/score code the auto-count and vision-import paths already use, so an edited count can't be judged by a different standard |
+| (-) | Each verify fetches the symbol's candles server-side (one market-data call per debounced edit); mitigated by the debounce and provider caching, but it is not free |
+| (-) | "Move" is a candle-to-candle nudge, not pixel-perfect dragging; a deliberate scope cut that keeps every edit snapped to real data |
 
 ---
 
