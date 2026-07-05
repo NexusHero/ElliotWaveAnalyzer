@@ -547,6 +547,18 @@ export interface RejectedPivot {
   reason: string
 }
 
+/** The deterministic read of an analyst-edited count (mirrors backend `WaveVerification`). */
+export interface WaveVerification {
+  structure: string
+  bullish: boolean
+  isValid: boolean
+  snapped: SnappedPivot[]
+  rejected: RejectedPivot[]
+  rules: WaveRuleReport
+  levels: WaveLevels | null
+  score: number | null
+}
+
 /** Side-by-side of the claimed and our own count (mirrors backend `CountComparison`). */
 export interface CountComparison {
   claimedStructure: string

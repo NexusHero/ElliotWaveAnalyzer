@@ -1254,6 +1254,78 @@
   line-height: 1.5;
 }
 
+/* ── Live verification (analyst-in-the-loop deterministic verdict) ────────── */
+.liveverify {
+  margin-top: 14px;
+}
+.lv-status {
+  color: var(--muted);
+  font-size: 12px;
+}
+.lv-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 8px;
+}
+.verdict-badge.ok {
+  background: var(--pass-soft);
+  color: var(--pass);
+}
+.verdict-badge.bad {
+  background: var(--fail-soft);
+  color: var(--fail);
+}
+.lv-structure {
+  font-weight: 700;
+  font-size: 13px;
+}
+.lv-score {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+.lv-fails {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+.lv-fails li {
+  padding: 6px 10px;
+  border-left: 3px solid var(--fail);
+  background: var(--fail-soft);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.lv-fail-name {
+  display: block;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--fail);
+}
+.lv-fail-detail {
+  font-size: 12px;
+  color: var(--muted);
+}
+.lv-rejected {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.anno-nudge {
+  border: 1px solid var(--line-soft);
+  background: var(--inset);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}
+.anno-nudge:hover {
+  color: var(--text);
+}
+
 /* ── Risk box (stop distance, R:R, position size) ────────────────────────── */
 .riskbox {
   border-top: 1px solid var(--line-soft);

@@ -18,6 +18,9 @@ internal static class WaveAnalysisExtensions
         services.AddTransient<IAutoWaveAnalysisService, AutoWaveAnalysisService>();
         services.AddTransient<ITopDownAnalysisService, TopDownAnalysisService>();
 
+        // Analyst-in-the-loop re-verification (REQ-031): deterministic, no LLM.
+        services.AddTransient<IWaveVerificationService, WaveVerificationService>();
+
         // Setup scanner (REQ-029): deterministic sweep across symbols. Bind its options and register
         // the service scoped (it resolves the scoped/transient analysis service; the cache is shared).
         services.AddOptions<ScanOptions>().BindConfiguration(ScanOptions.SectionName);
