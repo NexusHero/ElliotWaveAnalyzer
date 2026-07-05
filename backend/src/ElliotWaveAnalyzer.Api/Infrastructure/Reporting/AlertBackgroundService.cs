@@ -1,4 +1,3 @@
-using Cronos;
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.Options;
@@ -6,65 +5,20 @@ using Microsoft.Extensions.Options;
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Reporting;
 
 /// <summary>
-/// Hosted service that runs <see cref="IAlertService"/> on a cron schedule. Only registered when
-/// <c>Alerts:Enabled</c> is true. Each run executes in its own DI scope so the scoped
-/// <see cref="IAlertService"/> (and its <c>AppDbContext</c>) resolve correctly. Mirrors
-/// <see cref="DailyReportBackgroundService"/>.
+/// Runs <see cref="IAlertService"/> on a cron schedule. Only registered when
+/// <c>Alerts:Enabled</c> is true. The scheduling loop lives in <see cref="CronBackgroundService"/>;
+/// this class supplies the schedule and the per-occurrence work (re-evaluate saved analyses and
+/// notify) in its own DI scope so the scoped <see cref="IAlertService"/> resolves correctly.
 /// </summary>
 internal sealed class AlertBackgroundService(
     IServiceProvider services,
     IOptions<AlertOptions> options,
-    ILogger<AlertBackgroundService> logger) : BackgroundService
+    ILogger<AlertBackgroundService> logger) : CronBackgroundService(services, logger)
 {
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        var opts = options.Value;
+    protected override string SchedulerName => "Alert scheduler";
 
-        CronExpression cron;
-        try
-        {
-            cron = CronExpression.Parse(opts.Cron);
-        }
-        catch (CronFormatException ex)
-        {
-            logger.LogError(ex, "Invalid Alerts:Cron expression '{Cron}'; alert scheduler not started", opts.Cron);
-            return;
-        }
+    protected override string CronExpression => options.Value.Cron;
 
-        logger.LogInformation("Alert scheduler started (cron '{Cron}', UTC)", opts.Cron);
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            var next = cron.GetNextOccurrence(DateTimeOffset.UtcNow, TimeZoneInfo.Utc);
-            if (next is null)
-            {
-                logger.LogWarning("Cron '{Cron}' has no future occurrences; alert scheduler stopping", opts.Cron);
-                return;
-            }
-
-            var delay = next.Value - DateTimeOffset.UtcNow;
-            if (delay > TimeSpan.Zero)
-            {
-                try
-                {
-                    await Task.Delay(delay, stoppingToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    return;
-                }
-            }
-
-            using var scope = services.CreateScope();
-            var alertService = scope.ServiceProvider.GetRequiredService<IAlertService>();
-            try
-            {
-                await alertService.RunAsync(stoppingToken);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, "Alert run failed");
-            }
-        }
-    }
+    protected override Task RunOnceAsync(IServiceScope scope, CancellationToken cancellationToken)
+        => scope.ServiceProvider.GetRequiredService<IAlertService>().RunAsync(cancellationToken);
 }
