@@ -20,7 +20,7 @@ internal sealed class DepotImportService(
             logger.LogInformation(
                 "No depot importer accepted '{FileName}' ({ContentType})", file.FileName, file.ContentType);
             return DepotImportResult.Fail(
-                "Unsupported file. Upload a Smartbroker+ PDF depot export.");
+                "Unsupported file. Upload a Smartbroker+ PDF or a Scalable Capital CSV export.");
         }
 
         logger.LogInformation(
