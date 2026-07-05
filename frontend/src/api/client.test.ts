@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getAuthProviders,
   getCurrentUser,
+  getSavedDepot,
   importDepot,
   login,
   validateWaveCount,
@@ -156,6 +157,24 @@ describe('importDepot', () => {
 
     const file = new File([new Uint8Array([1])], 'x.pdf', { type: 'application/pdf' })
     await expect(importDepot(file)).rejects.toThrow('Smartbroker+')
+  })
+})
+
+describe('getSavedDepot', () => {
+  it('returns null when the user has no saved depot (204)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 204, ok: false }))
+
+    expect(await getSavedDepot()).toBeNull()
+  })
+
+  it('returns the saved snapshot when present', async () => {
+    const snapshot = { source: 'SmartbrokerPlus', currency: 'EUR', positions: [], totals: null }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(snapshot) })
+    )
+
+    expect(await getSavedDepot()).toEqual(snapshot)
   })
 })
 

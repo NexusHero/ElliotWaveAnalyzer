@@ -124,10 +124,23 @@ export async function deleteAnalysis(id: string, signal?: AbortSignal): Promise<
 }
 
 /** Lists the user's configured API-key providers (metadata only — never the key). */
+/** Returns the user's most recently imported depot, or null if they have none (204). */
+export async function getSavedDepot(signal?: AbortSignal): Promise<DepotSnapshot | null> {
+  const response = await fetch('/api/depot', { signal })
+  if (response.status === 204) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+  return (await response.json()) as DepotSnapshot
+}
+
 /**
  * Imports a broker depot from an uploaded file via `POST /api/depot/import` (multipart).
- * The backend detects the broker (currently Smartbroker+ PDF) and returns the parsed holdings.
- * No `Content-Type` header is set so the browser adds the multipart boundary itself.
+ * The backend detects the broker (Smartbroker+ PDF or Scalable Capital CSV), saves it as the
+ * user's current depot and returns the parsed holdings. No `Content-Type` header is set so the
+ * browser adds the multipart boundary itself.
  */
 export async function importDepot(file: File, signal?: AbortSignal): Promise<DepotSnapshot> {
   const form = new FormData()

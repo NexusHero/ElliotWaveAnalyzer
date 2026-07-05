@@ -19,6 +19,9 @@ internal static class DepotImportExtensions
         services.AddSingleton<IDepotImporter, ScalableCapitalCsvImporter>();
         services.AddSingleton<IDepotImportService, DepotImportService>();
 
+        // Persists the user's most recent import (uses the scoped AppDbContext).
+        services.AddScoped<IDepotStore, DepotStore>();
+
         return services;
     }
 }
