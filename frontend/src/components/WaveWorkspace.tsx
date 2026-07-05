@@ -311,6 +311,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const [layers, setLayers] = useState<LevelLayers>(CLEAN_LAYERS)
   const [activeCount, setActiveCount] = useState(0)
+  // Price-axis scale. Auto-follows a count computed in log space (so the levels line up), but the
+  // analyst can override it with the chart toggle.
+  const [logScale, setLogScale] = useState(false)
 
   const rankings = auto.data?.rankings ?? []
   const activeRanked = rankings[activeCount] ?? rankings[0] ?? null
@@ -318,6 +321,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   // The chart overlays the selected auto count's levels, else the manual result's.
   const activeLevels: WaveLevels | null =
     auto.isSuccess && activeRanked ? activeRanked.levels : (validation.data?.levels ?? null)
+
+  useEffect(() => {
+    if (activeLevels?.scale === 'Log') setLogScale(true)
+  }, [activeLevels?.scale])
 
   const lastPrice = candles.length > 0 ? (candles[candles.length - 1]?.close ?? null) : null
 
@@ -558,6 +565,15 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               </div>
               <button
                 type="button"
+                className={`pro-toggle${logScale ? ' on' : ''}`}
+                aria-pressed={logScale}
+                onClick={() => setLogScale((v) => !v)}
+                title="Logarithmic price axis — matches the log-correct Fibonacci levels"
+              >
+                Log
+              </button>
+              <button
+                type="button"
                 className={`pro-toggle${pro ? ' on' : ''}`}
                 aria-pressed={pro}
                 onClick={() => setPro((v) => !v)}
@@ -608,6 +624,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 annotations={markers}
                 waveLines={waveLines}
                 priceLines={priceLines}
+                logScale={logScale}
                 onPointClick={handlePointClick}
                 theme={theme}
               />
