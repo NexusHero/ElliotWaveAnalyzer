@@ -178,6 +178,39 @@ export interface WaveLevels {
   channels: Channel[]
 }
 
+/** The reward side of one target in a risk assessment (mirrors backend `TargetRisk`). */
+export interface TargetRisk {
+  price: number
+  rewardAbs: number
+  rewardToRisk: number
+}
+
+/** A deterministic risk read for a trade idea (mirrors backend `RiskAssessment`). */
+export interface RiskAssessment {
+  hasValidStop: boolean
+  noStopReason: string | null
+  bullish: boolean
+  entry: number
+  stopPrice: number
+  stopDistanceAbs: number
+  stopDistancePct: number
+  riskCapital: number
+  suggestedSize: number | null
+  notional: number | null
+  targets: TargetRisk[]
+}
+
+/** Body of `POST /api/risk` (mirrors backend `RiskRequest`). */
+export interface RiskRequest {
+  entry: number
+  invalidation: number
+  targets: number[]
+  bullish: boolean
+  accountEquity?: number
+  riskPercent?: number
+  riskAmount?: number
+}
+
 /** Response of `POST /api/wave-analysis` — mirrors the backend `WaveAnalysisResponse`. */
 export interface WaveAnalysisResponse {
   result: WaveValidationResult

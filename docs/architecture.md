@@ -78,6 +78,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-027 | Portfolio auto-commentary: `GET /api/depot/analysis` reviews each imported holding — resolve ISIN → top-down count → scenario geometry → optional fact-checked LLM narrative — with a portfolio summary and an explicit unresolved list; narrative degrades gracefully (no key / failed fact-guard); results cached per (position, day); opt-in scheduled refresh | #122 · ADR-028 · §6 Scenario 15 | Fulfilled |
 | REQ-028 | Vision import: `POST /api/wave-analysis/verify-image` extracts a claimed count from an uploaded chart with a vision LLM (strict JSON + one retry), snaps every claimed pivot to a real candle extreme (hallucination guard; too few → `ExtractionUnreliable`), runs the deterministic rules on what survives, and compares side-by-side with our own count; image never persisted | #123 · ADR-029 · §6 Scenario 16 | Fulfilled |
 | REQ-029 | Setup scanner: `GET /api/scan` sweeps a set of symbols (configured universe or request-supplied) with the deterministic pipeline and returns ranked hits (in-zone → higher score → tighter risk) with structure/score/zone flags; filters (structure/minScore/inZone); bounded concurrency + per-(symbol,day) cache; no LLM; coverage reported (scanned/matched) | #148 · ADR-030 · §6 Scenario 17 | Fulfilled |
+| REQ-030 | Risk layer: `POST /api/risk` turns a count's geometry (entry, the invalidation as the stop, target prices, direction) plus an account-risk input (percent of equity or absolute) into stop distance (abs + %), reward:risk per target, and the position size that risks exactly the chosen capital; direction-aware; an entry on the wrong side of the invalidation → explicit `hasValidStop:false` (never a negative/infinite size), non-positive risk keeps the stop/R:R but omits the size; pure arithmetic, no LLM; "not trading advice" | #150 · ADR-032 · §6 Scenario 19 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -899,6 +900,30 @@ sequenceDiagram
 
 ---
 
+## Scenario 19 — Size a Trade from the Count's Geometry (REQ-030) {#_runtime_scenario_19}
+
+A user turns a count into risk terms. The frontend sends the geometry it already has (invalidation as the stop, target zones mapped to their first-touch edge, direction) plus the entry and account-risk; the pure calculator returns stop distance, R:R per target and the position size. An entry on the wrong side of the invalidation comes back as an explicit no-valid-stop result — never a crash or a negative size. No LLM.
+
+```mermaid
+sequenceDiagram
+    participant UI as RiskBox
+    participant Ep as RiskEndpoints
+    participant Calc as RiskCalculator (pure)
+
+    UI->>Ep: POST /api/risk (entry, invalidation, targets, bullish, account-risk)
+    Ep->>Ep: RiskRequest.ResolveRiskCapital()  %% percent-of-equity or absolute
+    Ep->>Calc: Assess(entry, invalidation, targets, bullish, riskCapital)
+    alt entry on the wrong side of the stop
+        Calc-->>Ep: hasValidStop:false + reason (no size)
+    else valid stop
+        Calc->>Calc: stop distance, R:R per target, size = riskCapital / stopDistance
+        Calc-->>Ep: RiskAssessment (stop, R:R[], size, notional)
+    end
+    Ep-->>UI: 200 assessment  %% "arithmetic, not advice"
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1602,6 +1627,29 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | The decrypted key exists only for the lifetime of one built client and never leaves the server or reaches a log |
 | (-) | The **Ensemble** auto-ranker still resolves the *keyed* per-provider startup clients directly, so it uses operator keys, not per-user keys — a documented limitation (a per-user ensemble would need the factory threaded through that path) |
 | (-) | Each LLM call that finds a user key costs one short-lived DI scope + a decrypt; negligible next to the network round-trip, and skipped entirely when there is no authenticated user |
+
+---
+
+## ADR-032: Risk as Pure Arithmetic Behind `POST /api/risk` — Geometry In, Sizing Out, "Not Advice"
+
+**Context:** Every count already yields a hard **invalidation** (the natural stop) and **target zones** (the natural objective), but the tool stopped at *analysis* — it never took the next step a professional always does: turn that geometry into **risk terms** (stop distance, reward:risk, position size for a chosen account risk). That step is pure arithmetic and high in perceived value, but it introduces two inputs that are *not* part of a count — the **entry** and the **account-risk** — and it must never mislead a user into treating sizing math as a recommendation.
+
+**Decision:**
+
+- **Pure calculator.** `RiskCalculator.Assess(entry, invalidation, targets, bullish, riskCapital)` (Application, static) returns a `RiskAssessment`: stop distance (absolute + percent), per-target `TargetRisk` (signed reward + R:R) ordered by price, and the position size + notional that risk exactly `riskCapital`. Direction-aware and **fully guarded** — an entry on the wrong side of the invalidation (or on it) returns `HasValidStop:false` with a reason and no size; a non-positive `riskCapital` keeps the stop and R:R but omits the size. No division can blow up. No LLM, no I/O.
+- **A dedicated `POST /api/risk`, not an additive projection field.** Entry and account-risk are the *user's* inputs, distinct per idea and changed interactively (try a different entry, a different %), so they don't belong baked onto the deterministic projection. A small endpoint takes the geometry (straight from a count) plus the account-risk and returns the assessment; `RiskRequest` resolves the account-risk from either a percent of equity **or** an absolute amount. The "wrong side of the stop" case is a normal `200` result (`hasValidStop:false`), not a `400` — the explicit result is more useful than an error.
+- **Targets are prices, zones map to their first-touch edge.** The calculator takes target *prices* (matching the natural fixtures); the frontend maps each target *zone* to its first-touch edge in the trade's direction (near edge for a long) as the representative target — conservative R:R.
+- **"Arithmetic, not advice."** The response and the UI carry an explicit disclaimer, consistent with the existing guardrail stance. The layer computes on the user's own inputs; it does not tell anyone what to trade.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | Bridges analysis → decision with the step professionals always take next, at zero marginal cost (pure arithmetic), reusing the invalidation/targets the count already produces |
+| (+) | Safe by construction: every degenerate input (wrong-side entry, zero stop distance, zero/negative risk) yields an explicit, non-exploding result rather than a crash or a nonsense size |
+| (+) | Interactive by design: because entry and account-risk are endpoint inputs, the user can explore "what size at this entry / this risk?" without re-running the analysis |
+| (-) | R:R against a target *zone* collapses it to a single representative price (first-touch edge); the band's far side isn't surfaced as a separate reward — a deliberate simplification |
+| (-) | The endpoint trusts the geometry it is handed (the client re-sends the invalidation/targets); acceptable because it is arithmetic on the caller's own inputs, but it means the server does not re-derive the count for the risk call |
 
 ---
 

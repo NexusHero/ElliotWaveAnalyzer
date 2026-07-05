@@ -1,5 +1,6 @@
 import type { WaveLevels } from '../api/types'
 import { distancePercent } from './levelOverlay'
+import RiskBox from './RiskBox'
 
 interface LevelsSummaryProps {
   levels: WaveLevels | null
@@ -104,6 +105,8 @@ export default function LevelsSummary({ levels, currentPrice }: LevelsSummaryPro
           <span className="level-note">{levels.alternative.note}</span>
         </div>
       )}
+
+      {inv && <RiskBox levels={levels} currentPrice={currentPrice} />}
     </div>
   )
 }

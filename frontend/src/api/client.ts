@@ -2,15 +2,17 @@ import type {
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
   BacktestSummary,
-  ImageVerificationReport,
-  PortfolioReview,
-  ScanFilters,
-  ScanResult,
   CandleIntervalCode,
   DepotSnapshot,
+  ImageVerificationReport,
+  PortfolioReview,
   ResolvedSymbol,
+  RiskAssessment,
+  RiskRequest,
   SavedAnalysisResponse,
   SavedApiKey,
+  ScanFilters,
+  ScanResult,
   TechnicalAnalysisResult,
   TopDownAnalysis,
   TrackAnalysisRequest,
@@ -186,7 +188,10 @@ export async function getPortfolioReview(signal?: AbortSignal): Promise<Portfoli
 }
 
 /** Scans symbols for Elliott Wave setups via `GET /api/scan`. */
-export async function scanSetups(filters: ScanFilters = {}, signal?: AbortSignal): Promise<ScanResult> {
+export async function scanSetups(
+  filters: ScanFilters = {},
+  signal?: AbortSignal
+): Promise<ScanResult> {
   const params = new URLSearchParams()
   if (filters.symbols) params.set('symbols', filters.symbols)
   if (filters.structure) params.set('structure', filters.structure)
@@ -203,6 +208,25 @@ export async function scanSetups(filters: ScanFilters = {}, signal?: AbortSignal
   }
 
   return (await response.json()) as ScanResult
+}
+
+/** Assesses stop distance, reward:risk and position size via `POST /api/risk` (deterministic). */
+export async function assessRisk(
+  request: RiskRequest,
+  signal?: AbortSignal
+): Promise<RiskAssessment> {
+  const response = await fetch('/api/risk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as RiskAssessment
 }
 
 /** Verifies an uploaded analyst chart via `POST /api/wave-analysis/verify-image` (multipart). */

@@ -1,7 +1,15 @@
-import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render as rtlRender, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import type { WaveLevels } from '../api/types'
 import LevelsSummary from './LevelsSummary'
+
+// LevelsSummary now embeds RiskBox (a TanStack Query mutation), so tests render within a client.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
 
 const baseLevels: WaveLevels = {
   unfoldingWave: 'Wave 3',
