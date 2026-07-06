@@ -72,10 +72,21 @@ internal sealed class LlmChartVisionExtractor(
             }
 
             logger.LogWarning("Vision extraction produced invalid JSON (attempt {Attempt}/{Max})", attempt, MaxAttempts);
+
+            // Give the retry corrective feedback instead of resending the identical prompt — a model
+            // that just emitted malformed output tends to repeat it verbatim otherwise. Still
+            // perception-only and schema-validated, so this relaxes no determinism guarantee.
+            if (attempt < MaxAttempts)
+            {
+                messages.Add(new(ChatRole.User,
+                    "Your previous response was not valid JSON of the required shape. Respond with ONLY "
+                    + "the JSON object described above — no prose, no markdown, no code fences."));
+            }
         }
 
         throw new ChartExtractionException(
-            "The chart image could not be read into a valid count (the model's output failed schema validation).");
+            "The chart image could not be read into a valid count. Try a cleaner screenshot of just the "
+            + "price chart with the wave labels visible — crop out app menus and side panels.");
     }
 
     /// <summary>Parses and validates the strict schema; returns false on any missing/invalid field.</summary>

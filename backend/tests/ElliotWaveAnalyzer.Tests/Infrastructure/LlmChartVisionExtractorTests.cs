@@ -52,19 +52,43 @@ public sealed class LlmChartVisionExtractorTests
     }
 
     [Test]
+    public async Task ExtractAsync_Retry_SendsCorrectiveFeedback()
+    {
+        // First attempt malformed, second attempt valid — the retry must carry a correction telling
+        // the model its previous output was invalid, rather than resending the identical prompt.
+        var client = new CountingChatClient("not valid json", ValidJson);
+
+        var extraction = await Extractor(client).ExtractAsync(Image, "image/png");
+
+        Assert.That(extraction.Pivots, Has.Count.EqualTo(2));
+        Assert.That(client.Calls, Is.EqualTo(2));
+        Assert.That(
+            client.LastMessages.Any(m => m.Text.Contains("was not valid JSON", StringComparison.Ordinal)),
+            Is.True,
+            "the retry should include corrective feedback");
+    }
+
+    [Test]
     public void ExtractAsync_NoVisionClient_ThrowsInvalidOperation()
         => Assert.ThrowsAsync<InvalidOperationException>(() => Extractor().ExtractAsync(Image, "image/png"));
 
-    /// <summary>Chat client that returns a fixed body and counts how many times it was called.</summary>
-    private sealed class CountingChatClient(string response) : IChatClient
+    /// <summary>
+    /// Chat client that returns each supplied body in turn (repeating the last), counts calls, and
+    /// records the messages of the most recent call so a test can assert on the retry's content.
+    /// </summary>
+    private sealed class CountingChatClient(params string[] responses) : IChatClient
     {
         public int Calls { get; private set; }
+
+        public IReadOnlyList<ChatMessage> LastMessages { get; private set; } = [];
 
         public Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
+            LastMessages = [.. messages];
+            var body = responses[Math.Min(Calls, responses.Length - 1)];
             Calls++;
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, response)));
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, body)));
         }
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(

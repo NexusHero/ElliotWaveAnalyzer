@@ -82,7 +82,10 @@ public sealed class AutoWaveAnalysisPromptBuilderTests
         Assert.Multiple(() =>
         {
             Assert.That(prompt, Does.Contain("## Market Context"));
-            Assert.That(prompt, Does.Contain("Symbol:       BTC/USD"));
+            // The symbol is named as-is — no fabricated "/USD" pair suffix, which mis-labels
+            // indices/equities/ETFs as crypto pairs (#215).
+            Assert.That(prompt, Does.Contain("Symbol:       BTC"));
+            Assert.That(prompt, Does.Not.Contain("BTC/USD"));
             Assert.That(prompt, Does.Contain("(low)").And.Contains("(high)"));
         });
     }

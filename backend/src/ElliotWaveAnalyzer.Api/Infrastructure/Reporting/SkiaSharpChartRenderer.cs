@@ -33,7 +33,7 @@ internal sealed class SkiaSharpChartRenderer : IChartRenderer
         using var font = new SKFont { Size = 18 };
         using var textPaint = new SKPaint { Color = Foreground, IsAntialias = true };
         canvas.DrawText(
-            $"{analysis.Symbol}/USD — daily ({analysis.Candles.Count} candles)",
+            $"{analysis.Symbol} — daily ({analysis.Candles.Count} candles)",
             Left, 28f, SKTextAlign.Left, font, textPaint);
 
         if (analysis.Candles.Count > 0)
