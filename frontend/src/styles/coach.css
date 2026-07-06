@@ -1114,6 +1114,76 @@
   text-align: left;
 }
 
+/* Collapsed alternate: a single scannable row (#217) */
+.auto-count.collapsed {
+  padding: 0;
+}
+.auto-count-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 13px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.acs-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--acc-strong);
+  white-space: nowrap;
+}
+.acs-structure {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acs-spacer {
+  flex: 1;
+}
+.acs-score {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.conf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.conf-dot.ok {
+  background: var(--pass);
+}
+.conf-dot.bad {
+  background: var(--fail);
+}
+.conf-dot.neutral {
+  background: var(--warn);
+}
+.acs-chevron {
+  color: var(--faint);
+  font-size: 13px;
+  line-height: 1;
+}
+.auto-count-collapse {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.auto-count-collapse:hover {
+  color: var(--text);
+}
+
 /* ---------- levels summary ---------- */
 .levels {
   margin: 6px 0 4px;

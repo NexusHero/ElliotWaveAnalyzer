@@ -264,6 +264,47 @@ describe('AutoAnalysisPanel', () => {
     })
   })
 
+  describe('declutter — only Primary expanded by default (#217)', () => {
+    const altCount: RankedWaveCount = {
+      ...bestCount,
+      isBest: false,
+      structure: 'Alt A-B-C zigzag',
+      confidence: 'low',
+      rationale: 'A corrective alternative worth watching',
+      outlook: 'Alt outlook text',
+    }
+
+    it('collapses alternates to a compact row and expands only the primary', () => {
+      renderPanel({
+        state: 'result',
+        data: { ...sampleData, rankings: [bestCount, altCount] },
+        activeCount: 0,
+      })
+      // Primary's full detail is visible …
+      expect(screen.getByText('Classic five-wave impulse')).toBeInTheDocument()
+      // … while the alternate shows only its compact summary (structure), not its rationale/outlook.
+      expect(screen.getByText('Alt A-B-C zigzag')).toBeInTheDocument()
+      expect(screen.queryByText('A corrective alternative worth watching')).not.toBeInTheDocument()
+      expect(screen.queryByText('Alt outlook text')).not.toBeInTheDocument()
+    })
+
+    it('expands an alternate in place when its row is clicked, then collapses again', async () => {
+      const user = userEvent.setup()
+      renderPanel({
+        state: 'result',
+        data: { ...sampleData, rankings: [bestCount, altCount] },
+        activeCount: 0,
+      })
+      await user.click(screen.getByRole('button', { name: /alt 1/i }))
+      expect(screen.getByText('A corrective alternative worth watching')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /collapse alt 1/i }))
+      expect(
+        screen.queryByText('A corrective alternative worth watching')
+      ).not.toBeInTheDocument()
+    })
+  })
+
   describe('deterministic score (AC1)', () => {
     it('shows the guideline score when the count carries one', () => {
       renderPanel({ state: 'result', data: { ...sampleData, rankings: [nestedCount] } })
