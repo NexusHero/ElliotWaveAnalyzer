@@ -4,6 +4,7 @@ import {
   autoAnalyzeWaves,
   deleteAnalysis,
   getBacktestSummary,
+  getAlternateHypotheses,
   getHistoricalAnalogs,
   getMarketData,
   getPortfolioReview,
@@ -30,6 +31,7 @@ import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
 import HistoricalAnalogsPanel, { type AnalogsState } from './HistoricalAnalogsPanel'
+import HypothesesPanel, { type HypothesesState } from './HypothesesPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
@@ -197,6 +199,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     : analogs.isError
       ? 'error'
       : analogs.isSuccess
+        ? 'result'
+        : 'idle'
+
+  // Alternate hypotheses (REQ-035): on-demand; the LLM proposes, the engine validates.
+  const hypotheses = useMutation({
+    mutationFn: () => getAlternateHypotheses(symbol, timeframe.code === '1w' ? '1w' : '1d'),
+  })
+  const hypothesesState: HypothesesState = hypotheses.isPending
+    ? 'loading'
+    : hypotheses.isError
+      ? 'error'
+      : hypotheses.isSuccess
         ? 'result'
         : 'idle'
 
@@ -841,6 +855,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             data={analogs.data ?? null}
             error={analogs.error instanceof Error ? analogs.error.message : null}
             onLoad={() => analogs.mutate()}
+          />
+
+          <HypothesesPanel
+            symbol={symbol}
+            state={hypothesesState}
+            data={hypotheses.data ?? null}
+            error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
+            onLoad={() => hypotheses.mutate()}
           />
 
           <TrackRecordPanel

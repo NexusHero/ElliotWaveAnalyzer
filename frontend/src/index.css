@@ -329,3 +329,68 @@ textarea {
   color: #b39ddb;
   background: rgba(179, 157, 219, 0.14);
 }
+
+/* ── Alternate hypotheses (#186): the LLM proposes, the engine validates ───────── */
+.hypotheses {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.hyp-subhead {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 0.75rem 0 0.35rem;
+}
+.hyp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.hyp-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.hyp-mark {
+  font-weight: 700;
+  line-height: 1.4;
+}
+.hyp-row.ok .hyp-mark {
+  color: var(--up, oklch(0.72 0.14 155));
+}
+.hyp-row.bad .hyp-mark {
+  color: var(--down, oklch(0.66 0.16 25));
+}
+.hyp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.hyp-structure {
+  font-weight: 600;
+}
+.hyp-score {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+.hyp-fail {
+  font-size: 0.82rem;
+  color: var(--down, oklch(0.66 0.16 25));
+}
+.hyp-reason {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.hyp-unavailable,
+.hyp-cap {
+  font-size: 0.84rem;
+  font-style: italic;
+}

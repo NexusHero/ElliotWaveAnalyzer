@@ -83,6 +83,7 @@ the process. GitHub issues are where a requirement is discussed; this table is w
 | REQ-032 | Test strategy: the safety invariants are encoded as **property-based + metamorphic** tests (CsCheck) that attack the pure deterministic core with thousands of generated, shrunk variants — sizing never negative/underflowing, no-valid-stop ⇔ the direction guard, verifier never throws + snapped pivots ⊆ real candles + valid ⇔ no hard-rule fail, snap idempotence, determinism, rule-verdict invariance under price-scaling and time-shift, **no-lookahead** (poisoned future candles never change the windowed analysis), and **LLM-swap invariance** (swapping the model's entire output leaves the deterministic fields byte-identical, proving I1 end to end); generators emit only valid fixtures; the wider layers (adversarial corpus, mutation, browser-E2E, contract-drift, real-LLM eval, load) are tracked as their own issues | #192, #193 (epic #201) · ADR-034 | Fulfilled (foundation) |
 | REQ-033 | Mutation testing gate: **Stryker** runs **nightly** over the pure algorithmic core (`Application/**` minus the acceptance-tested orchestration services, plus `Domain/CandleWindow`), rewriting it with small faults and failing if the **mutation score** falls below an enforced **`thresholds.break` floor** — proving the suite would actually *catch* a regression, not merely execute the line (the answer coverage can't give). The pre-4.x config (invalid in Stryker 4.16) is corrected to the 4.16 schema so a local run and CI share one gate; the run is scoped (string/LINQ mutations ignored) to stay bounded, and every surviving mutant is surfaced (HTML/JSON artifact + Markdown into the job summary) with its file, line and mutation | #195 (epic #201) · ADR-035 (+ ADR-015) | Fulfilled |
 | REQ-034 | Historical-analog retrieval (deterministic core): for a formed count, a **deterministic feature vector** (structure, direction, guideline score, confluence strength, reward:risk, distance-to-invalidation, RSI/MACD regime) fingerprints the setup; a pure **k-nearest retrieval** finds the most similar *past* setups by cosine over those vectors, restricted to ones that **concluded strictly before** the query's as-of date (**no-lookahead**) and **only concluded** (pending never counted); a pure **aggregator** computes hit-rate, target/invalidated split and median resolution time **only from concluded analogs**, flagging "insufficient history" below a minimum; an **analog fact-guard** rejects any narrative citing a rate/count/date not in the computed report. Wired end to end: an on-demand corpus is swept from the symbol's own history (cached per day), **`GET /api/wave-analysis/analogs`** returns the ranked analogs + measured stats, a **fact-guarded** LLM narrator adds an optional grounded summary (degrading to a reason with no key), and a **Historical analogs** panel presents it | #182 (epic #191) · ADR-037 (+ ADR-009/ADR-027/ADR-028) · §6 Scenario 21 | Fulfilled |
+| REQ-035 | Alternate-hypothesis generation: the LLM **proposes** which Elliott structures are worth testing (from a bounded vocabulary — impulse, diagonal, zigzag, flat, triangle), each with a one-line reason; the **deterministic engine generates + rule-checks** each proposal over the detected pivots with the same positional checkers the beam parser uses, scoring survivors with the shared guideline scorer. An **out-of-vocabulary** proposal is rejected **before** generation; a **rule-violating** proposal is rejected with the specific failing rule and **never** presented as valid; the number tested is **capped** (no unbounded prompting) and logged when hit; validation/scoring is **deterministic** and reproducible; with **no LLM key** the feature is simply absent (the deterministic beam search is unaffected). Exposed as **`GET /api/wave-analysis/hypotheses`**, presented by an **Alternate hypotheses** panel (validated with score; "considered & rejected" with the failing rule). The LLM proposes; the engine owns generation, validation and scoring | #186 (epic #191) · ADR-038 (+ ADR-009) · §6 Scenario 22 | Fulfilled |
 
 ## Quality Goals {#_quality_goals}
 
@@ -987,6 +988,37 @@ sequenceDiagram
 
 ---
 
+## Scenario 22 — Propose Alternate Hypotheses, Engine Validates (REQ-035) {#_runtime_scenario_22}
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant WS as Alternate hypotheses panel
+    participant Ep as GET /api/wave-analysis/hypotheses
+    participant Svc as AlternateHypothesisService
+    participant LLM as IHypothesisProposer
+    participant V as StructureVocabulary + HypothesisValidator (pure)
+
+    User->>WS: Propose & test hypotheses
+    WS->>Ep: symbol, interval
+    Ep->>Svc: AnalyzeAsync
+    alt no LLM key
+        Svc-->>Ep: report { unavailable } — deterministic search unaffected
+    else
+        Svc->>LLM: propose structures for the detected pivots (bounded)
+        LLM-->>Svc: [ {structure, reason}, … ]  (names only, never a verdict)
+        loop each proposal (capped)
+            Svc->>V: in-vocabulary? then generate + rule-check over pivots
+            Note over V: out-of-vocab ⇒ dropped before generation;<br/>hard-rule fail ⇒ rejected WITH the rule, never valid;<br/>survivor ⇒ scored by the shared guideline scorer
+            V-->>Svc: HypothesisResult (valid+score | rejected+failing rule)
+        end
+    end
+    Svc-->>Ep: validated[] + rejected[]
+    Ep-->>WS: 200 — the LLM proposed, the engine decided
+```
+
+---
+
 # Deployment View {#section-deployment-view}
 
 ## Infrastructure Overview {#_infrastructure_overview}
@@ -1830,6 +1862,29 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 | (+) | In-memory cosine keeps the stack dependency-free; a learned embedding or `pgvector` ANN can later slot behind the same `SetupFeatureVector`/retrieval seam without touching callers |
 | (-) | A hand-weighted feature vector is a modelling choice, not a learned one — it may rank "similar" imperfectly; mitigated by keeping structure/direction dominant and leaving the encoding a single, tunable seam |
 | (-) | Retrieval quality is only as good as the corpus depth; the "insufficient history" gate makes thin histories explicit rather than misleading, but a sparse instrument simply won't have analogs yet |
+
+---
+
+## ADR-038: Alternate-Hypothesis Generation — the LLM Proposes, the Engine Validates the Geometry
+
+**Context:** The deterministic parser explores rule-valid counts by beam search, but the Elliott structure space is large and a beam can rank away a structure a seasoned analyst would want tested ("have you considered a running flat here?"). We want to expand the search *intelligently* — but the invariant is absolute: the LLM must never assert a count it didn't earn against the rules (ADR-009). This is the capstone of the AI-differentiator epic (#191), whose whole thesis is "the LLM never does geometry."
+
+**Decision:** Split the feature at the proposal/validation seam:
+
+- **The LLM proposes names, nothing more.** `IHypothesisProposer` asks the model for a bounded list of structures worth testing (plus a one-line reason each) from a **fixed vocabulary**. It receives only a compact description of the detected pivots; it returns structure *names*, never a verdict, price or pivot.
+- **The vocabulary guard rejects out-of-vocab before generation.** `StructureVocabulary.TryParse` maps a proposal to a known `StructureKind` (impulse, diagonal, zigzag, flat, triangle) or drops it. A made-up structure, or one the engine doesn't model, never reaches generation.
+- **The engine owns validity and scoring (deterministic).** `HypothesisValidator` takes the proposed kind and the detected pivots, generates the structure's canonical labeling over the most recent pivots, and rule-checks it with the **same positional checkers the beam parser uses** (`ElliottRuleChecker`/`Zigzag`/`Flat`/`Triangle`/`Diagonal`). A hard-rule failure is returned as **rejected with the failing rule** and is never marked valid; a survivor is scored by the shared `WaveGuidelineScorer`. Same pivots + same kind ⇒ same verdict.
+- **Bounded and off-by-default.** The number of proposals tested per request is **capped** (no unbounded prompting loop; logged when hit), and with no LLM key the feature is simply absent — the deterministic beam search is unaffected.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The search expands to structures a beam might rank away, without ever letting the model assert a count — the moat ("the LLM never does geometry") holds by construction |
+| (+) | Rejected hypotheses are *educational*: "considered and rejected — Rule 3: wave 4 overlaps wave 1", grounded in the same checkers, never a hallucinated rejection |
+| (+) | The validator is pure and unit-tested (vocabulary guard, rule-violating ⇒ rejected-never-valid, valid ⇒ scored, determinism); reuses the existing checkers/scorer — no new geometry to trust |
+| (-) | Validation labels the *most recent* pivots for the proposed structure, so a hypothesis over an earlier sub-window isn't tested (nested/sub-wave hypothesis generation is a deliberate follow-up) |
+| (-) | Impulse vs diagonal (and zigzag vs flat) share pivot counts, so the useful granularity is the family the checkers distinguish; the engine's own classification remains the source of truth |
 
 ---
 
