@@ -109,39 +109,6 @@ function fmtMoney(value: number): string {
   return '$' + Math.round(value).toLocaleString('en-US')
 }
 
-/** Heuristic "AI" count — finds alternating swing pivots and labels the first five. */
-function aiCount(candles: MarketCandle[]): WaveAnnotation[] {
-  const win = 3
-  const pivots: { i: number; price: number; kind: 'H' | 'L' }[] = []
-  for (let i = win; i < candles.length - win; i++) {
-    let isHigh = true
-    let isLow = true
-    for (let j = i - win; j <= i + win; j++) {
-      if (candles[j]!.high > candles[i]!.high) isHigh = false
-      if (candles[j]!.low < candles[i]!.low) isLow = false
-    }
-    if (isHigh) pivots.push({ i, price: candles[i]!.high, kind: 'H' })
-    else if (isLow) pivots.push({ i, price: candles[i]!.low, kind: 'L' })
-  }
-  const seq: typeof pivots = []
-  let lastKind: 'H' | 'L' | null = null
-  for (const p of pivots) {
-    if (p.kind !== lastKind) {
-      seq.push(p)
-      lastKind = p.kind
-    }
-  }
-  const start = Math.max(
-    0,
-    seq.findIndex((p) => p.kind === 'L')
-  )
-  return seq.slice(start, start + 5).map((p, idx) => ({
-    date: candles[p.i]!.openTime,
-    price: p.price,
-    label: String(idx + 1),
-  }))
-}
-
 /**
  * The annotation workspace: a contained chart on the left, the annotation +
  * coaching loop on the right. Users place wave labels, then either validate
@@ -160,7 +127,6 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const candles = useMemo<MarketCandle[]>(() => marketQuery.data?.candles ?? [], [marketQuery.data])
 
   const [annotations, setAnnotations] = useState<WaveAnnotation[]>([])
-  const [aiAnnotations, setAiAnnotations] = useState<WaveAnnotation[]>([])
   const [coachState, setCoachState] = useState<CoachState>('empty')
   const [mode, setMode] = useState<CoachMode>('user')
 
@@ -423,7 +389,6 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const resetCoach = useCallback(() => {
     setCoachState('empty')
     setMode('user')
-    setAiAnnotations([])
     validation.reset()
   }, [validation])
 
@@ -536,22 +501,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const handleValidate = useCallback(() => {
     if (annotations.length < 2) return
-    setAiAnnotations([])
     void runAnalysis('user', annotations)
   }, [annotations, runAnalysis])
 
-  const handleAnalyze = useCallback(() => {
-    const ai = aiCount(candles)
-    setAiAnnotations(ai)
-    void runAnalysis('ai', ai)
-  }, [candles, runAnalysis])
+  // "Analyze for me" runs the real backend parser (grammar + beam search + guideline scoring),
+  // the same engine as the Auto-analysis panel — never a client-side heuristic (#160). The best
+  // ranked count is drawn as the AI count below; the panel shows its reading.
+  const handleAnalyze = handleAutoAnalyze
 
-  // The AI's primary line: the selected auto count's own pivots (origin + waves) once the backend
-  // has run, else the client-side "Analyze for me" heuristic count.
+  // The AI's primary line: the selected auto count's own pivots (origin + waves) from the real
+  // parser once it has run; nothing before that (no heuristic fallback — #160).
   const aiLineAnnotations = useMemo<WaveAnnotation[]>(
-    () =>
-      auto.isSuccess && activeRanked ? [activeRanked.origin, ...activeRanked.waves] : aiAnnotations,
-    [auto.isSuccess, activeRanked, aiAnnotations]
+    () => (auto.isSuccess && activeRanked ? [activeRanked.origin, ...activeRanked.waves] : []),
+    [auto.isSuccess, activeRanked]
   )
 
   // The overlaid alternate count (#162): a different ranked count shown alongside the primary for
@@ -736,7 +698,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               ) : (
                 <span>All labels placed — relabel or clear to continue.</span>
               )}
-              {(annotations.length > 0 || aiAnnotations.length > 0) && (
+              {(annotations.length > 0 || aiLineAnnotations.length > 0) && (
                 <button type="button" className="chip-clear" onClick={handleClear}>
                   Clear all
                 </button>

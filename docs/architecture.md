@@ -1911,6 +1911,22 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 
 ---
 
+## ADR-040: One "count for me" — "Analyze for me" Uses the Real Parser, the Client Heuristic Is Retired
+
+**Context:** Two differently-good "AI counts" sat side by side. The Coach's prominent **"Analyze for me"** button ran a **naive client-side heuristic** (`aiCount` in `WaveWorkspace` — a local swing-pivot finder labelling the first five alternating pivots), while the real intelligence (grammar parser + beam search + rule pruning + guideline scoring) lived behind the separate **Auto-analysis** panel. A user reasonably assumed the prominent button was *the* AI count, got the weak heuristic, and lost trust (#160).
+
+**Decision:** Make **one** deterministic "count for me": "Analyze for me" now delegates to the same real-parser flow as the Auto-analysis panel (`handleAutoAnalyze` → `autoAnalyzeWaves`), and the drawn AI count is the parser's **best ranked candidate** (`origin + waves`). The client-side `aiCount` heuristic — and its `aiAnnotations` state — are **removed from the product entirely**. The LLM still only ranks/narrates; the geometry is the deterministic parser's (ADR-009 holds).
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | One coherent, trustworthy "the AI's count" — the prominent button and the panel run the identical deterministic engine; no second-rate heuristic anywhere |
+| (+) | Less code and less state (`aiCount`/`aiAnnotations` gone); the AI line is derived purely from the ranked result |
+| (-) | "Analyze for me" now requires an API key (it routes through the ranked flow), where the offline heuristic previously drew *something* without one — an acceptable trade for not shipping a misleading count (the deterministic rule checks remain available on a hand-placed count via "Validate my count") |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}

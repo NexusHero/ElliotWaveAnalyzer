@@ -124,6 +124,21 @@ describe('WaveWorkspace', () => {
     expect(await screen.findByText('Analysis unavailable')).toBeInTheDocument()
   })
 
+  it('"Analyze for me" runs the real backend parser, not a client heuristic (#160)', async () => {
+    mockClient.autoAnalyzeWaves.mockResolvedValue({
+      rankings: [],
+      marketSummary: 'no clear structure',
+      usage: { provider: 'Gemini', promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    })
+    renderWorkspace()
+
+    fireEvent.click(screen.getByRole('button', { name: /analyze for me/i }))
+
+    // It goes to the deterministic parser (auto-analysis), never a local heuristic feeding validate.
+    await waitFor(() => expect(mockClient.autoAnalyzeWaves).toHaveBeenCalled())
+    expect(mockClient.validateWaveCount).not.toHaveBeenCalled()
+  })
+
   it('places a corrective A B C count when Zigzag / Flat is selected', () => {
     renderWorkspace()
 
