@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type {
   AutoWaveAnalysisResponse,
   RankedWaveCount,
@@ -213,8 +214,68 @@ function AutoResult({
     )
   }
 
-  const active = data.rankings[activeCount] ?? data.rankings[0]
+  // Guaranteed non-empty by the guard above, so the fallback element exists.
+  const active = data.rankings[activeCount] ?? data.rankings[0]!
   const showTabs = pro && data.rankings.length > 1
+
+  return (
+    <AutoResultBody
+      data={data}
+      topDown={topDown}
+      active={active}
+      showTabs={showTabs}
+      activeCount={activeCount}
+      onSelectCount={onSelectCount}
+      overlayCount={overlayCount}
+      onToggleOverlay={onToggleOverlay}
+      currentPrice={currentPrice}
+      onSaveCount={onSaveCount}
+      savePending={savePending}
+    />
+  )
+}
+
+/**
+ * The rendered result body. Split out so the expand/collapse UI state (below) lives in a component
+ * that is only mounted once there are rankings — keeping the hooks unconditional.
+ */
+function AutoResultBody({
+  data,
+  topDown,
+  active,
+  showTabs,
+  activeCount,
+  onSelectCount,
+  overlayCount,
+  onToggleOverlay,
+  currentPrice,
+  onSaveCount,
+  savePending,
+}: {
+  data: AutoWaveAnalysisResponse
+  topDown: TopDownAnalysis | null
+  active: RankedWaveCount
+  showTabs: boolean
+  activeCount: number
+  onSelectCount: (index: number) => void
+  overlayCount: number | null
+  onToggleOverlay: (index: number) => void
+  currentPrice: number | null
+  onSaveCount?: (count: RankedWaveCount) => void
+  savePending?: boolean
+}) {
+  // Only the current answer (the active count) is expanded by default; alternates collapse to a
+  // compact row and expand on demand, so a full result set stays scannable instead of a wall of
+  // text. Reset when a fresh analysis arrives.
+  const [manualExpanded, setManualExpanded] = useState<ReadonlySet<number>>(() => new Set())
+  useEffect(() => setManualExpanded(new Set()), [data])
+  const toggleExpand = (index: number) =>
+    setManualExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
 
   return (
     <div className="auto-result fade-up">
@@ -268,15 +329,20 @@ function AutoResult({
         </div>
       )}
 
-      {active?.levels && <LevelsSummary levels={active.levels} currentPrice={currentPrice} />}
+      {active.levels && <LevelsSummary levels={active.levels} currentPrice={currentPrice} />}
 
       <ul className="auto-counts">
         {data.rankings.map((count, i) => (
           <RankedCount
             key={i}
+            index={i}
             count={count}
             active={i === activeCount}
+            // The active count is always shown in full (it's the count on the chart); alternates
+            // start collapsed and expand on demand.
+            expanded={i === activeCount || manualExpanded.has(i)}
             onSelect={() => onSelectCount(i)}
+            onToggleExpand={() => toggleExpand(i)}
             onSaveCount={onSaveCount}
             savePending={savePending}
           />
@@ -287,22 +353,62 @@ function AutoResult({
 }
 
 function RankedCount({
+  index,
   count,
   active,
+  expanded,
   onSelect,
+  onToggleExpand,
   onSaveCount,
   savePending,
 }: {
+  index: number
   count: RankedWaveCount
   active: boolean
+  expanded: boolean
   onSelect: () => void
+  onToggleExpand: () => void
   onSaveCount?: (count: RankedWaveCount) => void
   savePending?: boolean
 }) {
+  const name = index === 0 ? 'Primary' : `Alt ${index}`
+  const confClass =
+    count.confidence === 'high' ? 'ok' : count.confidence === 'low' ? 'bad' : 'neutral'
+
+  // Collapsed: a single scannable row (name · structure · score · confidence) that expands on click.
+  // The active count is never collapsed — it's the count drawn on the chart.
+  if (!expanded) {
+    return (
+      <li className={`auto-count collapsed${count.isBest ? ' best' : ''}`}>
+        <button
+          type="button"
+          className="auto-count-summary"
+          aria-expanded={false}
+          onClick={onToggleExpand}
+        >
+          <span className="acs-name">{name}</span>
+          <span className="acs-structure">{count.structure}</span>
+          {count.isBest && <span className="best-tag">Most likely</span>}
+          <span className="acs-spacer" />
+          {count.score != null && (
+            <span className="acs-score mono" title="Deterministic guideline score (0–1)">
+              {fmtScore(count.score)}
+            </span>
+          )}
+          <span className={`conf-dot ${confClass}`} title={`${count.confidence} confidence`} />
+          <span className="acs-chevron" aria-hidden>
+            ⌄
+          </span>
+        </button>
+      </li>
+    )
+  }
+
   return (
     <li className={`auto-count${count.isBest ? ' best' : ''}${active ? ' active' : ''}`}>
       <div className="auto-count-head">
         <button type="button" className="auto-count-pick" onClick={onSelect}>
+          <span className="acs-name">{name}</span>
           {count.structure}
           {count.isBest && <span className="best-tag">Most likely</span>}
         </button>
@@ -328,6 +434,18 @@ function RankedCount({
               onClick={() => onSaveCount(count)}
             >
               <Seal size={13} /> Save
+            </button>
+          )}
+          {/* The active count stays open (it's on the chart); a manually-opened alternate can collapse. */}
+          {!active && (
+            <button
+              type="button"
+              className="auto-count-collapse"
+              aria-expanded={true}
+              aria-label={`Collapse ${name}`}
+              onClick={onToggleExpand}
+            >
+              ⌃
             </button>
           )}
         </span>
