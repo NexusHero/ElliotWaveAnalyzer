@@ -115,10 +115,23 @@ export interface PriceZone {
   basis: string
 }
 
+/**
+ * The re-projectable reading behind an alternative — the same pivots re-read under the opposite
+ * mode (mirrors backend `ScenarioReinterpretation`). Present so the alternate branch can be drawn
+ * as a real projection, not just a label.
+ */
+export interface ScenarioReinterpretation {
+  structure: StructureKind
+  /** True → re-project as a motive count; false → as a correction. */
+  motive: boolean
+  annotations: WaveAnnotation[]
+}
+
 /** The count that applies if the primary invalidation breaks (mirrors backend `AlternativeScenario`). */
 export interface AlternativeScenario {
   name: string
   note: string
+  reinterpretation?: ScenarioReinterpretation | null
 }
 
 /** Price scale the Fibonacci levels were computed in (mirrors backend `FibScale`). */

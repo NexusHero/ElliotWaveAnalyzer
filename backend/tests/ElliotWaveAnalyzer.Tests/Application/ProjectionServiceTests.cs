@@ -277,4 +277,60 @@ public sealed class ProjectionServiceTests
         Assert.That(levels.ConfluenceZones, Is.Not.Empty);
         Assert.That(levels.ConfluenceZones.All(z => z.Kind == ZoneKind.Entry), Is.True);
     }
+
+    // ─── structured alternate scenarios (#218) ──────────────────────────────────
+
+    // Every motive count that yields an alternative carries a re-projectable reinterpretation over
+    // the same pivots, and resolving it produces real levels (verified by round-trip). Covers each
+    // unfolding wave 2..5 and the complete impulse.
+    [TestCase(new[] { 100.0, 120.0 })]                             // wave 2
+    [TestCase(new[] { 100.0, 120.0, 110.0 })]                      // wave 3
+    [TestCase(new[] { 100.0, 120.0, 110.0, 140.0 })]              // wave 4
+    [TestCase(new[] { 100.0, 120.0, 110.0, 140.0, 130.0 })]      // wave 5
+    [TestCase(new[] { 100.0, 120.0, 110.0, 140.0, 130.0, 160.0 })] // impulse complete
+    public void Project_Alternative_CarriesResolvableReinterpretation(double[] prices)
+    {
+        var pivots = Pivots([.. prices.Select(p => (decimal)p)]);
+
+        var levels = ProjectionService.Project(pivots)!;
+        var reinterpretation = levels.Alternative!.Reinterpretation;
+
+        Assert.That(reinterpretation, Is.Not.Null, "the alternative should carry a reinterpretation");
+        // The reinterpretation re-reads the very same pivots …
+        Assert.That(reinterpretation!.Annotations.Select(a => a.Price),
+            Is.EqualTo(pivots.Select(a => a.Price)));
+        // … and resolving it yields real, non-null levels without throwing.
+        WaveLevels? resolved = null;
+        Assert.DoesNotThrow(() => resolved = ProjectionService.Resolve(reinterpretation));
+        Assert.That(resolved, Is.Not.Null);
+    }
+
+    [Test]
+    public void ProjectCorrective_Alternative_ResolvesToMotiveLevels()
+    {
+        var pivots = Pivots(100m, 80m, 90m); // unfolding wave C of a zigzag
+
+        var levels = ProjectionService.ProjectCorrective(pivots, StructureKind.Zigzag)!;
+        var reinterpretation = levels.Alternative!.Reinterpretation;
+
+        Assert.That(reinterpretation, Is.Not.Null);
+        Assert.That(reinterpretation!.Motive, Is.True, "a correction's alternative reads as motive");
+        Assert.That(ProjectionService.Resolve(reinterpretation), Is.Not.Null);
+    }
+
+    [Test]
+    public void Resolve_MotiveAndCorrective_NeverThrowAndRoundTrip()
+    {
+        // A motive reinterpretation resolves via Project(); a corrective one via ProjectCorrective().
+        var motive = new ScenarioReinterpretation(
+            StructureKind.Impulse, Motive: true, Pivots(100m, 120m, 110m));
+        var corrective = new ScenarioReinterpretation(
+            StructureKind.Zigzag, Motive: false, Pivots(100m, 80m, 90m));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ProjectionService.Resolve(motive), Is.Not.Null);
+            Assert.That(ProjectionService.Resolve(corrective), Is.Not.Null);
+        });
+    }
 }

@@ -25,7 +25,8 @@ public static class ProjectionService
     {
         ArgumentNullException.ThrowIfNull(annotations);
 
-        var p = annotations.OrderBy(a => a.Date).Select(a => a.Price).ToList();
+        var sorted = annotations.OrderBy(a => a.Date).ToList();
+        var p = sorted.Select(a => a.Price).ToList();
         if (p.Count < 2)
         {
             return null;
@@ -45,13 +46,36 @@ public static class ProjectionService
         };
 
         var scale = FibMath.AutoSelect(p);
+        // A motive count's alternative reads the same pivots as a correction (the "it was an ABC,
+        // not an impulse" duality); resolved lazily so it can be drawn as a real projection (#218).
+        var reinterpretation = new ScenarioReinterpretation(StructureKind.Zigzag, Motive: false, sorted);
         return levels with
         {
             Scale = scale,
             ConfluenceZones = MotiveConfluence(p, unfolding, scale),
             Channels = ChannelProjector.Project(annotations, scale),
+            Alternative = WithReinterpretation(levels.Alternative, reinterpretation),
         };
     }
+
+    /// <summary>
+    /// Resolves an <see cref="AlternativeScenario.Reinterpretation"/> into the concrete
+    /// <see cref="WaveLevels"/> it stands for — the same pivots re-projected under the opposite
+    /// mode. Lazy by design (see <see cref="ScenarioReinterpretation"/>), so drawing the alternate
+    /// branch never triggers unbounded recursion. Returns null when the pivots can't be projected.
+    /// </summary>
+    public static WaveLevels? Resolve(ScenarioReinterpretation reinterpretation)
+    {
+        ArgumentNullException.ThrowIfNull(reinterpretation);
+        return reinterpretation.Motive
+            ? Project(reinterpretation.Annotations)
+            : ProjectCorrective(reinterpretation.Annotations, reinterpretation.Structure);
+    }
+
+    /// <summary>Attaches a reinterpretation to an alternative (null-safe; leaves a None alternative null).</summary>
+    private static AlternativeScenario? WithReinterpretation(
+        AlternativeScenario? alternative, ScenarioReinterpretation reinterpretation)
+        => alternative is null ? null : alternative with { Reinterpretation = reinterpretation };
 
     // Log-correct confluence zones for the wave currently unfolding, built from the legs that
     // matter for that wave. Wave 5 draws on two legs (Wave 1 and net Waves 1–3) so its target
@@ -170,7 +194,8 @@ public static class ProjectionService
     {
         ArgumentNullException.ThrowIfNull(annotations);
 
-        var p = annotations.OrderBy(a => a.Date).Select(a => a.Price).ToList();
+        var sorted = annotations.OrderBy(a => a.Date).ToList();
+        var p = sorted.Select(a => a.Price).ToList();
         if (p.Count < 2)
         {
             return null;
@@ -199,7 +224,15 @@ public static class ProjectionService
         }
 
         var scale = FibMath.AutoSelect(p);
-        return levels with { Scale = scale, ConfluenceZones = CorrectiveConfluence(p, kind, unfolding, scale) };
+        // A correction's alternative reads the same pivots as a motive count (the mirror of the
+        // motive→corrective duality above), resolved lazily so the alternate branch can be drawn.
+        var reinterpretation = new ScenarioReinterpretation(StructureKind.Impulse, Motive: true, sorted);
+        return levels with
+        {
+            Scale = scale,
+            ConfluenceZones = CorrectiveConfluence(p, kind, unfolding, scale),
+            Alternative = WithReinterpretation(levels.Alternative, reinterpretation),
+        };
     }
 
     // Confluence zones for a corrective leg. Wave B/C project Wave A; a completed ABC retraces the

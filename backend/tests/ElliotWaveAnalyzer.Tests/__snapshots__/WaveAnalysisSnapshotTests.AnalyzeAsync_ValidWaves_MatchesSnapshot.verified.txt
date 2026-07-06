@@ -55,7 +55,28 @@
     ],
     Alternative: {
       Name: Corrective B-wave,
-      Note: If price reverses below Wave 2, the move up may be a corrective B-wave rather than Wave 3.
+      Note: If price reverses below Wave 2, the move up may be a corrective B-wave rather than Wave 3.,
+      Reinterpretation: {
+        Structure: Zigzag,
+        Motive: false,
+        Annotations: [
+          {
+            Date: DateTime_1,
+            Price: 38000.0,
+            Label: 1
+          },
+          {
+            Date: DateTime_2,
+            Price: 35000.0,
+            Label: 2
+          },
+          {
+            Date: DateTime_3,
+            Price: 52000.0,
+            Label: 3
+          }
+        ]
+      }
     },
     ConfluenceZones: [
       {
