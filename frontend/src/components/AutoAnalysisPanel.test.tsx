@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { AutoWaveAnalysisResponse, RankedWaveCount, WaveLevels, WaveNode } from '../api/types'
@@ -93,6 +93,8 @@ function renderPanel(overrides: Partial<Parameters<typeof AutoAnalysisPanel>[0]>
     pro: false,
     activeCount: 0,
     onSelectCount: vi.fn(),
+    overlayCount: null,
+    onToggleOverlay: vi.fn(),
     currentPrice: null,
     onRun: vi.fn(),
     onOpenSettings: vi.fn(),
@@ -225,9 +227,10 @@ describe('AutoAnalysisPanel', () => {
         pro: true,
         activeCount: 0,
       })
-      expect(screen.getByRole('group', { name: /wave counts/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /primary/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /alt 1/i })).toBeInTheDocument()
+      const tabs = screen.getByRole('group', { name: /wave counts/i })
+      expect(tabs).toBeInTheDocument()
+      expect(within(tabs).getByRole('button', { name: /primary/i })).toBeInTheDocument()
+      expect(within(tabs).getByRole('button', { name: /alt 1/i })).toBeInTheDocument()
     })
 
     it('calls onSelectCount when a count tab is clicked in pro mode', async () => {
@@ -239,8 +242,25 @@ describe('AutoAnalysisPanel', () => {
         pro: true,
         activeCount: 0,
       })
-      await user.click(screen.getByRole('button', { name: /alt 1/i }))
+      const tabs = screen.getByRole('group', { name: /wave counts/i })
+      await user.click(within(tabs).getByRole('button', { name: /alt 1/i }))
       expect(props.onSelectCount).toHaveBeenCalledWith(1)
+    })
+
+    it('toggles an alternate overlay for the non-active counts only (#162)', async () => {
+      const user = userEvent.setup()
+      const twoRankings = [bestCount, { ...bestCount, isBest: false, structure: 'Alt A-B-C' }]
+      const { props } = renderPanel({
+        state: 'result',
+        data: { ...sampleData, rankings: twoRankings },
+        pro: true,
+        activeCount: 0,
+      })
+      const overlay = screen.getByRole('group', { name: /overlay an alternate count/i })
+      // The active count (Primary) is not offered as its own overlay; the alternate is.
+      expect(within(overlay).queryByRole('button', { name: /primary/i })).not.toBeInTheDocument()
+      await user.click(within(overlay).getByRole('button', { name: /alt 1/i }))
+      expect(props.onToggleOverlay).toHaveBeenCalledWith(1)
     })
   })
 

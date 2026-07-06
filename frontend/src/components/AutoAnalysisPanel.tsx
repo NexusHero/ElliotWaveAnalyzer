@@ -28,6 +28,9 @@ interface AutoAnalysisPanelProps {
   /** Index of the count whose levels are on the chart. */
   activeCount: number
   onSelectCount: (index: number) => void
+  /** Index of the alternate count overlaid alongside the primary for comparison (#162), or null. */
+  overlayCount: number | null
+  onToggleOverlay: (index: number) => void
   /** Latest price, for live distance to the invalidation line. */
   currentPrice: number | null
   onRun: () => void
@@ -83,6 +86,8 @@ export default function AutoAnalysisPanel({
   pro,
   activeCount,
   onSelectCount,
+  overlayCount,
+  onToggleOverlay,
   currentPrice,
   onRun,
   onOpenSettings,
@@ -164,6 +169,8 @@ export default function AutoAnalysisPanel({
           pro={pro}
           activeCount={activeCount}
           onSelectCount={onSelectCount}
+          overlayCount={overlayCount}
+          onToggleOverlay={onToggleOverlay}
           currentPrice={currentPrice}
           onSaveCount={onSaveCount}
           savePending={savePending}
@@ -179,6 +186,8 @@ function AutoResult({
   pro,
   activeCount,
   onSelectCount,
+  overlayCount,
+  onToggleOverlay,
   currentPrice,
   onSaveCount,
   savePending,
@@ -188,6 +197,8 @@ function AutoResult({
   pro: boolean
   activeCount: number
   onSelectCount: (index: number) => void
+  overlayCount: number | null
+  onToggleOverlay: (index: number) => void
   currentPrice: number | null
   onSaveCount?: (count: RankedWaveCount) => void
   savePending?: boolean
@@ -235,6 +246,25 @@ function AutoResult({
               {c.isBest && i !== 0 ? ' ★' : ''}
             </button>
           ))}
+        </div>
+      )}
+
+      {showTabs && (
+        <div className="overlay-row" role="group" aria-label="Overlay an alternate count">
+          <span className="overlay-lbl">Overlay</span>
+          {data.rankings.map((_, i) =>
+            i === activeCount ? null : (
+              <button
+                key={i}
+                type="button"
+                className={`overlay-btn${overlayCount === i ? ' on' : ''}`}
+                aria-pressed={overlayCount === i}
+                onClick={() => onToggleOverlay(i)}
+              >
+                {i === 0 ? 'Primary' : `Alt ${i}`}
+              </button>
+            )
+          )}
         </div>
       )}
 

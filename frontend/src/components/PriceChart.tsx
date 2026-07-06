@@ -23,9 +23,12 @@ import type { WaveLinePoint } from './waveLine'
 import { type ZoneBandColors, ZoneBandsPrimitive } from './zoneBandsPrimitive'
 import type { ZoneBand } from './zoneOverlay'
 
-/** A count's wave-line polyline through its pivots, coloured by whose count it is. */
+/**
+ * A count's wave-line polyline through its pivots, coloured by whose count it is: the analyst's own
+ * (`user`), the AI's primary count (`ai`), or an overlaid alternate count (`alt`) shown for comparison.
+ */
 export interface WaveLine {
-  kind: 'user' | 'ai'
+  kind: 'user' | 'ai' | 'alt'
   points: WaveLinePoint[]
 }
 
@@ -34,7 +37,7 @@ export interface ChartMarker {
   time: string // YYYY-MM-DD
   label: string
   /** Whose count this marker belongs to — drives colour + position. */
-  kind?: 'user' | 'ai'
+  kind?: 'user' | 'ai' | 'alt'
 }
 
 /** Semantic kind of a horizontal level line. */
@@ -46,6 +49,11 @@ export interface PriceLineSpec {
   kind: LevelKind
   /** Axis label text; empty string draws the line without a label (e.g. a zone's far bound). */
   title: string
+  /**
+   * Which count this line belongs to. An overlaid alternate's lines (`alt`) draw in the alternate
+   * colour so the two counts' invalidations/targets stay attributable. Defaults to the primary.
+   */
+  variant?: 'primary' | 'alt'
 }
 
 interface PriceChartProps {
@@ -215,8 +223,9 @@ export default function PriceChart({
     const colors = chartColors(theme)
     const markers: SeriesMarker<Time>[] = annotations.map((a) => ({
       time: a.time as Time,
-      position: a.kind === 'ai' ? 'belowBar' : 'aboveBar',
-      color: a.kind === 'ai' ? colors.aiMarker : colors.marker,
+      // The analyst's own labels sit above the bar; the AI's and the alternate's below it.
+      position: a.kind === 'user' || a.kind === undefined ? 'aboveBar' : 'belowBar',
+      color: countColor(colors, a.kind),
       shape: 'circle',
       text: a.label,
     }))
@@ -243,7 +252,7 @@ export default function PriceChart({
     for (const wave of waveLines) {
       if (wave.points.length < 2) continue
       const line = chart.addSeries(LineSeries, {
-        color: wave.kind === 'ai' ? colors.aiMarker : colors.marker,
+        color: countColor(colors, wave.kind),
         lineWidth: 2,
         // The line traces structure; keep it out of the axis/crosshair furniture so the
         // markers on top stay legible.
@@ -271,7 +280,9 @@ export default function PriceChart({
       priceLinesRef.current.push(
         series.createPriceLine({
           price: spec.price,
-          color: levelColor(colors, spec.kind),
+          // An overlaid alternate's lines take the alternate colour so the two counts' levels stay
+          // attributable; the primary keeps the semantic invalid/support/target colours.
+          color: spec.variant === 'alt' ? colors.altMarker : levelColor(colors, spec.kind),
           lineWidth: 1,
           // Invalidation reads as "danger" (dashed); targets dotted; support solid.
           lineStyle:
@@ -301,6 +312,7 @@ interface ChartColors {
   down: string
   marker: string
   aiMarker: string
+  altMarker: string
   invalid: string
   support: string
   target: string
@@ -312,6 +324,11 @@ interface ChartColors {
 
 function levelColor(colors: ChartColors, kind: LevelKind): string {
   return kind === 'invalid' ? colors.invalid : kind === 'support' ? colors.support : colors.target
+}
+
+/** Marker/line colour for a count by whose it is (user / AI primary / overlaid alternate). */
+function countColor(colors: ChartColors, kind: 'user' | 'ai' | 'alt' | undefined): string {
+  return kind === 'ai' ? colors.aiMarker : kind === 'alt' ? colors.altMarker : colors.marker
 }
 
 /** The entry/target band palettes for the shaded-zone primitive, from the active theme. */
@@ -334,6 +351,7 @@ const DARK_COLORS: ChartColors = {
   down: '#e0655c', // --down
   marker: '#e8eaed', // --text (user labels)
   aiMarker: '#e0b34e', // --acc (AI labels)
+  altMarker: '#b39ddb', // violet: an overlaid alternate count (distinct from user/AI/levels)
   invalid: '#e0655c', // --down: danger / count-dead line
   support: '#e0b34e', // --acc amber: expected support zone
   target: '#5b9bd5', // blue: forward target zone (never collides with candles)
@@ -353,6 +371,7 @@ const LIGHT_COLORS: ChartColors = {
   down: '#d6473d', // --down
   marker: '#2b2f38', // --text (user labels)
   aiMarker: '#cf9438', // --acc (AI labels)
+  altMarker: '#7e57c2', // violet: an overlaid alternate count
   invalid: '#d6473d', // --down
   support: '#cf9438', // --acc amber
   target: '#2f6fb0', // blue
