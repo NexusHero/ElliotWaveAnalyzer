@@ -6,6 +6,8 @@ interface LevelsSummaryProps {
   levels: WaveLevels | null
   /** Latest price, for the live distance to the invalidation line. */
   currentPrice: number | null
+  /** Where the invalidation sits as a % retracement of the prior leg (#219), when computed. */
+  invalidationRetracePercent?: number | null
 }
 
 function fmt(value: number): string {
@@ -21,7 +23,11 @@ function zoneRange(low: number, high: number): string {
  * the expected Fibonacci support zone, forward target zones, and the alternative count that
  * applies if invalidation breaks. Shared by the manual coach and the full-auto panel.
  */
-export default function LevelsSummary({ levels, currentPrice }: LevelsSummaryProps) {
+export default function LevelsSummary({
+  levels,
+  currentPrice,
+  invalidationRetracePercent = null,
+}: LevelsSummaryProps) {
   if (!levels) return null
 
   const inv = levels.invalidation
@@ -54,6 +60,9 @@ export default function LevelsSummary({ levels, currentPrice }: LevelsSummaryPro
           </span>
           <span className="level-note">
             {inv.side === 'Below' ? 'count dead below' : 'count dead above'} · {inv.basis}
+            {invalidationRetracePercent != null && (
+              <> · ≈{invalidationRetracePercent.toFixed(0)}% retrace of the prior wave</>
+            )}
           </span>
         </div>
       )}

@@ -100,7 +100,11 @@ export default function LiveVerifyPanel({
             </p>
           )}
 
-          <LevelsSummary levels={verification.levels} currentPrice={currentPrice} />
+          <LevelsSummary
+            levels={verification.levels}
+            currentPrice={currentPrice}
+            invalidationRetracePercent={verification.branches?.invalidationRetracePercent ?? null}
+          />
 
           {onSave && (
             <div className="lv-save">

@@ -333,4 +333,60 @@ public sealed class ProjectionServiceTests
             Assert.That(ProjectionService.Resolve(corrective), Is.Not.Null);
         });
     }
+
+    // ─── forward projection branches (#219) ─────────────────────────────────────
+
+    [Test]
+    public void Branches_Wave4_HasInvalidationPercent_SpeculativeWave5_AndAlternate()
+    {
+        // Wave 4 unfolding (bull): invalidation = end of Wave 1 (120), last leg = Wave 3 (110→140).
+        var branches = ProjectionService.Branches(Pivots(100m, 120m, 110m, 140m))!;
+
+        Assert.Multiple(() =>
+        {
+            // (140 - 120) / (140 - 110) = 66.7% retracement of Wave 3.
+            Assert.That(branches.InvalidationRetracePercent!.Value, Is.EqualTo(66.67).Within(0.1));
+            // Completing Wave 4 at its support-zone edge projects one step ahead into Wave 5.
+            Assert.That(branches.Speculative, Is.Not.Null);
+            Assert.That(branches.Speculative!.UnfoldingWave, Is.EqualTo("Wave 5"));
+            // The alternate reading resolves to real levels (the corrective duality from #218).
+            Assert.That(branches.Alternate, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public void Branches_ExtendingWave_HasNoInvalidationPercent_ButStillProjectsAhead()
+    {
+        // Wave 3 unfolding (bull) has a target, not a support zone → no retrace %, but it still
+        // projects one step ahead (Wave 4) by completing at the target edge.
+        var branches = ProjectionService.Branches(Pivots(100m, 120m, 110m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branches.InvalidationRetracePercent, Is.Null);
+            Assert.That(branches.Speculative, Is.Not.Null);
+            Assert.That(branches.Speculative!.UnfoldingWave, Is.EqualTo("Wave 4"));
+        });
+    }
+
+    [Test]
+    public void Branches_SpeculativeTarget_ScalesWithPrice()
+    {
+        // Metamorphic (#219 AC4): scaling every price by k scales the speculative projection by k
+        // (the ratio span/low is invariant, so the auto-selected scale is unchanged).
+        const decimal k = 3m;
+        var basePivots = new[] { 100m, 120m, 110m, 140m };
+        var scaled = basePivots.Select(p => p * k).ToArray();
+
+        var a = ProjectionService.Branches(Pivots(basePivots))!.Speculative!;
+        var b = ProjectionService.Branches(Pivots(scaled))!.Speculative!;
+
+        Assert.That(a.TargetZones, Is.Not.Empty);
+        Assert.That(b.TargetZones[0].Low, Is.EqualTo(a.TargetZones[0].Low * k).Within(0.01m));
+        Assert.That(b.TargetZones[0].High, Is.EqualTo(a.TargetZones[0].High * k).Within(0.01m));
+    }
+
+    [Test]
+    public void Branches_FewerThanTwoPivots_ReturnsNull()
+        => Assert.That(ProjectionService.Branches(Pivots(100m)), Is.Null);
 }

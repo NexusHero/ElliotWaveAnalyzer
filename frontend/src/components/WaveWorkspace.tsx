@@ -35,7 +35,7 @@ import HypothesesPanel, { type HypothesesState } from './HypothesesPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
-import { type ZoneBand, levelsToZoneBands } from './zoneOverlay'
+import { type ZoneBand, branchesToZoneBands, levelsToZoneBands } from './zoneOverlay'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
@@ -381,11 +381,16 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     () => levelsToPriceLines(activeLevels, effectiveLayers),
     [activeLevels, effectiveLayers]
   )
-  // The shaded zone bands fill between the same edges the price lines mark (the "green boxes").
-  const zoneBands = useMemo<ZoneBand[]>(
-    () => levelsToZoneBands(activeLevels, effectiveLayers),
-    [activeLevels, effectiveLayers]
-  )
+  // The shaded zone bands fill between the same edges the price lines mark (the "green boxes"),
+  // plus — in Pro mode — the forward projection branches (#219): the speculative one-step-ahead
+  // continuation and the bearish alternate, drawn subordinate (dashed) from the live-verify result.
+  const zoneBands = useMemo<ZoneBand[]>(() => {
+    const confirmed = levelsToZoneBands(activeLevels, effectiveLayers)
+    const branchBands = pro
+      ? branchesToZoneBands(liveVerify.data?.branches ?? null, effectiveLayers)
+      : []
+    return [...confirmed, ...branchBands]
+  }, [activeLevels, effectiveLayers, pro, liveVerify.data?.branches])
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
