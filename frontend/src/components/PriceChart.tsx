@@ -221,16 +221,24 @@ export default function PriceChart({
     if (!markersApi) return
 
     const colors = chartColors(theme)
-    const markers: SeriesMarker<Time>[] = annotations.map((a) => ({
-      time: a.time as Time,
-      // The analyst's own labels sit above the bar; the AI's and the alternate's below it.
-      position: a.kind === 'user' || a.kind === undefined ? 'aboveBar' : 'belowBar',
-      color: countColor(colors, a.kind),
-      shape: 'circle',
-      text: a.label,
-    }))
+    // Only plot markers whose date is within the loaded window — a pivot outside the current range
+    // (e.g. after narrowing the range) stays in the count's state upstream but isn't drawn here, and
+    // reappears when the range covers its date again (#164). Markers must be time-sorted for v5.
+    const markers: SeriesMarker<Time>[] = annotations
+      .filter((a) => inWindow(candles, a.time))
+      .map(
+        (a): SeriesMarker<Time> => ({
+          time: datePart(a.time) as Time,
+          // The analyst's own labels sit above the bar; the AI's and the alternate's below it.
+          position: a.kind === 'user' || a.kind === undefined ? 'aboveBar' : 'belowBar',
+          color: countColor(colors, a.kind),
+          shape: 'circle',
+          text: a.label,
+        })
+      )
+      .sort((l, r) => String(l.time).localeCompare(String(r.time)))
     markersApi.setMarkers(markers)
-  }, [annotations, theme])
+  }, [annotations, candles, theme])
 
   // ── Update the shaded zone bands when they (or theme) change ───────────────
   useEffect(() => {
@@ -250,7 +258,13 @@ export default function PriceChart({
 
     const colors = chartColors(theme)
     for (const wave of waveLines) {
-      if (wave.points.length < 2) continue
+      // Only trace through pivots inside the loaded window (#164) — out-of-window points stay in
+      // the count's state upstream but aren't plotted; time-sorted for the v5 series.
+      const points = wave.points
+        .filter((p) => inWindow(candles, p.time))
+        .map((p) => ({ time: datePart(p.time) as Time, value: p.value }))
+        .sort((l, r) => String(l.time).localeCompare(String(r.time)))
+      if (points.length < 2) continue
       const line = chart.addSeries(LineSeries, {
         color: countColor(colors, wave.kind),
         lineWidth: 2,
@@ -260,10 +274,10 @@ export default function PriceChart({
         priceLineVisible: false,
         crosshairMarkerVisible: false,
       })
-      line.setData(wave.points.map((p) => ({ time: p.time as Time, value: p.value })))
+      line.setData(points)
       waveLineSeriesRef.current.push(line)
     }
-  }, [waveLines, theme])
+  }, [waveLines, candles, theme])
 
   // ── Draw level lines (invalidation / fib zones) when they (or theme) change ──
   useEffect(() => {
@@ -411,4 +425,22 @@ function timeToIsoDate(time: Time): string {
   if (typeof time === 'number') return new Date(time * 1000).toISOString().split('T')[0] as string
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${time.year}-${pad(time.month)}-${pad(time.day)}`
+}
+
+/** The `YYYY-MM-DD` date part of an ISO timestamp (the series' time granularity). */
+function datePart(iso: string): string {
+  return iso.split('T')[0] as string
+}
+
+/**
+ * Whether an annotation/pivot date falls within the loaded candle window (#164). Comparison is on
+ * `YYYY-MM-DD` strings, which sort lexicographically. Out-of-window points aren't drawn (they stay
+ * in the count's state upstream and reappear when the range covers them again).
+ */
+function inWindow(candles: MarketCandle[], iso: string): boolean {
+  if (candles.length === 0) return false
+  const first = datePart(candles[0]!.openTime)
+  const last = datePart(candles[candles.length - 1]!.openTime)
+  const d = datePart(iso)
+  return d >= first && d <= last
 }

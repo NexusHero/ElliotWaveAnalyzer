@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../api/client'
 import type { WaveAnalysisResponse } from '../api/types'
@@ -137,6 +137,31 @@ describe('WaveWorkspace', () => {
     // It goes to the deterministic parser (auto-analysis), never a local heuristic feeding validate.
     await waitFor(() => expect(mockClient.autoAnalyzeWaves).toHaveBeenCalled())
     expect(mockClient.validateWaveCount).not.toHaveBeenCalled()
+  })
+
+  it('offers longer history ranges 3Y/5Y/Max (#164)', () => {
+    renderWorkspace()
+    const rangeGroup = screen.getByRole('group', { name: 'Range' })
+    for (const label of ['3Y', '5Y', 'Max']) {
+      expect(within(rangeGroup).getByRole('button', { name: label })).toBeInTheDocument()
+    }
+  })
+
+  it('keeps the count across a range change but resets on a timeframe change (#164)', () => {
+    renderWorkspace()
+    fireEvent.click(screen.getByTestId('pt1'))
+    fireEvent.click(screen.getByTestId('pt2'))
+    expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+
+    // A pure range change (same symbol + timeframe) preserves the analyst's work …
+    fireEvent.click(within(screen.getByRole('group', { name: 'Range' })).getByRole('button', { name: '3Y' }))
+    expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+
+    // … but a timeframe change resets it (labels placed on daily bars don't map onto weekly).
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Timeframe' })).getByRole('button', { name: 'Weekly' })
+    )
+    expect(screen.queryByLabelText('Label for annotation 1')).not.toBeInTheDocument()
   })
 
   it('places a corrective A B C count when Zigzag / Flat is selected', () => {
