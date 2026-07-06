@@ -320,6 +320,8 @@ interface ChartColors {
   zoneEntryBorder: string
   zoneTargetFill: string
   zoneTargetBorder: string
+  zoneAltFill: string
+  zoneAltBorder: string
 }
 
 function levelColor(colors: ChartColors, kind: LevelKind): string {
@@ -336,6 +338,7 @@ function zoneColors(colors: ChartColors): ZoneBandColors {
   return {
     entry: { fill: colors.zoneEntryFill, border: colors.zoneEntryBorder },
     target: { fill: colors.zoneTargetFill, border: colors.zoneTargetBorder },
+    alternate: { fill: colors.zoneAltFill, border: colors.zoneAltBorder },
   }
 }
 
@@ -360,6 +363,9 @@ const DARK_COLORS: ChartColors = {
   zoneEntryBorder: 'rgba(66, 165, 245, 0.55)',
   zoneTargetFill: 'rgba(102, 187, 106, 0.16)',
   zoneTargetBorder: 'rgba(102, 187, 106, 0.55)',
+  // Bearish alternate branch (#219): the danger red, so it reads apart from entry/target.
+  zoneAltFill: 'rgba(224, 101, 92, 0.14)',
+  zoneAltBorder: 'rgba(224, 101, 92, 0.55)',
 }
 
 const LIGHT_COLORS: ChartColors = {
@@ -380,6 +386,8 @@ const LIGHT_COLORS: ChartColors = {
   zoneEntryBorder: 'rgba(47, 111, 176, 0.60)',
   zoneTargetFill: 'rgba(45, 158, 110, 0.15)',
   zoneTargetBorder: 'rgba(45, 158, 110, 0.60)',
+  zoneAltFill: 'rgba(214, 71, 61, 0.13)',
+  zoneAltBorder: 'rgba(214, 71, 61, 0.60)',
 }
 
 function chartColors(theme: Theme): ChartColors {

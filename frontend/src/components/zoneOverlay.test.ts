@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { WaveLevels } from '../api/types'
+import type { ProjectionBranches, WaveLevels } from '../api/types'
 import { CLEAN_LAYERS } from './levelOverlay'
-import { levelsToZoneBands } from './zoneOverlay'
+import { branchesToZoneBands, levelsToZoneBands } from './zoneOverlay'
 
 const ALL_LAYERS = { invalidation: true, support: true, targets: true }
 
@@ -75,5 +75,63 @@ describe('levelsToZoneBands', () => {
     }
     const bands = levelsToZoneBands(inverted, ALL_LAYERS)
     expect(bands).toEqual([{ low: 134, high: 140, kind: 'entry', score: null }])
+  })
+})
+
+describe('branchesToZoneBands (#219)', () => {
+  const speculative: WaveLevels = {
+    ...levels,
+    unfoldingWave: 'Wave 5',
+    supportZone: null,
+    targetZones: [{ low: 200, high: 220, label: 'w5', basis: 'fib' }],
+    confluenceZones: [],
+    alternative: null,
+  }
+  const alternate: WaveLevels = {
+    ...levels,
+    unfoldingWave: 'Correction (ABC)',
+    bullish: false,
+    supportZone: { low: 90, high: 100, label: 'res', basis: 'fib' },
+    targetZones: [],
+    confluenceZones: [],
+    alternative: null,
+  }
+  const branches: ProjectionBranches = {
+    invalidationRetracePercent: 71,
+    speculative,
+    alternate,
+  }
+
+  it('returns nothing for null branches', () => {
+    expect(branchesToZoneBands(null, ALL_LAYERS)).toEqual([])
+  })
+
+  it('tags the speculative continuation and the alternate reading with distinct variants', () => {
+    const bands = branchesToZoneBands(branches, ALL_LAYERS)
+    expect(bands).toContainEqual({
+      low: 200,
+      high: 220,
+      kind: 'target',
+      score: null,
+      variant: 'speculative',
+    })
+    expect(bands).toContainEqual({
+      low: 90,
+      high: 100,
+      kind: 'entry',
+      score: null,
+      variant: 'alternate',
+    })
+  })
+
+  it('honours the layer toggles', () => {
+    const targetsOff = branchesToZoneBands(branches, {
+      invalidation: true,
+      support: true,
+      targets: false,
+    })
+    // The speculative branch is a target zone → dropped; the alternate's support band remains.
+    expect(targetsOff.some((b) => b.variant === 'speculative')).toBe(false)
+    expect(targetsOff.some((b) => b.variant === 'alternate')).toBe(true)
   })
 })

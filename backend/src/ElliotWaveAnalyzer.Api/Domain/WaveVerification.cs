@@ -14,6 +14,7 @@ namespace ElliotWaveAnalyzer.Api.Domain;
 /// <param name="Rules">The deterministic hard-rule report (+ key Fibonacci ratios) on the snapped count.</param>
 /// <param name="Levels">Forward projections: invalidation, support/target zones, confluence, channels; null if too few pivots.</param>
 /// <param name="Score">Guideline score in [0,1] for the count's structure; null when it can't be scored.</param>
+/// <param name="Branches">Forward projection branches (#219): invalidation retrace %, one-step-ahead speculative levels, and the resolved alternate; null if too few pivots.</param>
 public sealed record WaveVerification(
     string Structure,
     bool Bullish,
@@ -22,4 +23,5 @@ public sealed record WaveVerification(
     IReadOnlyList<RejectedPivot> Rejected,
     WaveRuleReport Rules,
     WaveLevels? Levels,
-    double? Score);
+    double? Score,
+    ProjectionBranches? Branches = null);

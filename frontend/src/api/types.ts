@@ -560,6 +560,17 @@ export interface RejectedPivot {
   reason: string
 }
 
+/**
+ * The forward branches from the unfolding wave (mirrors backend `ProjectionBranches`, #219): how far
+ * the invalidation sits as a retracement %, the one-step-ahead speculative levels, and the resolved
+ * alternate reading.
+ */
+export interface ProjectionBranches {
+  invalidationRetracePercent: number | null
+  speculative: WaveLevels | null
+  alternate: WaveLevels | null
+}
+
 /** The deterministic read of an analyst-edited count (mirrors backend `WaveVerification`). */
 export interface WaveVerification {
   structure: string
@@ -570,6 +581,7 @@ export interface WaveVerification {
   rules: WaveRuleReport
   levels: WaveLevels | null
   score: number | null
+  branches?: ProjectionBranches | null
 }
 
 /** Side-by-side of the claimed and our own count (mirrors backend `CountComparison`). */

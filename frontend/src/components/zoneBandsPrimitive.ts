@@ -15,10 +15,12 @@ export interface ZoneBandStyle {
   border: string
 }
 
-/** The two zone-kind palettes, resolved from the active theme by the chart. */
+/** The zone palettes, resolved from the active theme by the chart. */
 export interface ZoneBandColors {
   entry: ZoneBandStyle
   target: ZoneBandStyle
+  /** The bearish alternate branch (#219) — a distinct colour from entry/target. */
+  alternate: ZoneBandStyle
 }
 
 /**
@@ -50,6 +52,7 @@ export class ZoneBandsPrimitive implements ISeriesPrimitive<Time> {
               const ctx = scope.context
               const width = scope.bitmapSize.width
               const vsr = scope.verticalPixelRatio
+              const hsr = scope.horizontalPixelRatio
               for (const b of bands) {
                 const yHigh = series.priceToCoordinate(b.high)
                 const yLow = series.priceToCoordinate(b.low)
@@ -57,12 +60,27 @@ export class ZoneBandsPrimitive implements ISeriesPrimitive<Time> {
                 const top = Math.min(yHigh, yLow) * vsr
                 const height = Math.abs(yLow - yHigh) * vsr
                 if (height <= 0) continue
-                const style = b.kind === 'entry' ? colors.entry : colors.target
+                // A projected branch (#219) reads subordinate to the confirmed count: the bearish
+                // alternate gets its own colour, and both projected variants are drawn dashed and
+                // fainter so they never compete with the count actually on the chart.
+                const projected = b.variant !== undefined
+                const style =
+                  b.variant === 'alternate'
+                    ? colors.alternate
+                    : b.kind === 'entry'
+                      ? colors.entry
+                      : colors.target
+                ctx.save()
+                if (projected) {
+                  ctx.globalAlpha = 0.55
+                  ctx.setLineDash([4 * hsr, 3 * hsr])
+                }
                 ctx.fillStyle = style.fill
                 ctx.fillRect(0, top, width, height)
                 ctx.strokeStyle = style.border
                 ctx.lineWidth = 1
                 ctx.strokeRect(0, top, width, height)
+                ctx.restore()
               }
             })
           },

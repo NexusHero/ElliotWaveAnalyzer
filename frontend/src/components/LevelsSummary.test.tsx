@@ -61,6 +61,18 @@ describe('LevelsSummary', () => {
     expect(screen.getByText(/42,000/)).toBeInTheDocument()
   })
 
+  it('shows the invalidation retracement % when provided (#219)', () => {
+    render(
+      <LevelsSummary levels={baseLevels} currentPrice={null} invalidationRetracePercent={71} />
+    )
+    expect(screen.getByText(/≈71% retrace of the prior wave/)).toBeInTheDocument()
+  })
+
+  it('omits the retracement note when not provided', () => {
+    render(<LevelsSummary levels={baseLevels} currentPrice={null} />)
+    expect(screen.queryByText(/retrace of the prior wave/)).not.toBeInTheDocument()
+  })
+
   it('renders live distance to invalidation when currentPrice is provided', () => {
     // distancePercent(inv=42000, current=48000) = (42000-48000)/48000*100 = -12.5%
     const { container } = render(<LevelsSummary levels={baseLevels} currentPrice={48000} />)

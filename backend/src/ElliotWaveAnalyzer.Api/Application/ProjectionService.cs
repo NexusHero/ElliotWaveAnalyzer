@@ -77,6 +77,90 @@ public static class ProjectionService
         AlternativeScenario? alternative, ScenarioReinterpretation reinterpretation)
         => alternative is null ? null : alternative with { Reinterpretation = reinterpretation };
 
+    /// <summary>
+    /// The forward branches for the count (#219): where the invalidation sits as a % retracement,
+    /// the one-step-ahead speculative projection (the current wave completes at its zone edge, then
+    /// the next wave is projected), and the resolved alternate reading. Computed once, non-recursively
+    /// (this method calls <see cref="Project"/>/<see cref="Resolve"/>, neither of which calls back
+    /// here), so drawing the branches is bounded. Returns null when the base count can't be projected.
+    /// </summary>
+    public static ProjectionBranches? Branches(IReadOnlyList<WaveAnnotation> annotations)
+    {
+        ArgumentNullException.ThrowIfNull(annotations);
+        var baseLevels = Project(annotations);
+        if (baseLevels is null)
+        {
+            return null;
+        }
+
+        var sorted = annotations.OrderBy(a => a.Date).ToList();
+        var alternate = baseLevels.Alternative?.Reinterpretation is { } r ? Resolve(r) : null;
+        return new ProjectionBranches(
+            InvalidationRetracePercent(sorted, baseLevels),
+            Speculative(sorted, baseLevels),
+            alternate);
+    }
+
+    /// <summary>
+    /// Where the invalidation sits as a % retracement of the last completed leg — the informative
+    /// "the invalidation is ≈X% of the prior wave" figure. Only meaningful for a retracing wave
+    /// (one with a support zone); null otherwise.
+    /// </summary>
+    private static double? InvalidationRetracePercent(
+        IReadOnlyList<WaveAnnotation> sorted, WaveLevels levels)
+    {
+        if (levels is { SupportZone: not null, Invalidation: not null } && sorted.Count >= 2)
+        {
+            var legEnd = sorted[^1].Price;
+            var span = legEnd - sorted[^2].Price;
+            if (span != 0)
+            {
+                return (double)Math.Abs((legEnd - levels.Invalidation.Price) / span) * 100.0;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The one-step-ahead projection: append a synthetic pivot where the current wave completes (the
+    /// far edge of its zone) and re-project the next wave. Null when there's no zone edge to complete at.
+    /// </summary>
+    private static WaveLevels? Speculative(IReadOnlyList<WaveAnnotation> sorted, WaveLevels levels)
+    {
+        var completion = CompletionPrice(levels);
+        if (completion is null)
+        {
+            return null;
+        }
+
+        var next = new List<WaveAnnotation>(sorted)
+        {
+            new(sorted[^1].Date.AddDays(1), completion.Value, "x"),
+        };
+        return Project(next);
+    }
+
+    /// <summary>
+    /// The price at which the current wave is assumed to complete: the far edge of its support zone
+    /// (a retracing wave) or its first target zone (an extending wave), in the trade direction.
+    /// </summary>
+    private static decimal? CompletionPrice(WaveLevels levels)
+    {
+        if (levels.SupportZone is { } support)
+        {
+            return levels.Bullish ? support.Low : support.High;
+        }
+
+        if (levels.TargetZones.Count > 0)
+        {
+            var target = levels.TargetZones[0];
+            return levels.Bullish ? target.High : target.Low;
+        }
+
+        return null;
+    }
+
     // Log-correct confluence zones for the wave currently unfolding, built from the legs that
     // matter for that wave. Wave 5 draws on two legs (Wave 1 and net Waves 1–3) so its target
     // box is a genuine multi-ratio cluster; the others project a single leg.

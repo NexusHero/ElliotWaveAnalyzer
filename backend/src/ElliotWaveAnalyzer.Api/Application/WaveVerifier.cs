@@ -33,6 +33,7 @@ public static class WaveVerifier
 
         var rules = ElliottRuleChecker.Check(snappedAnnotations);
         var levels = ProjectionService.Project(snappedAnnotations);
+        var branches = ProjectionService.Branches(snappedAnnotations);
         var structure = InferStructure(snappedAnnotations.Select(a => a.Label));
         var score = ScoreOrNull(structure, snappedAnnotations);
 
@@ -40,7 +41,7 @@ public static class WaveVerifier
         var isValid = rules.Rules.All(r => r.Status != RuleStatus.Fail || r.IsGuideline);
 
         return new WaveVerification(
-            structure, rules.BullishAssumed, isValid, snapped, rejected, rules, levels, score);
+            structure, rules.BullishAssumed, isValid, snapped, rejected, rules, levels, score, branches);
     }
 
     /// <summary>Infers the structure family from the drawn labels (mirrors the vision-import inference).</summary>
