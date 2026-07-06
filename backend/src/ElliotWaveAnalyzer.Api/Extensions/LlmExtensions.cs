@@ -70,6 +70,10 @@ internal static class LlmExtensions
         // Historical-analog summaries (REQ-034): fact-guarded; degrades to a reason without a key.
         services.AddScoped<IAnalogNarrator, LlmAnalogNarrator>();
 
+        // Alternate-hypothesis proposals (REQ-035): the LLM only names structures to test; the engine
+        // validates them. Absent (feature off) when no key is configured.
+        services.AddScoped<IHypothesisProposer, LlmHypothesisProposer>();
+
         // Vision import (REQ-028): a vision LLM extracts a claimed count; deterministic pipeline verifies it.
         services.AddScoped<IChartVisionExtractor, LlmChartVisionExtractor>();
         services.AddScoped<IImageVerificationService, ImageVerificationService>();
