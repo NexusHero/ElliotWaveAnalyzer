@@ -114,6 +114,27 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
 
+        // ── GET /api/wave-analysis/hypotheses ─────────────────────────────────
+        // Intelligent alternate-hypothesis generation (#186): the LLM proposes which structures are
+        // worth testing; the deterministic engine generates + rule-checks each. Makes one LLM call.
+        group.MapGet("/wave-analysis/hypotheses", AlternateHypotheses)
+            .WithName("AlternateHypotheses")
+            .WithSummary("Propose alternate structure hypotheses; the engine validates each deterministically")
+            .WithDescription("""
+                For a symbol's detected pivots, the active LLM proposes a bounded set of Elliott
+                structures worth testing (from a fixed vocabulary — impulse, diagonal, zigzag, flat,
+                triangle), each with a one-line reason. The deterministic engine then generates and
+                rule-checks exactly those structures: validated ones are returned with their guideline
+                score; rejected ones carry the specific hard rule they violated and are never presented
+                as valid counts. The LLM proposes; the engine owns validity and scoring. Out-of-vocabulary
+                proposals are dropped before generation, the count tested is capped, and with no LLM key
+                the feature is simply absent (the deterministic search is unaffected). Daily or weekly.
+                """)
+            .Produces<AlternateHypothesesReport>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
+
         // ── POST /api/wave-analysis/verify-image ──────────────────────────────
         // Vision import: a vision LLM extracts the claimed count from an uploaded chart, then the
         // deterministic pipeline verifies it against real data. Makes an LLM call → strict throttle.
@@ -398,6 +419,53 @@ public static class WaveAnalysisEndpoints
         {
             loggerFactory.CreateLogger("WaveAnalysisEndpoints")
                 .LogError(ex, "Historical analogs failed for {Symbol}", normalized);
+            return Results.Problem(
+                title: "Analysis unavailable",
+                detail: "The market-data service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> AlternateHypotheses(
+        string symbol,
+        string? interval,
+        IAlternateHypothesisService hypothesisService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!Application.SymbolInput.IsValidSymbol(symbol))
+        {
+            return Results.Problem(
+                title: "Invalid symbol",
+                detail: "Symbol must be a short ticker of letters, digits and . - ^ = / characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!TryParseAnalogInterval(interval, out var candleInterval, out _))
+        {
+            return Results.Problem(
+                title: "Invalid interval",
+                detail: "interval must be '1d' (daily) or '1w' (weekly).",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var report = await hypothesisService.AnalyzeAsync(
+                symbol.ToUpperInvariant(), candleInterval, cancellationToken);
+            return Results.Ok(report);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (HttpRequestException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Alternate hypotheses failed for {Symbol}", symbol);
             return Results.Problem(
                 title: "Analysis unavailable",
                 detail: "The market-data service is currently unavailable. Please try again later.",

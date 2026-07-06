@@ -25,6 +25,10 @@ internal static class WaveAnalysisExtensions
         // no-lookahead corpus; the narrator (registered in the LLM extensions) only summarises it.
         services.AddTransient<IHistoricalAnalogService, HistoricalAnalogService>();
 
+        // Alternate-hypothesis generation (REQ-035): the LLM proposes structures (registered in the LLM
+        // extensions); this service validates each deterministically via the shared rule checkers.
+        services.AddTransient<IAlternateHypothesisService, AlternateHypothesisService>();
+
         // Setup scanner (REQ-029): deterministic sweep across symbols. Bind its options and register
         // the service scoped (it resolves the scoped/transient analysis service; the cache is shared).
         services.AddOptions<ScanOptions>().BindConfiguration(ScanOptions.SectionName);
