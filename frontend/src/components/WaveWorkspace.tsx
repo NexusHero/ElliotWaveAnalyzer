@@ -71,11 +71,18 @@ const COUNT_TYPES = [
 ] as const
 type CountTypeKey = (typeof COUNT_TYPES)[number]['key']
 
-/** Lookback windows for the live chart, mapped to the market-data `days` parameter. */
+/**
+ * Lookback windows for the live chart, mapped to the market-data `days` parameter. Higher-degree
+ * Elliott work (Cycle/Primary) spans years, so 3Y/5Y/Max are offered too (#164) — "Max" asks for a
+ * large window and the chart shows whatever the provider actually serves.
+ */
 const RANGES = [
   { label: '3M', days: 90 },
   { label: '6M', days: 180 },
   { label: '1Y', days: 365 },
+  { label: '3Y', days: 365 * 3 },
+  { label: '5Y', days: 365 * 5 },
+  { label: 'Max', days: 365 * 20 },
 ] as const
 type Range = (typeof RANGES)[number]
 
@@ -346,6 +353,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const lastPrice = candles.length > 0 ? (candles[candles.length - 1]?.close ?? null) : null
 
+  // Honest coverage note (#164): for a long range, if the source served materially less than asked
+  // (its own history limit), say so rather than showing a chart that looks shorter than requested.
+  const coverageNote = useMemo<string | null>(() => {
+    if (candles.length < 2 || range.days < 365 * 3) return null
+    const first = candles[0]?.openTime
+    const last = candles[candles.length - 1]?.openTime
+    if (!first || !last) return null
+    const loadedDays = (new Date(last).getTime() - new Date(first).getTime()) / 86_400_000
+    if (loadedDays >= range.days * 0.8) return null
+    const loadedYears = Math.max(1, Math.round(loadedDays / 365))
+    return `showing ~${loadedYears}y — the source's history is shorter than ${range.label}`
+  }, [candles, range])
+
   // Clean mode forces invalidation-only; Pro honours the layer toggles.
   const effectiveLayers = pro ? layers : CLEAN_LAYERS
   const priceLines = useMemo<PriceLineSpec[]>(
@@ -450,14 +470,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     resetCoach()
   }, [resetCoach])
 
-  const handleRange = useCallback(
-    (next: Range) => {
-      setRange(next)
-      setAnnotations([])
-      resetCoach()
-    },
-    [resetCoach]
-  )
+  // A pure range change is the same instrument on the same timeframe — the bars are a superset/subset,
+  // so the count is KEPT (#164). Pivots whose dates fall outside the loaded window simply aren't drawn
+  // until the range covers them again; they stay in state (the chart maps only what it can plot).
+  const handleRange = useCallback((next: Range) => {
+    setRange(next)
+  }, [])
 
   const handleTimeframe = useCallback(
     (next: Timeframe) => {
@@ -604,7 +622,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                   ? 'Live data unavailable'
                   : marketQuery.isPending
                     ? 'Loading live data…'
-                    : 'Live market data'}
+                    : (coverageNote ?? 'Live market data')}
               </span>
             </div>
             <div className="chart-head-right">
