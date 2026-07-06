@@ -58,6 +58,19 @@ function renderWorkspace(hasApiKey = true) {
 describe('WaveWorkspace', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('groups the toolbar into labeled Resolution/Window sections with Log/Pro toggles (#216)', () => {
+    renderWorkspace()
+    // The timeframe and range pills read as two distinct, labeled groups …
+    expect(screen.getByText('Resolution')).toBeInTheDocument()
+    expect(screen.getByText('Window')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Timeframe' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Range' })).toBeInTheDocument()
+    // … and Log/Pro sit apart as their own toggle group.
+    const options = screen.getByRole('group', { name: 'Chart options' })
+    expect(options).toHaveTextContent('Log')
+    expect(options).toHaveTextContent('Pro')
+  })
+
   it('keeps "Validate my count" disabled until two labels are placed', () => {
     renderWorkspace()
     const validate = screen.getByRole('button', { name: /validate my count/i })

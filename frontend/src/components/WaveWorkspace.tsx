@@ -630,50 +630,64 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               </span>
             </div>
             <div className="chart-head-right">
-              <div className="tf-select" role="group" aria-label="Timeframe">
-                {TIMEFRAMES.map((t) => (
-                  <button
-                    key={t.code}
-                    type="button"
-                    className={timeframe.code === t.code ? 'on' : ''}
-                    aria-pressed={timeframe.code === t.code}
-                    onClick={() => handleTimeframe(t)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+              <div className="tf-cluster">
+                <div className="tf-group">
+                  <span className="tf-eyebrow">Resolution</span>
+                  <div className="tf-select" role="group" aria-label="Timeframe">
+                    {TIMEFRAMES.map((t) => (
+                      <button
+                        key={t.code}
+                        type="button"
+                        className={timeframe.code === t.code ? 'on' : ''}
+                        aria-pressed={timeframe.code === t.code}
+                        onClick={() => handleTimeframe(t)}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="tf-group">
+                  <span className="tf-eyebrow">Window</span>
+                  <div className="tf-select" role="group" aria-label="Range">
+                    {RANGES.map((r) => (
+                      <button
+                        key={r.label}
+                        type="button"
+                        className={range.label === r.label ? 'on' : ''}
+                        aria-pressed={range.label === r.label}
+                        onClick={() => handleRange(r)}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="tf-select" role="group" aria-label="Range">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.label}
-                    type="button"
-                    className={range.label === r.label ? 'on' : ''}
-                    aria-pressed={range.label === r.label}
-                    onClick={() => handleRange(r)}
-                  >
-                    {r.label}
-                  </button>
-                ))}
+              {/* Log/Pro are view settings, not navigation — set them apart as compact toggle chips
+                  so they don't read as a fifth timeframe. */}
+              <div className="chart-toggles" role="group" aria-label="Chart options">
+                <button
+                  type="button"
+                  className={`chart-toggle${logScale ? ' on' : ''}`}
+                  aria-pressed={logScale}
+                  onClick={() => setLogScale((v) => !v)}
+                  title="Logarithmic price axis — matches the log-correct Fibonacci levels"
+                >
+                  <span className="chart-toggle-dot" aria-hidden />
+                  Log
+                </button>
+                <button
+                  type="button"
+                  className={`chart-toggle${pro ? ' on' : ''}`}
+                  aria-pressed={pro}
+                  onClick={() => setPro((v) => !v)}
+                  title="Pro: show Fibonacci/target layers and alternate counts"
+                >
+                  <span className="chart-toggle-dot" aria-hidden />
+                  Pro
+                </button>
               </div>
-              <button
-                type="button"
-                className={`pro-toggle${logScale ? ' on' : ''}`}
-                aria-pressed={logScale}
-                onClick={() => setLogScale((v) => !v)}
-                title="Logarithmic price axis — matches the log-correct Fibonacci levels"
-              >
-                Log
-              </button>
-              <button
-                type="button"
-                className={`pro-toggle${pro ? ' on' : ''}`}
-                aria-pressed={pro}
-                onClick={() => setPro((v) => !v)}
-                title="Pro: show Fibonacci/target layers and alternate counts"
-              >
-                Pro
-              </button>
             </div>
           </div>
 
