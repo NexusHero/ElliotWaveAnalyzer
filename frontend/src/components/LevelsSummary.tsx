@@ -8,6 +8,8 @@ interface LevelsSummaryProps {
   currentPrice: number | null
   /** Where the invalidation sits as a % retracement of the prior leg (#219), when computed. */
   invalidationRetracePercent?: number | null
+  /** One-step-ahead speculative levels (#220); its target rides into the risk box, clearly tagged. */
+  speculativeLevels?: WaveLevels | null
 }
 
 function fmt(value: number): string {
@@ -27,6 +29,7 @@ export default function LevelsSummary({
   levels,
   currentPrice,
   invalidationRetracePercent = null,
+  speculativeLevels = null,
 }: LevelsSummaryProps) {
   if (!levels) return null
 
@@ -115,7 +118,13 @@ export default function LevelsSummary({
         </div>
       )}
 
-      {inv && <RiskBox levels={levels} currentPrice={currentPrice} />}
+      {inv && (
+        <RiskBox
+          levels={levels}
+          currentPrice={currentPrice}
+          speculativeLevels={speculativeLevels}
+        />
+      )}
     </div>
   )
 }

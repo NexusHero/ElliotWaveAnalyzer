@@ -66,12 +66,14 @@ function band(a: number, b: number, kind: ZoneKind, score: number | null): ZoneB
  */
 export function branchesToZoneBands(
   branches: ProjectionBranches | null | undefined,
-  layers: LevelLayers
+  layers: LevelLayers,
+  /** True once price has broken the invalidation (#220): the alternate is promoted to the live count. */
+  promoted = false
 ): ZoneBand[] {
   if (!branches) return []
   const bands: ZoneBand[] = []
 
-  const addFrom = (levels: WaveLevels | null, variant: ZoneVariant) => {
+  const addFrom = (levels: WaveLevels | null, variant: ZoneVariant | undefined) => {
     if (!levels) return
     if (layers.support && levels.supportZone) {
       bands.push({ ...band(levels.supportZone.low, levels.supportZone.high, 'entry', null), variant })
@@ -83,7 +85,28 @@ export function branchesToZoneBands(
     }
   }
 
+  if (promoted) {
+    // The invalidation broke: the bullish continuation is dead, and the alternate is now the live
+    // reading — draw it solid (no variant), not as a subordinate dashed branch.
+    addFrom(branches.alternate, undefined)
+    return bands
+  }
+
   addFrom(branches.speculative, 'speculative')
   addFrom(branches.alternate, 'alternate')
   return bands
+}
+
+/**
+ * Whether the latest price has broken the count's hard invalidation (#220) — the trigger to promote
+ * the alternate reading on the live chart. Pure; false when there's no invalidation or price yet.
+ */
+export function hasCrossedInvalidation(
+  levels: WaveLevels | null | undefined,
+  currentPrice: number | null
+): boolean {
+  if (!levels?.invalidation || currentPrice == null) return false
+  return levels.invalidation.side === 'Below'
+    ? currentPrice < levels.invalidation.price
+    : currentPrice > levels.invalidation.price
 }

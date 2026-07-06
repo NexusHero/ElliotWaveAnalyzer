@@ -104,6 +104,7 @@ export default function LiveVerifyPanel({
             levels={verification.levels}
             currentPrice={currentPrice}
             invalidationRetracePercent={verification.branches?.invalidationRetracePercent ?? null}
+            speculativeLevels={verification.branches?.speculative ?? null}
           />
 
           {onSave && (

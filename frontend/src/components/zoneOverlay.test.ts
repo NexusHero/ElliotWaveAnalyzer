@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ProjectionBranches, WaveLevels } from '../api/types'
 import { CLEAN_LAYERS } from './levelOverlay'
-import { branchesToZoneBands, levelsToZoneBands } from './zoneOverlay'
+import { branchesToZoneBands, hasCrossedInvalidation, levelsToZoneBands } from './zoneOverlay'
 
 const ALL_LAYERS = { invalidation: true, support: true, targets: true }
 
@@ -133,5 +133,39 @@ describe('branchesToZoneBands (#219)', () => {
     // The speculative branch is a target zone → dropped; the alternate's support band remains.
     expect(targetsOff.some((b) => b.variant === 'speculative')).toBe(false)
     expect(targetsOff.some((b) => b.variant === 'alternate')).toBe(true)
+  })
+
+  it('promotes the alternate to a solid band and drops the dead continuation (#220)', () => {
+    const bands = branchesToZoneBands(branches, ALL_LAYERS, true)
+    // The alternate is now the live count — drawn solid (no variant) …
+    expect(bands).toContainEqual({ low: 90, high: 100, kind: 'entry', score: null, variant: undefined })
+    // … and the bullish continuation is gone.
+    expect(bands.some((b) => b.variant === 'speculative')).toBe(false)
+  })
+})
+
+describe('hasCrossedInvalidation (#220)', () => {
+  const bull: WaveLevels = {
+    ...levels,
+    invalidation: { price: 120, side: 'Below', label: 'inv', basis: 'x' },
+  }
+  const bear: WaveLevels = {
+    ...levels,
+    invalidation: { price: 120, side: 'Above', label: 'inv', basis: 'x' },
+  }
+
+  it('is false without an invalidation or a price', () => {
+    expect(hasCrossedInvalidation(null, 100)).toBe(false)
+    expect(hasCrossedInvalidation(bull, null)).toBe(false)
+  })
+
+  it('detects a break below for a "count dead below" invalidation', () => {
+    expect(hasCrossedInvalidation(bull, 119)).toBe(true)
+    expect(hasCrossedInvalidation(bull, 121)).toBe(false)
+  })
+
+  it('detects a break above for a "count dead above" invalidation', () => {
+    expect(hasCrossedInvalidation(bear, 121)).toBe(true)
+    expect(hasCrossedInvalidation(bear, 119)).toBe(false)
   })
 })

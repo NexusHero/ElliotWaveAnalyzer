@@ -7,6 +7,12 @@ interface RiskBoxProps {
   levels: WaveLevels
   /** Latest price, used as the default entry. */
   currentPrice: number | null
+  /**
+   * The one-step-ahead speculative projection (#220), when available. Its target(s) are offered as
+   * an additional, clearly-tagged take-profit — the setup assumes the current wave completes as a
+   * simple correction, so it is never presented as a confirmed target.
+   */
+  speculativeLevels?: WaveLevels | null
 }
 
 function fmt(value: number): string {
@@ -26,7 +32,7 @@ function targetPrice(low: number, high: number, bullish: boolean): number {
  * entry and account-risk into stop distance, reward:risk per target and a position size. Deterministic
  * (`POST /api/risk`, no LLM). Not trading advice — arithmetic on the user's own inputs.
  */
-export default function RiskBox({ levels, currentPrice }: RiskBoxProps) {
+export default function RiskBox({ levels, currentPrice, speculativeLevels = null }: RiskBoxProps) {
   const invalidation = levels.invalidation
   const [entry, setEntry] = useState<string>(currentPrice != null ? String(currentPrice) : '')
   const [equity, setEquity] = useState<string>('10000')
@@ -37,6 +43,11 @@ export default function RiskBox({ levels, currentPrice }: RiskBoxProps) {
   if (!invalidation) return null
 
   const targets = levels.targetZones.map((z) => targetPrice(z.low, z.high, levels.bullish))
+  // Speculative targets ride along the confirmed ones in the same request (same R:R maths), but are
+  // tagged apart in the result so their reward:risk never reads as a confirmed target (#220).
+  const speculativeTargets =
+    speculativeLevels?.targetZones.map((z) => targetPrice(z.low, z.high, levels.bullish)) ?? []
+  const allTargets = [...targets, ...speculativeTargets]
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -45,7 +56,7 @@ export default function RiskBox({ levels, currentPrice }: RiskBoxProps) {
     risk.mutate({
       entry: entryNum,
       invalidation: invalidation!.price,
-      targets,
+      targets: allTargets,
       bullish: levels.bullish,
       accountEquity: Number(equity) || undefined,
       riskPercent: Number(riskPct) || undefined,
@@ -119,15 +130,26 @@ export default function RiskBox({ levels, currentPrice }: RiskBoxProps) {
           )}
           {result.targets.length > 0 && (
             <ul className="risk-targets">
-              {result.targets.map((t, i) => (
-                <li key={i}>
-                  <span className="mono">{fmt(t.price)}</span>
-                  <span className="risk-rr mono">{t.rewardToRisk.toFixed(1)}R</span>
-                </li>
-              ))}
+              {result.targets.map((t, i) => {
+                const speculative = i >= targets.length
+                return (
+                  <li key={i}>
+                    <span className="mono">{fmt(t.price)}</span>
+                    {speculative && <span className="spec-tag">speculative</span>}
+                    <span className={`risk-rr mono${speculative ? ' spec' : ''}`}>
+                      {t.rewardToRisk.toFixed(1)}R
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           )}
-          <p className="riskbox-disclaimer">Arithmetic on your inputs — not trading advice.</p>
+          <p className="riskbox-disclaimer">
+            Arithmetic on your inputs — not trading advice.
+            {speculativeTargets.length > 0 && (
+              <> The speculative target assumes the current wave completes as a simple correction.</>
+            )}
+          </p>
         </div>
       )}
     </div>
