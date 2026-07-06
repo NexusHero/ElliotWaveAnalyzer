@@ -139,6 +139,52 @@ describe('WaveWorkspace', () => {
     expect(mockClient.validateWaveCount).not.toHaveBeenCalled()
   })
 
+  it('reveals the wave-degree control once Pro is on and a parsed count is active (#161)', async () => {
+    const pivot = (date: string, price: number, label: string) => ({ date, price, label })
+    const ranking = {
+      structure: 'Impulse',
+      origin: pivot('2024-01-01T00:00:00Z', 100, '0'),
+      waves: [pivot('2024-02-01T00:00:00Z', 130, '1'), pivot('2024-03-01T00:00:00Z', 120, '2')],
+      ruleReport: { bullishAssumed: true, rules: [], ratios: [] },
+      levels: null,
+      confidence: 'high' as const,
+      rationale: 'a clean impulse',
+      outlook: 'wave 3 extension',
+      isBest: true,
+      score: 0.8,
+      tree: {
+        label: 'Impulse',
+        degree: 'Primary' as const,
+        start: pivot('2024-01-01T00:00:00Z', 100, '0'),
+        end: pivot('2024-03-01T00:00:00Z', 120, '2'),
+        score: 0.8,
+        children: [
+          {
+            label: '1',
+            degree: 'Intermediate' as const,
+            start: pivot('2024-01-01T00:00:00Z', 100, '0'),
+            end: pivot('2024-02-01T00:00:00Z', 130, '1'),
+            score: 0.5,
+            children: [],
+          },
+        ],
+      },
+    }
+    mockClient.autoAnalyzeWaves.mockResolvedValue({
+      rankings: [ranking],
+      marketSummary: 'ok',
+      usage: { provider: 'Gemini', promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    })
+    renderWorkspace()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pro' }))
+    fireEvent.click(screen.getByRole('button', { name: /analyze for me/i }))
+
+    const group = await screen.findByRole('group', { name: 'Wave degrees' })
+    expect(within(group).getByRole('button', { name: 'Show' })).toBeInTheDocument()
+    expect(within(group).getByRole('button', { name: '+ Sub-waves' })).toBeInTheDocument()
+  })
+
   it('groups tools into tabs; switching shows one section and hides the others (#163)', () => {
     renderWorkspace()
     // Default Count tab shows the count workflow; other sections aren't mounted.
