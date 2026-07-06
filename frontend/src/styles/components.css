@@ -693,6 +693,41 @@
   gap: 14px;
   min-width: 0;
 }
+/* Workspace section tabs (#163): a sticky, scannable strip so only one tool area shows at a time. */
+.ws-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 4px;
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  position: sticky;
+  top: 78px;
+  z-index: 2;
+}
+.ws-tab {
+  flex: 1 1 auto;
+  min-width: 64px;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ws-tab:hover {
+  color: var(--text);
+}
+.ws-tab.on {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
 .anno-card {
   background: var(--panel);
   border: 1px solid var(--line-soft);

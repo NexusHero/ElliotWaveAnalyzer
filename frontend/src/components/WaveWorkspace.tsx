@@ -94,6 +94,20 @@ const SENSITIVITIES = [1.5, 2, 2.5, 3, 4] as const
 const DEFAULT_SENSITIVITY = 2.5
 
 /**
+ * Workspace sections (#163). The nine right-column panels are grouped into a small set of tabs so
+ * the tool area is scannable instead of one long scroll; the chart stays persistent on the left and
+ * every panel's data lives in the parent (queries/mutations), so switching tabs never loses state.
+ */
+const WORKSPACE_TABS = [
+  { key: 'count', label: 'Count' },
+  { key: 'scan', label: 'Scan' },
+  { key: 'verify', label: 'Verify chart' },
+  { key: 'portfolio', label: 'Portfolio' },
+  { key: 'history', label: 'History' },
+] as const
+type WorkspaceTab = (typeof WORKSPACE_TABS)[number]['key']
+
+/**
  * Candle timeframe options. 1H/4H come from the intraday (hourly) source and work for
  * intraday-capable instruments; when a source can't serve them the chart shows an error state.
  */
@@ -136,6 +150,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const [annotations, setAnnotations] = useState<WaveAnnotation[]>([])
   const [coachState, setCoachState] = useState<CoachState>('empty')
   const [mode, setMode] = useState<CoachMode>('user')
+  const [tab, setTab] = useState<WorkspaceTab>('count')
 
   const validation = useMutation({
     mutationFn: (payload: WaveAnnotation[]) => validateWaveCount({ symbol, annotations: payload }),
@@ -760,6 +775,23 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
         {/* ---- coach column ---- */}
         <div className="coach-col">
+          <div className="ws-tabs" role="tablist" aria-label="Workspace sections">
+            {WORKSPACE_TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                className={`ws-tab${tab === t.key ? ' on' : ''}`}
+                onClick={() => setTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'count' && (
+            <>
           <div className="anno-card">
             <div className="anno-head">
               <h3>Your wave count</h3>
@@ -874,38 +906,51 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
             onLoad={() => hypotheses.mutate()}
           />
+            </>
+          )}
 
-          <TrackRecordPanel
-            state={trackRecordState}
-            analyses={trackRecordQuery.data ?? []}
-            error={trackRecordError}
-            deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
-            onDelete={handleDeleteAnalysis}
-          />
+          {tab === 'scan' && (
+            <ScannerPanel
+              state={scannerState}
+              result={scanMutation.data ?? null}
+              error={scanMutation.error instanceof Error ? scanMutation.error.message : null}
+              onScan={(filters) => scanMutation.mutate(filters)}
+            />
+          )}
 
-          <ScannerPanel
-            state={scannerState}
-            result={scanMutation.data ?? null}
-            error={scanMutation.error instanceof Error ? scanMutation.error.message : null}
-            onScan={(filters) => scanMutation.mutate(filters)}
-          />
+          {tab === 'verify' && (
+            <VerifyImagePanel
+              state={verifyImageState}
+              report={verifyImageMutation.data ?? null}
+              error={
+                verifyImageMutation.error instanceof Error
+                  ? verifyImageMutation.error.message
+                  : null
+              }
+              onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
+            />
+          )}
 
-          <VerifyImagePanel
-            state={verifyImageState}
-            report={verifyImageMutation.data ?? null}
-            error={
-              verifyImageMutation.error instanceof Error ? verifyImageMutation.error.message : null
-            }
-            onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
-          />
+          {tab === 'portfolio' && (
+            <PortfolioReviewPanel
+              state={portfolioState}
+              review={portfolioQuery.data ?? null}
+              error={portfolioQuery.error instanceof Error ? portfolioQuery.error.message : null}
+            />
+          )}
 
-          <PortfolioReviewPanel
-            state={portfolioState}
-            review={portfolioQuery.data ?? null}
-            error={portfolioQuery.error instanceof Error ? portfolioQuery.error.message : null}
-          />
-
-          <BacktestSummaryPanel summary={backtestQuery.data ?? null} />
+          {tab === 'history' && (
+            <>
+              <TrackRecordPanel
+                state={trackRecordState}
+                analyses={trackRecordQuery.data ?? []}
+                error={trackRecordError}
+                deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
+                onDelete={handleDeleteAnalysis}
+              />
+              <BacktestSummaryPanel summary={backtestQuery.data ?? null} />
+            </>
+          )}
         </div>
       </div>
     </div>
