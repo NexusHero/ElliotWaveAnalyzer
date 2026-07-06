@@ -338,6 +338,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const [layers, setLayers] = useState<LevelLayers>(CLEAN_LAYERS)
   const [activeCount, setActiveCount] = useState(0)
+  // The alternate count overlaid alongside the primary for comparison (#162), or null.
+  const [overlayCount, setOverlayCount] = useState<number | null>(null)
   // Price-axis scale. Auto-follows a count computed in log space (so the levels line up), but the
   // analyst can override it with the chart toggle.
   const [logScale, setLogScale] = useState(false)
@@ -352,6 +354,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   useEffect(() => {
     if (activeLevels?.scale === 'Log') setLogScale(true)
   }, [activeLevels?.scale])
+
+  // A fresh set of ranked counts invalidates any overlay selection from the previous run.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on the new response.
+  useEffect(() => setOverlayCount(null), [auto.data])
 
   const lastPrice = candles.length > 0 ? (candles[candles.length - 1]?.close ?? null) : null
 
@@ -369,6 +375,15 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
+  }, [])
+
+  // Selecting a count as primary drops it as the overlay (a count can't be both).
+  const handleSelectCount = useCallback((index: number) => {
+    setActiveCount(index)
+    setOverlayCount((cur) => (cur === index ? null : cur))
+  }, [])
+  const toggleOverlay = useCallback((index: number) => {
+    setOverlayCount((cur) => (cur === index ? null : index))
   }, [])
 
   const [countType, setCountType] = useState<CountTypeKey>('impulse')
@@ -501,19 +516,45 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     void runAnalysis('ai', ai)
   }, [candles, runAnalysis])
 
+  // The AI's primary line: the selected auto count's own pivots (origin + waves) once the backend
+  // has run, else the client-side "Analyze for me" heuristic count.
+  const aiLineAnnotations = useMemo<WaveAnnotation[]>(
+    () =>
+      auto.isSuccess && activeRanked ? [activeRanked.origin, ...activeRanked.waves] : aiAnnotations,
+    [auto.isSuccess, activeRanked, aiAnnotations]
+  )
+
+  // The overlaid alternate count (#162): a different ranked count shown alongside the primary for
+  // side-by-side comparison. Ignored when it points at the active count or the rankings changed.
+  const overlayRanked =
+    overlayCount !== null && overlayCount !== activeCount ? (rankings[overlayCount] ?? null) : null
+  const overlayAnnotations = useMemo<WaveAnnotation[]>(
+    () => (overlayRanked ? [overlayRanked.origin, ...overlayRanked.waves] : []),
+    [overlayRanked]
+  )
+  const overlayPriceLines = useMemo<PriceLineSpec[]>(
+    () =>
+      levelsToPriceLines(overlayRanked?.levels ?? null, effectiveLayers).map((l) => ({
+        ...l,
+        variant: 'alt' as const,
+      })),
+    [overlayRanked, effectiveLayers]
+  )
+
   const markers = useMemo<ChartMarker[]>(() => {
-    const user = annotations.map<ChartMarker>((a) => ({
-      time: a.date.split('T')[0] ?? a.date,
-      label: a.label,
-      kind: 'user',
-    }))
-    const ai = aiAnnotations.map<ChartMarker>((a) => ({
-      time: a.date.split('T')[0] ?? a.date,
-      label: a.label,
-      kind: 'ai',
-    }))
-    return [...user, ...ai]
-  }, [annotations, aiAnnotations])
+    const toMarker =
+      (kind: ChartMarker['kind']) =>
+      (a: WaveAnnotation): ChartMarker => ({
+        time: a.date.split('T')[0] ?? a.date,
+        label: a.label,
+        kind,
+      })
+    return [
+      ...annotations.map(toMarker('user')),
+      ...aiLineAnnotations.map(toMarker('ai')),
+      ...overlayAnnotations.map(toMarker('alt')),
+    ]
+  }, [annotations, aiLineAnnotations, overlayAnnotations])
 
   // Connected wave-line polylines through the pivots (a count needs ≥2 pivots to draw a line).
   const waveLines = useMemo<WaveLine[]>(() => {
@@ -521,11 +562,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     if (annotations.length >= 2) {
       lines.push({ kind: 'user', points: toWaveLinePoints(annotations) })
     }
-    if (aiAnnotations.length >= 2) {
-      lines.push({ kind: 'ai', points: toWaveLinePoints(aiAnnotations) })
+    if (aiLineAnnotations.length >= 2) {
+      lines.push({ kind: 'ai', points: toWaveLinePoints(aiLineAnnotations) })
+    }
+    if (overlayAnnotations.length >= 2) {
+      lines.push({ kind: 'alt', points: toWaveLinePoints(overlayAnnotations) })
     }
     return lines
-  }, [annotations, aiAnnotations])
+  }, [annotations, aiLineAnnotations, overlayAnnotations])
 
   const liveVerifyState: LiveVerifyState =
     annotations.length < 2
@@ -679,7 +723,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 annotations={markers}
                 waveLines={waveLines}
                 zoneBands={zoneBands}
-                priceLines={priceLines}
+                priceLines={
+                  overlayPriceLines.length > 0 ? [...priceLines, ...overlayPriceLines] : priceLines
+                }
                 logScale={logScale}
                 onPointClick={handlePointClick}
                 theme={theme}
@@ -779,7 +825,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             onSensitivityChange={handleSensitivity}
             pro={pro}
             activeCount={activeCount}
-            onSelectCount={setActiveCount}
+            onSelectCount={handleSelectCount}
+            overlayCount={overlayCount}
+            onToggleOverlay={toggleOverlay}
             currentPrice={lastPrice}
             onRun={handleAutoAnalyze}
             onOpenSettings={onOpenSettings}

@@ -299,3 +299,33 @@ textarea {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Overlay an alternate count (#162): compare two counts on one chart ──────── */
+.overlay-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0.2rem;
+  flex-wrap: wrap;
+}
+.overlay-lbl {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.overlay-btn {
+  font-size: 0.74rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.overlay-btn.on {
+  /* Match the violet the chart draws the overlaid alternate in. */
+  border-color: #b39ddb;
+  color: #b39ddb;
+  background: rgba(179, 157, 219, 0.14);
+}

@@ -81,6 +81,25 @@ describe('PriceChart', () => {
     ).not.toThrow()
   })
 
+  it('renders an overlaid alternate count (alt wave line + alt price line) without throwing', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() =>
+      render(
+        <PriceChart
+          candles={candles}
+          waveLines={[
+            { kind: 'ai', points: [{ time: '2024-01-01', value: 100 }, { time: '2024-01-05', value: 130 }] },
+            { kind: 'alt', points: [{ time: '2024-01-02', value: 95 }, { time: '2024-01-06', value: 120 }] },
+          ]}
+          priceLines={[
+            { price: 90, kind: 'invalid', title: 'Invalidation' },
+            { price: 88, kind: 'invalid', title: 'Alt invalidation', variant: 'alt' },
+          ]}
+        />
+      )
+    ).not.toThrow()
+  })
+
   it('renders connected wave lines without throwing', () => {
     const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
     expect(() =>
