@@ -49,6 +49,7 @@ import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
+import { treeToDegreeMarkers } from './degreeMarkers'
 import { toWaveLinePoints } from './waveLine'
 
 /**
@@ -344,6 +345,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   }, [pro])
 
   const [layers, setLayers] = useState<LevelLayers>(CLEAN_LAYERS)
+  // On-chart degree notation + sub-wave nesting (#161): null = off (plain labels, the default),
+  // 0 = top-level labels decorated by degree, 1 = also nest one level of sub-waves. Opt-in so the
+  // chart stays legible by default.
+  const [subWaveDepth, setSubWaveDepth] = useState<number | null>(null)
   const [activeCount, setActiveCount] = useState(0)
   // The alternate count overlaid alongside the primary for comparison (#162), or null.
   const [overlayCount, setOverlayCount] = useState<number | null>(null)
@@ -574,12 +579,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
         label: a.label,
         kind,
       })
+    // With degree notation on (#161) and a parsed tree available, the AI count is drawn from the
+    // tree — labels decorated by degree, sub-waves nested to the chosen depth — instead of the
+    // plain top-level pivots.
+    const aiMarkers =
+      subWaveDepth !== null && activeRanked?.tree
+        ? treeToDegreeMarkers(activeRanked.tree, subWaveDepth)
+        : aiLineAnnotations.map(toMarker('ai'))
     return [
       ...annotations.map(toMarker('user')),
-      ...aiLineAnnotations.map(toMarker('ai')),
+      ...aiMarkers,
       ...overlayAnnotations.map(toMarker('alt')),
     ]
-  }, [annotations, aiLineAnnotations, overlayAnnotations])
+  }, [annotations, aiLineAnnotations, overlayAnnotations, subWaveDepth, activeRanked])
 
   // Connected wave-line polylines through the pivots (a count needs ≥2 pivots to draw a line).
   const waveLines = useMemo<WaveLine[]>(() => {
@@ -753,6 +765,28 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                         ? 'Fib support'
                         : 'Targets'}
                   </label>
+                ))}
+              </div>
+            )}
+            {pro && activeRanked?.tree && (
+              <div className="layer-row" role="group" aria-label="Wave degrees">
+                <span className="layer-lbl">Degrees</span>
+                {(
+                  [
+                    { label: 'Off', value: null },
+                    { label: 'Show', value: 0 },
+                    { label: '+ Sub-waves', value: 1 },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.label}
+                    type="button"
+                    className={`count-type-btn${subWaveDepth === o.value ? ' on' : ''}`}
+                    aria-pressed={subWaveDepth === o.value}
+                    onClick={() => setSubWaveDepth(o.value)}
+                  >
+                    {o.label}
+                  </button>
                 ))}
               </div>
             )}
