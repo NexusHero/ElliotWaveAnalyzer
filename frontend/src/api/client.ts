@@ -1,4 +1,5 @@
 import type {
+  AlternateHypothesesReport,
   AnalogResponse,
   AutoWaveAnalysisRequest,
   AutoWaveAnalysisResponse,
@@ -116,6 +117,30 @@ export async function getHistoricalAnalogs(
   }
 
   return (await response.json()) as AnalogResponse
+}
+
+/**
+ * Alternate-hypothesis generation via `GET /api/wave-analysis/hypotheses`. The LLM proposes which
+ * structures to test; the deterministic engine rule-checks each and returns the validated ones (with
+ * their score) and the rejected ones (with the failing rule). The engine owns validity, not the LLM.
+ */
+export async function getAlternateHypotheses(
+  symbol: string,
+  interval?: string,
+  signal?: AbortSignal
+): Promise<AlternateHypothesesReport> {
+  const query = new URLSearchParams({ symbol })
+  if (interval) {
+    query.set('interval', interval)
+  }
+
+  const response = await fetch(`/api/wave-analysis/hypotheses?${query.toString()}`, { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as AlternateHypothesesReport
 }
 
 /**

@@ -691,3 +691,21 @@ export interface AnalogResponse {
   narrative: string | null
   narrativeUnavailableReason: string | null
 }
+
+/** One proposed structure after the engine validated it (mirrors backend `HypothesisResult`). */
+export interface HypothesisResult {
+  structure: string
+  reason: string
+  isValid: boolean
+  score: number | null
+  failingRule: string | null
+}
+
+/** Alternate-hypothesis pass: the LLM proposed, the engine validated (mirrors `AlternateHypothesesReport`). */
+export interface AlternateHypothesesReport {
+  symbol: string
+  validated: HypothesisResult[]
+  rejected: HypothesisResult[]
+  proposalCapHit: boolean
+  unavailable: string | null
+}
