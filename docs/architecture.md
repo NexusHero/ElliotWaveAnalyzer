@@ -1888,6 +1888,28 @@ The CI-measured baseline after this ADR is ~94% line coverage.
 
 ---
 
+## ADR-039: Structured Alternate Scenarios — the Alternative Carries a Re-projectable Reading, Resolved Lazily
+
+**Context:** `ProjectionService` returns, for the wave currently unfolding, an `AlternativeScenario` — the count that applies if the primary invalidation breaks. It was **text only** (`Name`, `Note`): the engine could *name* the alternative ("Ending diagonal / ABC") but not *draw* it, because nothing behind the name could be projected into real levels. The analyst-UX follow-up (#166) wants the alternate branch drawn on the chart as a genuine projection (its own zones/invalidation), and generically — for any active wave, motive or corrective, bull or bear — without special-casing each wave. This is the foundation (#218) beneath the on-chart projection (#219) and the live scenario switch (#220).
+
+**Decision:** Give the alternative a **re-projectable reinterpretation**, produced only by the projection engine, and resolve it **lazily**:
+
+- **`ScenarioReinterpretation` carries inputs, not a computed result.** It holds the same pivots as the primary count plus how to re-read them: a `Motive` flag (motive vs corrective) and a `StructureKind`. It deliberately does **not** carry an eagerly-computed `WaveLevels` — that would recurse without bound (an alternative's projection has its own alternative, and so on).
+- **One uniform duality, engine-owned.** A motive count's alternative re-reads the same pivots as a **correction** (the "it was an ABC, not an impulse" reading); a correction's alternative re-reads them as a **motive** count. `ProjectionService.Project`/`ProjectCorrective` attach it; nothing else constructs it, so there is a single source of truth.
+- **`ProjectionService.Resolve(ScenarioReinterpretation)` projects it on demand** via the same `Project`/`ProjectCorrective` entry points, so resolving the alternate branch is a normal projection call — no bespoke per-wave geometry. Lazy resolution caps recursion at construction: an alternative-of-an-alternative is only ever computed if a caller explicitly walks the chain.
+
+**Consequences:**
+
+| | |
+|---|---|
+| (+) | The alternate branch can be drawn as a real projection (#219) and promoted live when the invalidation breaks (#220), reusing the existing pure projection engine — no new geometry to trust, LLM still absent from this path (ADR-009) |
+| (+) | Generic by construction: the same seam handles every unfolding wave, motive or corrective, both directions — no per-wave special-casing |
+| (+) | Additive and pure: `Name`/`Note` are unchanged; the reinterpretation is an optional field; round-trip and no-throw are unit-tested for waves 2–5, the complete impulse, and corrective counts |
+| (-) | The current uniform duality re-reads the *same* pivots in the opposite mode; a count whose truer alternative needs a *different* pivot set (e.g. "wave 5 is still extending") is approximated by the mode flip — per-case reinterpretations are a deliberate follow-up on this seam |
+| (-) | The reinterpretation embeds the pivot list, so each serialized `WaveLevels` alternative repeats its count's pivots — a small, bounded payload cost |
+
+---
+
 # Quality Requirements {#section-quality-scenarios}
 
 ## Quality Scenarios {#_quality_scenarios}
