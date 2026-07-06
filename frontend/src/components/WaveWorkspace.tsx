@@ -35,7 +35,12 @@ import HypothesesPanel, { type HypothesesState } from './HypothesesPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
-import { type ZoneBand, branchesToZoneBands, levelsToZoneBands } from './zoneOverlay'
+import {
+  type ZoneBand,
+  branchesToZoneBands,
+  hasCrossedInvalidation,
+  levelsToZoneBands,
+} from './zoneOverlay'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
@@ -381,16 +386,22 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     () => levelsToPriceLines(activeLevels, effectiveLayers),
     [activeLevels, effectiveLayers]
   )
+  // Live scenario switch (#220): once price breaks the live count's invalidation, the bullish
+  // continuation is dead and the alternate reading is promoted to the live count. Ephemeral and
+  // client-local — durable switch history stays owned by the track-record re-evaluation (#119).
+  const promoted = hasCrossedInvalidation(liveVerify.data?.levels ?? null, lastPrice)
+
   // The shaded zone bands fill between the same edges the price lines mark (the "green boxes"),
   // plus — in Pro mode — the forward projection branches (#219): the speculative one-step-ahead
-  // continuation and the bearish alternate, drawn subordinate (dashed) from the live-verify result.
+  // continuation and the bearish alternate, drawn subordinate (dashed) from the live-verify result;
+  // once promoted (#220) the alternate is drawn solid and the dead continuation dropped.
   const zoneBands = useMemo<ZoneBand[]>(() => {
     const confirmed = levelsToZoneBands(activeLevels, effectiveLayers)
     const branchBands = pro
-      ? branchesToZoneBands(liveVerify.data?.branches ?? null, effectiveLayers)
+      ? branchesToZoneBands(liveVerify.data?.branches ?? null, effectiveLayers, promoted)
       : []
     return [...confirmed, ...branchBands]
-  }, [activeLevels, effectiveLayers, pro, liveVerify.data?.branches])
+  }, [activeLevels, effectiveLayers, pro, liveVerify.data?.branches, promoted])
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))

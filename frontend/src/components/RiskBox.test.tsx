@@ -75,6 +75,37 @@ describe('RiskBox', () => {
     expect(screen.getByText('3.0R')).toBeInTheDocument()
   })
 
+  it('rides a speculative target into the request and tags it apart (#220)', async () => {
+    const speculativeLevels: WaveLevels = {
+      ...levels,
+      unfoldingWave: 'Wave 5',
+      targetZones: [{ low: 180, high: 200, label: 'w5', basis: 'projection' }],
+    }
+    assessRiskMock.mockResolvedValue(
+      assessment({
+        targets: [
+          { price: 130, rewardAbs: 30, rewardToRisk: 3 },
+          { price: 180, rewardAbs: 80, rewardToRisk: 8 },
+        ],
+      })
+    )
+    renderBox(
+      <RiskBox levels={levels} currentPrice={100} speculativeLevels={speculativeLevels} />
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Assess' }))
+
+    await waitFor(() => expect(assessRiskMock).toHaveBeenCalledTimes(1))
+    // The confirmed target (130) and the speculative one (180, near edge for a long) both go in.
+    expect(assessRiskMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({ targets: [130, 180] })
+    )
+    // The speculative target is tagged, and the disclaimer is strengthened.
+    expect(await screen.findByText('8.0R')).toBeInTheDocument()
+    expect(screen.getByText('speculative')).toBeInTheDocument()
+    expect(screen.getByText(/assumes the current wave completes as a simple correction/)).toBeInTheDocument()
+  })
+
   it('shows the no-valid-stop reason instead of a size', async () => {
     assessRiskMock.mockResolvedValue(
       assessment({

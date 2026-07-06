@@ -1503,7 +1503,8 @@
 }
 .risk-targets li {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
   padding: 2px 0;
   font-size: 12.5px;
   border-top: 1px dashed var(--line-soft);
@@ -1511,6 +1512,21 @@
 .risk-rr {
   font-weight: 700;
   color: var(--pass);
+  margin-left: auto;
+}
+/* A speculative (one-step-ahead) target reads apart from a confirmed one (#220). */
+.risk-rr.spec {
+  color: var(--target-line, #5b9bd5);
+}
+.spec-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--target-line, #5b9bd5);
+  border: 1px dashed var(--acc-line);
+  border-radius: 5px;
+  padding: 0 5px;
 }
 .riskbox-disclaimer {
   margin: 8px 0 0;
