@@ -50,6 +50,7 @@ import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { treeToDegreeMarkers } from './degreeMarkers'
+import { type LegMeasurement, legMeasurements } from './legMeasurements'
 import { toWaveLinePoints } from './waveLine'
 
 /**
@@ -571,6 +572,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     [overlayRanked, effectiveLayers]
   )
 
+  // Live per-leg proportions for the analyst's own count (#165) — Δprice/Δ%/Δtime/ratio, updating
+  // as pivots are placed, nudged or dragged. The authoritative Fibonacci ratios still come from verify.
+  const legs = useMemo<LegMeasurement[]>(() => legMeasurements(annotations), [annotations])
+
   const markers = useMemo<ChartMarker[]>(() => {
     const toMarker =
       (kind: ChartMarker['kind']) =>
@@ -879,6 +884,30 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                   </li>
                 ))}
               </ul>
+            )}
+            {legs.length > 0 && (
+              <div className="leg-readout" data-testid="leg-readout">
+                <div className="leg-readout-head mono">Δ price · % · days · ratio</div>
+                <ul>
+                  {legs.map((leg, i) => (
+                    <li key={i} className="mono">
+                      <span className="leg-name">{leg.label}</span>
+                      <span className={leg.deltaPrice >= 0 ? 'up' : 'down'}>
+                        {leg.deltaPrice >= 0 ? '+' : ''}
+                        {fmtMoney(leg.deltaPrice)}
+                      </span>
+                      <span className={leg.deltaPercent >= 0 ? 'up' : 'down'}>
+                        {leg.deltaPercent >= 0 ? '+' : ''}
+                        {leg.deltaPercent.toFixed(1)}%
+                      </span>
+                      <span className="leg-days">{leg.deltaDays}d</span>
+                      <span className="leg-ratio">
+                        {leg.ratioToPrev == null ? '—' : `${leg.ratioToPrev.toFixed(3)}×`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 

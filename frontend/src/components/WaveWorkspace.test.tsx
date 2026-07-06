@@ -214,6 +214,18 @@ describe('WaveWorkspace', () => {
     expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
   })
 
+  it('shows a live per-leg measurement readout once two pivots are placed (#165)', () => {
+    renderWorkspace()
+    expect(screen.queryByTestId('leg-readout')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('pt1'))
+    fireEvent.click(screen.getByTestId('pt2'))
+
+    const readout = screen.getByTestId('leg-readout')
+    // one leg (1→2) with its Δ%, Δdays and no prior-leg ratio yet
+    expect(within(readout).getByText('1→2')).toBeInTheDocument()
+  })
+
   it('offers longer history ranges 3Y/5Y/Max (#164)', () => {
     renderWorkspace()
     const rangeGroup = screen.getByRole('group', { name: 'Range' })
