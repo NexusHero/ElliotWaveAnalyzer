@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { getSavedDepot, importDepot } from '../api/client'
 import type { DepotSnapshot } from '../api/types'
@@ -20,6 +21,7 @@ function percent(value: number | null): string {
  * persisted server-side yet — the snapshot lives only in this component.
  */
 export default function DepotImportPanel() {
+  const queryClient = useQueryClient()
   const [snapshot, setSnapshot] = useState<DepotSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -43,6 +45,10 @@ export default function DepotImportPanel() {
     setError(null)
     try {
       setSnapshot(await importDepot(file))
+      // The imported depot is persisted server-side and drives the workspace's Portfolio review.
+      // That query is cached (5-min stale) and lives in a sibling view, so invalidate it here or a
+      // fresh import won't show up until a hard reload.
+      await queryClient.invalidateQueries({ queryKey: ['portfolio-review'] })
     } catch (err) {
       setSnapshot(null)
       setError(err instanceof Error ? err.message : 'Import failed.')

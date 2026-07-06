@@ -65,21 +65,27 @@ export default function CoachPanel({
 }
 
 function EmptyState({ labelCount }: { labelCount: number }) {
+  // Once the two-label minimum is met the "place at least two" prompt is stale — swap it for a
+  // ready-to-check affordance instead of leaving a hint that undercounts the placed labels.
+  const ready = labelCount >= 2
   return (
     <div className="state-card fade-up">
       <span className="state-ico">
         <Target size={24} />
       </span>
-      <h4>Place at least two labels</h4>
+      <h4>{ready ? 'Ready to check your count' : 'Place at least two labels'}</h4>
       <p>
-        Click the chart to mark your wave pivots. With two or more, the canonical rules can be
-        checked.
+        {ready
+          ? 'Your pivots are placed. Run “Validate my count” to check the canonical rules, or keep marking pivots.'
+          : 'Click the chart to mark your wave pivots. With two or more, the canonical rules can be checked.'}
       </p>
-      <div className="state-progress">
-        <span className={`dot${labelCount >= 1 ? ' on' : ''}`} />
-        <span className={`dot${labelCount >= 2 ? ' on' : ''}`} />
-        <em className="mono">{labelCount}/2 placed</em>
-      </div>
+      {!ready && (
+        <div className="state-progress">
+          <span className={`dot${labelCount >= 1 ? ' on' : ''}`} />
+          <span className={`dot${labelCount >= 2 ? ' on' : ''}`} />
+          <em className="mono">{labelCount}/2 placed</em>
+        </div>
+      )}
     </div>
   )
 }

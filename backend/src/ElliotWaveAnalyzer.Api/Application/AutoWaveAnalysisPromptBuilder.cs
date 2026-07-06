@@ -65,7 +65,7 @@ public static class AutoWaveAnalysisPromptBuilder
         sb.AppendLine($"""
 
             ## Market Context
-            Symbol:       {symbol}/USD
+            Symbol:       {symbol}
             Period:       {ordered[0].OpenTime:yyyy-MM-dd} – {ordered[^1].OpenTime:yyyy-MM-dd}
             Price range:  ${low:F2} (low) – ${high:F2} (high)
             Start price:  ${startPrice:F2}

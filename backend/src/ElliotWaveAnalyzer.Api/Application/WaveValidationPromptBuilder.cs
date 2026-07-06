@@ -110,7 +110,7 @@ public static class WaveValidationPromptBuilder
 
         sb.AppendLine($"""
             ## Market Context
-            Symbol:       {symbol}/USD
+            Symbol:       {symbol}
             Period:       {start:yyyy-MM-dd} – {end:yyyy-MM-dd}
             Price range:  ${low:F2} (low) – ${high:F2} (high)
             Start price:  ${startPrice:F2}

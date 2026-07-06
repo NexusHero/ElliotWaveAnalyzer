@@ -52,6 +52,27 @@ describe('LiveVerifyPanel', () => {
     expect(screen.getByText(/score 0.74/)).toBeInTheDocument()
   })
 
+  it('shows a distinct "nothing to validate" verdict when no rule is determinate', () => {
+    // 0 pivots snapped → every rule Indeterminate → isValid is vacuously true. The badge must
+    // not read "Valid" for a count that was never actually checked.
+    const v = verification({
+      isValid: true,
+      structure: 'Unknown',
+      rules: {
+        bullishAssumed: true,
+        rules: [
+          { name: 'Rule 1 — Wave 2', status: 'Indeterminate', detail: 'too few pivots' },
+          { name: 'Rule 2 — Wave 3', status: 'Indeterminate', detail: 'too few pivots' },
+        ],
+        ratios: [],
+      },
+    })
+    render(<LiveVerifyPanel state="result" verification={v} error={null} currentPrice={null} />)
+
+    expect(screen.getByText('Nothing to validate yet')).toBeInTheDocument()
+    expect(screen.queryByText('Valid')).not.toBeInTheDocument()
+  })
+
   it('lists failing hard rules and shows the violation verdict', () => {
     const v = verification({
       isValid: false,
