@@ -139,6 +139,35 @@ describe('WaveWorkspace', () => {
     expect(mockClient.validateWaveCount).not.toHaveBeenCalled()
   })
 
+  it('groups tools into tabs; switching shows one section and hides the others (#163)', () => {
+    renderWorkspace()
+    // Default Count tab shows the count workflow; other sections aren't mounted.
+    expect(screen.getByText('Your wave count')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Setup scanner' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Portfolio review' })).not.toBeInTheDocument()
+
+    // Switch to Scan → the scanner appears and the count workflow is hidden.
+    fireEvent.click(screen.getByRole('tab', { name: 'Scan' }))
+    expect(screen.getByRole('region', { name: 'Setup scanner' })).toBeInTheDocument()
+    expect(screen.queryByText('Your wave count')).not.toBeInTheDocument()
+
+    // Switch to Portfolio → the portfolio review appears.
+    fireEvent.click(screen.getByRole('tab', { name: 'Portfolio' }))
+    expect(screen.getByRole('region', { name: 'Portfolio review' })).toBeInTheDocument()
+  })
+
+  it('preserves the placed count across a tab switch (#163)', () => {
+    renderWorkspace()
+    fireEvent.click(screen.getByTestId('pt1'))
+    fireEvent.click(screen.getByTestId('pt2'))
+    expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Scan' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Count' }))
+    // The count lives in the workspace, not a panel — it survives the round-trip.
+    expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+  })
+
   it('offers longer history ranges 3Y/5Y/Max (#164)', () => {
     renderWorkspace()
     const rangeGroup = screen.getByRole('group', { name: 'Range' })
