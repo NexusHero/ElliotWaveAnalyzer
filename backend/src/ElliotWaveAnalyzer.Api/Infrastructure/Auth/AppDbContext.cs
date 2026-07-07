@@ -79,8 +79,9 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             entity.HasKey(d => d.Id);
             entity.Property(d => d.Currency).HasMaxLength(8).IsRequired();
-            // One saved depot per user (the latest import replaces the previous).
-            entity.HasIndex(d => d.UserId).IsUnique();
+            // Every import accumulates as a snapshot (#115) — list the newest first per user,
+            // mirroring AnalysisSnapshot's history index (ADR-010).
+            entity.HasIndex(d => new { d.UserId, d.ImportedAt });
             entity.HasMany(d => d.Positions)
                 .WithOne()
                 .HasForeignKey(p => p.SavedDepotId)

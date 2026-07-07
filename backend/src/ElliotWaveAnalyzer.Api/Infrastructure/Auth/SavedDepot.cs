@@ -3,8 +3,8 @@ using ElliotWaveAnalyzer.Api.Domain.Depot;
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 
 /// <summary>
-/// A persisted depot snapshot for one user — the most recent import (a new import replaces the
-/// previous one). Header fields mirror <see cref="DepotSnapshot"/>; the holdings live in
+/// A single persisted depot snapshot for one user — every import accumulates as one of these (#115),
+/// never overwritten. Header fields mirror <see cref="DepotSnapshot"/>; the holdings live in
 /// <see cref="Positions"/>.
 /// </summary>
 internal sealed class SavedDepot
