@@ -1,6 +1,8 @@
 using ElliotWaveAnalyzer.Api.Application;
+using ElliotWaveAnalyzer.Api.Infrastructure;
 using ElliotWaveAnalyzer.Api.Infrastructure.DepotImport;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ElliotWaveAnalyzer.Api.Extensions;
@@ -27,6 +29,16 @@ internal static class DepotImportExtensions
         // Portfolio review (REQ-027): resolves + analyzes + narrates each holding. Scoped — depends
         // on the scoped depot store and per-user narrator.
         services.AddScoped<IPortfolioReviewService, PortfolioReviewService>();
+
+        // Live-price enrichment (#114): fills a missing market price/value/gain-loss for positions
+        // whose source file didn't carry one (e.g. Scalable Capital's transactions CSV). The quote
+        // provider is wrapped in the same short-lived caching decorator as symbol resolution.
+        services.AddTransient<IQuoteProvider>(sp =>
+            new CachingQuoteProvider(
+                new TechnicalAnalysisQuoteProvider(sp.GetRequiredService<ITechnicalAnalysisService>()),
+                sp.GetRequiredService<IMemoryCache>(),
+                sp.GetRequiredService<ILogger<CachingQuoteProvider>>()));
+        services.AddTransient<IDepotEnrichmentService, DepotEnrichmentService>();
 
         return services;
     }
