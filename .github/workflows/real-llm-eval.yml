@@ -1,0 +1,67 @@
+name: Real-LLM nightly eval
+
+# The per-PR gates deliberately fake the LLM (cost, determinism, no cloud dependency). This measures
+# the REAL configured model's behavior instead — fact-guard adherence, ranking sense, injection
+# resistance (#198) — nightly, reported, never gating (AC5): no assertion here checks a quality
+# threshold, only that the run itself completed; the scores land in a scorecard artifact for a human
+# to read over time.
+#
+# Requires an operator-provisioned EWA_EVAL_GEMINI_API_KEY repository secret. Without one, every eval
+# test calls Assert.Ignore and the job still succeeds (reported as "Skipped", not "Failed") — this is
+# a genuine, named gap this session cannot close itself (no access to this repo's secrets), the same
+# class of "needs an operator action" as #170/#172/#178/#180, applied to test infrastructure. See
+# docs/architecture.md ADR-066.
+on:
+  schedule:
+    - cron: '0 5 * * *' # 05:00 UTC nightly, staggered after mutation/e2e/load
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  real-llm-eval:
+    name: Real-model eval — fact-guard, ranking, injection
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: backend
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: backend
+
+      - name: Run the real-LLM eval suite
+        run: >
+          dotnet test
+          --no-build
+          --configuration Release
+          --filter "FullyQualifiedName~RealLlmEval"
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=real-llm-eval-results.trx"
+          --results-directory ./RealLlmEvalTestResults
+        working-directory: backend
+        env:
+          # Operator-provisioned secret — absent by default, in which case every test degrades to
+          # Assert.Ignore rather than failing the job (see the test fixture's own doc comment).
+          EWA_EVAL_GEMINI_API_KEY: ${{ secrets.EWA_EVAL_GEMINI_API_KEY }}
+
+      - name: Upload eval scorecard (AC1)
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: real-llm-eval-scorecard
+          path: |
+            backend/RealLlmEvalTestResults/**
+            backend/tests/ElliotWaveAnalyzer.Tests/bin/Release/net10.0/RealLlmEvalResults/**
+          if-no-files-found: warn
+          retention-days: 30
