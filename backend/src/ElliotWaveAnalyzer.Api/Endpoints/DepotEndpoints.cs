@@ -6,9 +6,9 @@ using ElliotWaveAnalyzer.Api.Interfaces;
 namespace ElliotWaveAnalyzer.Api.Endpoints;
 
 /// <summary>
-/// Endpoint group for a user's depot: import one from an uploaded broker file, and read back the
-/// most recently imported one. Authenticated and per-user rate limited like the rest of the API.
-/// An import replaces the user's previously saved depot.
+/// Endpoint group for a user's depot: import one from an uploaded broker file, read back the most
+/// recently imported one, and list/fetch the import history (#115). Authenticated and per-user rate
+/// limited like the rest of the API. Every import accumulates as a new snapshot — nothing is deleted.
 /// </summary>
 public static class DepotEndpoints
 {
@@ -28,9 +28,10 @@ public static class DepotEndpoints
             .WithSummary("Import a broker depot from an uploaded file and save it")
             .WithDescription("""
                 Multipart form upload with a single 'file' field. The importer detects the broker
-                (Smartbroker+ PDF or Scalable Capital CSV) and returns the parsed holdings (ISIN,
-                name, quantity, cost/market price and value, gain/loss, exchange) plus depot totals.
-                The result is saved as your current depot, replacing any previous import.
+                (Smartbroker+ PDF, Scalable Capital CSV, or Trade Republic PDF) and returns the parsed
+                holdings (ISIN, name, quantity, cost/market price and value, gain/loss, exchange) plus
+                depot totals. The result is saved as a new snapshot in your import history — it does
+                not delete any previous import.
                 """)
             .DisableAntiforgery()
             .Produces<DepotSnapshot>(StatusCodes.Status200OK)
@@ -47,6 +48,27 @@ public static class DepotEndpoints
                 """)
             .Produces<DepotSnapshot>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status204NoContent);
+
+        group.MapGet("/history", GetHistoryAsync)
+            .WithName("GetDepotHistory")
+            .WithSummary("List your imported depot snapshots, newest first")
+            .WithDescription("""
+                Headline metadata only (id, broker, timestamps, currency, totals) — fetch a specific
+                snapshot's full holdings via GET /api/depot/history/{id}. Every import you've ever made
+                is kept (no retention/pruning); this list can grow without bound.
+                """)
+            .Produces<IReadOnlyList<DepotHistoryEntry>>(StatusCodes.Status200OK);
+
+        group.MapGet("/history/{id:guid}", GetSnapshotByIdAsync)
+            .WithName("GetDepotSnapshotById")
+            .WithSummary("Get one of your imported depot snapshots by id")
+            .WithDescription("""
+                Returns the full snapshot (same shape and enrichment as GET /api/depot) for one of your
+                own past imports. 404 if the id doesn't exist or isn't yours — the two cases are
+                indistinguishable, so a guessed id can't confirm another user's snapshot exists.
+                """)
+            .Produces<DepotSnapshot>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/analysis", GetAnalysisAsync)
             .WithName("GetPortfolioReview")
@@ -104,6 +126,30 @@ public static class DepotEndpoints
         if (snapshot is null)
         {
             return Results.NoContent();
+        }
+
+        var enriched = await enrichment.EnrichAsync(snapshot, cancellationToken);
+        return Results.Ok(enriched);
+    }
+
+    private static async Task<IResult> GetHistoryAsync(
+        ClaimsPrincipal user, IDepotStore store, CancellationToken cancellationToken)
+    {
+        var history = await store.GetHistoryAsync(UserId(user), cancellationToken);
+        return Results.Ok(history);
+    }
+
+    private static async Task<IResult> GetSnapshotByIdAsync(
+        Guid id,
+        ClaimsPrincipal user,
+        IDepotStore store,
+        IDepotEnrichmentService enrichment,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await store.GetByIdAsync(UserId(user), id, cancellationToken);
+        if (snapshot is null)
+        {
+            return Results.NotFound();
         }
 
         var enriched = await enrichment.EnrichAsync(snapshot, cancellationToken);

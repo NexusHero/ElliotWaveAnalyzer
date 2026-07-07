@@ -8,8 +8,9 @@ namespace ElliotWaveAnalyzer.Tests.Acceptance;
 
 /// <summary>
 /// End-to-end acceptance tests for depot persistence: an import is saved for the user and read
-/// back via <c>GET /api/depot</c>, and a new import replaces the previous one. Drives the running
-/// API over HTTP against a real PostgreSQL (Testcontainers).
+/// back via <c>GET /api/depot</c>; every import accumulates as a snapshot in the history (#115)
+/// rather than replacing the previous one. Drives the running API over HTTP against a real
+/// PostgreSQL (Testcontainers).
 /// </summary>
 [TestFixture]
 public sealed class DepotPersistenceAcceptanceTests
@@ -78,9 +79,13 @@ public sealed class DepotPersistenceAcceptanceTests
     }
 
     [Test]
-    public async Task Reimport_ReplacesThePreviousDepot()
+    public async Task Reimport_LatestImportWins_ButBothSurviveInHistory()
     {
-        // First a PDF (3 holdings), then a CSV (1 aggregated holding) — the latest wins.
+        // First a PDF (3 holdings), then a CSV (1 aggregated holding) — GET /api/depot always
+        // shows the latest, but #115 means the earlier one is not deleted (checked via the
+        // history's delta, since this fixture's user accumulates imports across test methods).
+        var beforeCount = (await HistoryAsync()).GetArrayLength();
+
         await _client.PostAsync("/api/depot/import", PdfUpload());
         await _client.PostAsync("/api/depot/import", CsvUpload());
 
@@ -92,6 +97,55 @@ public sealed class DepotPersistenceAcceptanceTests
             Assert.That(body.GetProperty("positions").GetArrayLength(), Is.EqualTo(1));
             Assert.That(body.GetProperty("positions")[0].GetProperty("quantity").GetDecimal(), Is.EqualTo(6m));
         });
+
+        var afterHistory = await HistoryAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(afterHistory.GetArrayLength(), Is.EqualTo(beforeCount + 2));
+            // Newest first: the CSV import we just made, then the PDF import just before it.
+            Assert.That(afterHistory[0].GetProperty("source").GetString(), Is.EqualTo("ScalableCapital"));
+            Assert.That(afterHistory[1].GetProperty("source").GetString(), Is.EqualTo("SmartbrokerPlus"));
+        });
+    }
+
+    [Test]
+    public async Task GetHistory_ThenFetchById_ReturnsThatSnapshotsFullHoldings()
+    {
+        await _client.PostAsync("/api/depot/import", PdfUpload());
+
+        var history = await HistoryAsync();
+        var latestId = history[0].GetProperty("id").GetGuid();
+
+        var response = await _client.GetAsync($"/api/depot/history/{latestId}");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(body.GetProperty("source").GetString(), Is.EqualTo("SmartbrokerPlus"));
+            Assert.That(body.GetProperty("positions").GetArrayLength(), Is.EqualTo(3));
+        });
+    }
+
+    [Test]
+    public async Task GetSnapshotById_UnknownId_Returns404()
+    {
+        var response = await _client.GetAsync($"/api/depot/history/{Guid.NewGuid()}");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
+
+    [Test]
+    public async Task GetSnapshotById_AnotherUsersSnapshot_Returns404_NotTheirData()
+    {
+        await _client.PostAsync("/api/depot/import", PdfUpload());
+        var mine = (await HistoryAsync())[0].GetProperty("id").GetGuid();
+
+        using var otherUser = _factory.CreateClient();
+        await otherUser.PostAsJsonAsync("/api/auth/register", new { email = "other-depot-user@example.com", password = "Str0ng!Passw0rd" });
+        await otherUser.PostAsJsonAsync("/api/auth/login", new { email = "other-depot-user@example.com", password = "Str0ng!Passw0rd" });
+
+        var response = await otherUser.GetAsync($"/api/depot/history/{mine}");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
     [Test]
@@ -102,5 +156,22 @@ public sealed class DepotPersistenceAcceptanceTests
         var response = await anon.GetAsync("/api/depot");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task GetHistory_Unauthenticated_Returns401()
+    {
+        using var anon = _factory.CreateClient();
+
+        var response = await anon.GetAsync("/api/depot/history");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    private async Task<JsonElement> HistoryAsync()
+    {
+        var response = await _client.GetAsync("/api/depot/history");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 }
