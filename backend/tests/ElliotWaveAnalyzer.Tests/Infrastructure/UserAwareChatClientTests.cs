@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.AspNetCore.Http;
@@ -12,7 +13,8 @@ namespace ElliotWaveAnalyzer.Tests.Infrastructure;
 /// <summary>
 /// The per-user credential routing (REQ-013): when the calling user has a stored key for the active
 /// provider the client is built with it; otherwise it falls back to the operator's startup client.
-/// No HTTP user (a background job) also falls back.
+/// No HTTP user (a background job) also falls back. On the fallback path, the per-user quota (#174)
+/// gates the call; a user's own key never touches the quota.
 /// </summary>
 [TestFixture]
 public sealed class UserAwareChatClientTests
@@ -22,6 +24,7 @@ public sealed class UserAwareChatClientTests
     private IUserKeyStore _vault = null!;
     private IUserChatClientFactory _factory = null!;
     private IChatClientResolver _resolver = null!;
+    private IUserLlmQuotaService _quota = null!;
     private ServiceProvider _provider = null!;
 
     private readonly StubChatClient _userClient = new("USER");
@@ -33,11 +36,14 @@ public sealed class UserAwareChatClientTests
         _vault = Substitute.For<IUserKeyStore>();
         _factory = Substitute.For<IUserChatClientFactory>();
         _resolver = Substitute.For<IChatClientResolver>();
+        _quota = Substitute.For<IUserLlmQuotaService>();
         _resolver.Resolve("gemini").Returns(_startupClient);
         _factory.Create("gemini", "sk-user").Returns(_userClient);
+        _quota.TryConsumeAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var services = new ServiceCollection();
         services.AddScoped(_ => _vault);
+        services.AddScoped(_ => _quota);
         _provider = services.BuildServiceProvider();
     }
 
@@ -87,6 +93,39 @@ public sealed class UserAwareChatClientTests
 
         Assert.That(text, Is.EqualTo("STARTUP"));
         _factory.DidNotReceive().Create(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Test]
+    public async Task GetResponseAsync_UserHasNoKey_ConsumesOneUnitOfTheirQuota()
+    {
+        _vault.GetDecryptedAsync(User, "gemini", Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        await AskAsync(Sut(User));
+
+        await _quota.Received(1).TryConsumeAsync(User, Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task GetResponseAsync_UserHasOwnKey_NeverTouchesTheQuota()
+    {
+        _vault.GetDecryptedAsync(User, "gemini", Arg.Any<CancellationToken>()).Returns("sk-user");
+
+        await AskAsync(Sut(User));
+
+        await _quota.DidNotReceive().TryConsumeAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public void GetResponseAsync_UserHasNoKeyAndQuotaExhausted_ThrowsLlmQuotaExceededException()
+    {
+        _vault.GetDecryptedAsync(User, "gemini", Arg.Any<CancellationToken>()).Returns((string?)null);
+        _quota.TryConsumeAsync(User, Arg.Any<CancellationToken>()).Returns(false);
+        var status = new UserQuotaStatus(50, 50, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(1));
+        _quota.GetStatusAsync(User, Arg.Any<CancellationToken>()).Returns(status);
+
+        var ex = Assert.ThrowsAsync<LlmQuotaExceededException>(() => AskAsync(Sut(User)));
+
+        Assert.That(ex!.Status, Is.EqualTo(status));
     }
 
     [Test]
