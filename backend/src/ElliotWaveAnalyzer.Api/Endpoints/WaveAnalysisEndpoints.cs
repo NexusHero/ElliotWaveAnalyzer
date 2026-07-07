@@ -269,12 +269,22 @@ public static class WaveAnalysisEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        // ~2y of daily context is plenty to snap any edited pivot and project levels.
-        const int lookbackDays = 730;
+        // Verify on the SAME timeframe the pivots were placed on — snapping weekly/intraday
+        // pivots against daily candles would wrongly reject them (REQ-031 follow-up).
+        var interval = (request.Interval ?? "1d").ToLowerInvariant() switch
+        {
+            "1h" => CandleInterval.OneHour,
+            "4h" => CandleInterval.FourHours,
+            "1w" => CandleInterval.OneWeek,
+            _ => CandleInterval.OneDay,
+        };
+        // ~2y of context is plenty to snap any edited pivot and project levels; intraday
+        // sources serve a much shorter history, so stay within their window.
+        var lookbackDays = interval is CandleInterval.OneHour or CandleInterval.FourHours ? 60 : 730;
         try
         {
             var result = await verificationService.VerifyAsync(
-                request.Symbol.ToUpperInvariant(), request.Annotations, lookbackDays, cancellationToken);
+                request.Symbol.ToUpperInvariant(), request.Annotations, lookbackDays, interval, cancellationToken);
             return Results.Ok(result);
         }
         catch (ArgumentException ex)

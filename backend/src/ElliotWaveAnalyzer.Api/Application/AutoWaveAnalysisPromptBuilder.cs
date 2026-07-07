@@ -152,5 +152,7 @@ public static class AutoWaveAnalysisPromptBuilder
 
             - Include every candidate id exactly once in "rankings", most likely first.
             - "bestCandidateId" MUST be one of the candidate ids shown above.
+            - Be concise: "marketSummary" at most three sentences; each "rationale" and
+              "outlook" at most two short sentences. Long answers get truncated.
             """);
 }

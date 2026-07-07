@@ -161,7 +161,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   // Analyst-in-the-loop: a deterministic re-verification (no LLM) runs on every edit, debounced.
   const liveVerify = useMutation({
-    mutationFn: (payload: WaveAnnotation[]) => verifyEditedCount({ symbol, annotations: payload }),
+    // Verify on the same timeframe the pivots were placed on — the server snaps against the
+    // interval-resampled series, so weekly/intraday pivots land on the bars the analyst clicked.
+    mutationFn: (payload: WaveAnnotation[]) =>
+      verifyEditedCount({ symbol, annotations: payload, interval: timeframe.code }),
   })
   const { mutate: verifyMutate, reset: verifyReset } = liveVerify
   useEffect(() => {

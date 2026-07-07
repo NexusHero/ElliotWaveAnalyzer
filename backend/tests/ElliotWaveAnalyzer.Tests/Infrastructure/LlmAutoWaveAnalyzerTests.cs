@@ -73,4 +73,81 @@ public sealed class LlmAutoWaveAnalyzerTests
             Assert.That(result.Usage.Provider, Does.Contain("Gemini"));
         });
     }
+
+    [Test]
+    public async Task RankAsync_TruncatedFirstResponse_RetriesWithCorrectiveFeedbackAndSucceeds()
+    {
+        // First attempt: JSON cut off mid-string (the observed Gemini truncation). The runner must
+        // retry once with corrective feedback rather than failing the whole analysis.
+        var truncated = """{ "bestCandidateId": 1, "marketSummary": "cut off mid-sen""";
+        var client = new SequenceChatClient(truncated, RankingJson);
+        var analyzer = new LlmAutoWaveAnalyzer(
+            client,
+            Options.Create(new LlmProviderOptions
+            {
+                Active = "Gemini",
+                Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
+            }),
+            NullLogger<LlmAutoWaveAnalyzer>.Instance);
+
+        var result = await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Ranking.BestCandidateId, Is.EqualTo(1));
+            Assert.That(client.Calls, Is.EqualTo(2), "initial attempt + one corrective retry");
+            Assert.That(
+                client.LastMessages.Any(m => m.Text.Contains("cut off or was not valid JSON")),
+                Is.True,
+                "the retry should tell the model what went wrong");
+        });
+    }
+
+    [Test]
+    public void RankAsync_MalformedTwice_ThrowsAfterExactlyOneRetry()
+    {
+        var client = new SequenceChatClient("not json", "still not json");
+        var analyzer = new LlmAutoWaveAnalyzer(
+            client,
+            Options.Create(new LlmProviderOptions
+            {
+                Active = "Gemini",
+                Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
+            }),
+            NullLogger<LlmAutoWaveAnalyzer>.Instance);
+
+        Assert.ThrowsAsync<InvalidOperationException>(
+            () => analyzer.RankAsync("BTC", [], [Candidate(0)]));
+        Assert.That(client.Calls, Is.EqualTo(2));
+    }
+
+    /// <summary>Chat client returning each body in turn; records the last call's messages.</summary>
+    private sealed class SequenceChatClient(params string[] responses) : Microsoft.Extensions.AI.IChatClient
+    {
+        public int Calls { get; private set; }
+
+        public IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> LastMessages { get; private set; } = [];
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            LastMessages = [.. messages];
+            var body = responses[Math.Min(Calls, responses.Length - 1)];
+            Calls++;
+            return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(
+                new Microsoft.Extensions.AI.ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant, body)));
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
 }

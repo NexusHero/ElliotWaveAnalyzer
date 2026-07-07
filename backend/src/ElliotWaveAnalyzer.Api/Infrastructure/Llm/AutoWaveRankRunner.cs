@@ -15,8 +15,17 @@ internal static class AutoWaveRankRunner
 {
     // Generous cap: ranking several candidates (summary + per-candidate rationale & outlook)
     // is verbose, and Gemini 2.5 models spend "thinking" tokens against this same budget —
-    // too small a cap truncates the JSON mid-string. 8192 leaves ample room.
-    private const int MaxOutputTokens = 8192;
+    // too small a cap truncates the JSON mid-string.
+    private const int MaxOutputTokens = 16384;
+
+    // Initial attempt + one corrective retry: a model that truncated or emitted malformed JSON
+    // tends to repeat itself unless told what went wrong (same discipline as the vision extractor).
+    private const int MaxAttempts = 2;
+
+    private const string RetryNudge =
+        "Your previous response was cut off or was not valid JSON. Respond again with ONLY the "
+        + "complete JSON object described above — no prose, no markdown — and keep marketSummary "
+        + "to at most three sentences and every rationale/outlook to at most two short sentences.";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -56,55 +65,72 @@ internal static class AutoWaveRankRunner
             ResponseFormat = ChatResponseFormat.Json,
         };
 
-        ChatResponse response;
-        try
+        var promptTokens = 0;
+        var completionTokens = 0;
+        for (var attempt = 1; ; attempt++)
         {
-            response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex, "{Provider} chat request failed", provider);
-            throw new InvalidOperationException(
-                $"{provider} request failed: {ex.Message}. " +
-                "Check the API key and model name in appsettings.json.", ex);
-        }
+            ChatResponse response;
+            try
+            {
+                response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogError(ex, "{Provider} chat request failed", provider);
+                throw new InvalidOperationException(
+                    $"{provider} request failed: {ex.Message}. " +
+                    "Check the API key and model name in appsettings.json.", ex);
+            }
 
-        var text = response.Text;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new InvalidOperationException(
-                $"{provider} returned an empty response. Check the API key and model name in appsettings.json.");
-        }
+            promptTokens += (int)(response.Usage?.InputTokenCount ?? 0);
+            completionTokens += (int)(response.Usage?.OutputTokenCount ?? 0);
 
-        var usage = ToTokenUsage(provider, response.Usage);
-        var ranking = ParseRankingJson(text, provider, logger);
-        return new AutoWaveAnalysis(ranking, usage);
+            var text = response.Text;
+            if (!string.IsNullOrWhiteSpace(text) && TryParseRankingJson(text, provider, logger, out var ranking))
+            {
+                var usage = new TokenUsage(
+                    provider, promptTokens, completionTokens, promptTokens + completionTokens);
+                return new AutoWaveAnalysis(ranking, usage);
+            }
+
+            if (attempt >= MaxAttempts)
+            {
+                throw new InvalidOperationException(
+                    $"{provider} did not return a complete, valid ranking JSON after {MaxAttempts} attempts. " +
+                    "Try again, or lower the sensitivity so fewer candidates are ranked.");
+            }
+
+            // Tell the model what went wrong instead of resending the identical prompt — a
+            // truncated response usually means the rationales ran long; ask for brevity.
+            logger.LogWarning(
+                "{Provider} ranking response was empty, truncated or malformed (attempt {Attempt}/{Max}) — retrying with corrective feedback",
+                provider, attempt, MaxAttempts);
+            messages.Add(new(ChatRole.User, RetryNudge));
+        }
     }
 
-    private static TokenUsage ToTokenUsage(string provider, UsageDetails? details)
-    {
-        var prompt = (int)(details?.InputTokenCount ?? 0);
-        var completion = (int)(details?.OutputTokenCount ?? 0);
-        var total = (int)(details?.TotalTokenCount ?? (prompt + completion));
-        return new TokenUsage(provider, prompt, completion, total);
-    }
-
-    private static AutoWaveRanking ParseRankingJson(string text, string provider, ILogger logger)
+    private static bool TryParseRankingJson(
+        string text, string provider, ILogger logger, out AutoWaveRanking ranking)
     {
         // Models sometimes wrap JSON in ```fences``` or add prose — extract the object robustly.
         var cleaned = LlmJson.ExtractObject(text);
 
-        AutoRankingDto dto;
+        AutoRankingDto? dto;
         try
         {
-            dto = JsonSerializer.Deserialize<AutoRankingDto>(cleaned, JsonOptions)
-                  ?? throw new InvalidOperationException("Ranking JSON deserialized to null.");
+            dto = JsonSerializer.Deserialize<AutoRankingDto>(cleaned, JsonOptions);
         }
         catch (JsonException ex)
         {
-            logger.LogError(ex, "Could not parse {Provider} ranking JSON: {Json}", provider, cleaned);
-            throw new InvalidOperationException(
-                $"{provider} returned a response that is not valid JSON. Raw: {cleaned}", ex);
+            logger.LogWarning(ex, "Could not parse {Provider} ranking JSON: {Json}", provider, cleaned);
+            ranking = null!;
+            return false;
+        }
+
+        if (dto is null)
+        {
+            ranking = null!;
+            return false;
         }
 
         var rankings = (dto.Rankings ?? [])
@@ -115,7 +141,8 @@ internal static class AutoWaveRankRunner
                 Outlook: r.Outlook ?? string.Empty))
             .ToList();
 
-        return new AutoWaveRanking(dto.BestCandidateId, dto.MarketSummary ?? string.Empty, rankings);
+        ranking = new AutoWaveRanking(dto.BestCandidateId, dto.MarketSummary ?? string.Empty, rankings);
+        return true;
     }
 
     private sealed class AutoRankingDto

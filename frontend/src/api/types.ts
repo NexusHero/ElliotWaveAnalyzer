@@ -236,6 +236,8 @@ export interface WaveAnalysisResponse {
 export interface WaveValidationRequest {
   symbol: string
   annotations: WaveAnnotation[]
+  /** Candle timeframe the pivots were placed on ('1h' | '4h' | '1d' | '1w'); default daily. */
+  interval?: CandleIntervalCode
 }
 
 /** Request body for `POST /api/wave-analysis/auto` (full-auto "magic button"). */

@@ -15,6 +15,16 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // A canceled request (client navigated away / aborted the fetch) is not a server fault —
+        // don't log it as an error or dress it up as a 500. 499 is the de-facto
+        // "client closed request" status; the client is gone and never sees it anyway.
+        if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
+        {
+            logger.LogDebug("Request was canceled by the client: {Path}", httpContext.Request.Path);
+            httpContext.Response.StatusCode = 499;
+            return true;
+        }
+
         logger.LogError(exception, "Unhandled exception");
 
         var problem = new ProblemDetails
