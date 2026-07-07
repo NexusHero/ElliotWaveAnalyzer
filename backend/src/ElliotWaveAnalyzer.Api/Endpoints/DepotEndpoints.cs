@@ -39,6 +39,12 @@ public static class DepotEndpoints
         group.MapGet("/", GetAsync)
             .WithName("GetDepot")
             .WithSummary("Get your most recently imported depot")
+            .WithDescription("""
+                Returns your most recently imported depot. Positions whose source file didn't carry a
+                market price (e.g. a Scalable Capital transactions export) are enriched on read with a
+                live-derived market value and gain/loss where a quote resolves — a position whose quote
+                can't be resolved keeps those fields null rather than failing the request.
+                """)
             .Produces<DepotSnapshot>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status204NoContent);
 
@@ -92,10 +98,16 @@ public static class DepotEndpoints
     }
 
     private static async Task<IResult> GetAsync(
-        ClaimsPrincipal user, IDepotStore store, CancellationToken cancellationToken)
+        ClaimsPrincipal user, IDepotStore store, IDepotEnrichmentService enrichment, CancellationToken cancellationToken)
     {
         var snapshot = await store.GetLatestAsync(UserId(user), cancellationToken);
-        return snapshot is null ? Results.NoContent() : Results.Ok(snapshot);
+        if (snapshot is null)
+        {
+            return Results.NoContent();
+        }
+
+        var enriched = await enrichment.EnrichAsync(snapshot, cancellationToken);
+        return Results.Ok(enriched);
     }
 
     private static async Task<IResult> GetAnalysisAsync(
