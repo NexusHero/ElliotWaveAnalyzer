@@ -15,6 +15,8 @@ import type {
   SavedApiKey,
   ScanFilters,
   ScanResult,
+  SentimentAnalysisRequest,
+  SentimentReport,
   TechnicalAnalysisResult,
   TopDownAnalysis,
   TrackAnalysisRequest,
@@ -117,6 +119,30 @@ export async function getHistoricalAnalogs(
   }
 
   return (await response.json()) as AnalogResponse
+}
+
+/**
+ * Socionomics via `POST /api/wave-analysis/sentiment`. Normalizes the covering sentiment provider's
+ * readings and detects mood-vs-wave-position divergences against the caller's own pivots, plus a
+ * fact-guarded summary. With no provider coverage, returns an explicit "no coverage" report — never a
+ * fabricated series.
+ */
+export async function getSentimentAnalysis(
+  request: SentimentAnalysisRequest,
+  signal?: AbortSignal
+): Promise<SentimentReport> {
+  const response = await fetch('/api/wave-analysis/sentiment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as SentimentReport
 }
 
 /**
