@@ -276,6 +276,9 @@ function AutoResultBody({
       else next.add(index)
       return next
     })
+  // The market read is a full paragraph; clamp it so the levels/counts below stay above the fold.
+  const [readExpanded, setReadExpanded] = useState(false)
+  useEffect(() => setReadExpanded(false), [data])
 
   return (
     <div className="auto-result fade-up">
@@ -283,7 +286,15 @@ function AutoResultBody({
 
       <div className="reflection-block">
         <span className="rb-label">Market read</span>
-        <p>{data.marketSummary}</p>
+        <p className={readExpanded ? '' : 'clamped'}>{data.marketSummary}</p>
+        <button
+          type="button"
+          className="read-more"
+          aria-expanded={readExpanded}
+          onClick={() => setReadExpanded((v) => !v)}
+        >
+          {readExpanded ? 'Less' : 'More'}
+        </button>
       </div>
 
       {data.searchTruncated && (

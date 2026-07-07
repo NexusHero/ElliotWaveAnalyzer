@@ -185,6 +185,18 @@ describe('WaveWorkspace', () => {
     expect(within(group).getByRole('button', { name: '+ Sub-waves' })).toBeInTheDocument()
   })
 
+  it('gives the AI workbench its own Auto tab so the Count tab stays lean', () => {
+    renderWorkspace()
+    // The manual counting loop no longer stacks the auto-analysis beneath it …
+    expect(screen.getByText('Your wave count')).toBeInTheDocument()
+    expect(screen.queryByText('Full-auto analysis')).not.toBeInTheDocument()
+    // … the AI workbench lives in its own section.
+    fireEvent.click(screen.getByRole('tab', { name: 'Auto' }))
+    expect(screen.getByText('Full-auto analysis')).toBeInTheDocument()
+    expect(screen.getByText('Historical analogs')).toBeInTheDocument()
+    expect(screen.queryByText('Your wave count')).not.toBeInTheDocument()
+  })
+
   it('groups tools into tabs; switching shows one section and hides the others (#163)', () => {
     renderWorkspace()
     // Default Count tab shows the count workflow; other sections aren't mounted.
