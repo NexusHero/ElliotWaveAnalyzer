@@ -42,6 +42,12 @@ describe('ScannerPanel', () => {
     expect(screen.getByRole('button', { name: /scan/i })).toBeEnabled()
   })
 
+  it('shows a "do this next" hint before the first scan (#176 AC2)', () => {
+    renderPanel()
+    expect(screen.getByText('No scan yet')).toBeInTheDocument()
+    expect(screen.getByText(/Click Scan to sweep/i)).toBeInTheDocument()
+  })
+
   it('calls onScan with the entered symbols and in-zone filter', async () => {
     const user = userEvent.setup()
     const { props } = renderPanel()
@@ -59,9 +65,10 @@ describe('ScannerPanel', () => {
     expect(screen.getByText(/6.3% to inval\./)).toBeInTheDocument()
   })
 
-  it('shows an empty state when nothing matched', () => {
+  it('shows an empty state with a "do this next" hint when nothing matched', () => {
     renderPanel({ state: 'result', result: { scanned: 3, matched: 0, hits: [] } })
     expect(screen.getByText(/no setups matched/i)).toBeInTheDocument()
+    expect(screen.getByText(/try a different symbol list/i)).toBeInTheDocument()
   })
 
   it('shows an error state', () => {

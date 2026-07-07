@@ -554,6 +554,52 @@
   }
 }
 
+.onboarding-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px auto 0;
+  padding: 12px 16px;
+  max-width: var(--maxw);
+  width: calc(100% - 36px);
+  background: var(--acc-soft);
+  border: 1px solid var(--acc-line);
+  border-radius: var(--r);
+}
+.onboarding-intro-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.onboarding-intro-lead,
+.onboarding-intro-key {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.onboarding-intro-key {
+  color: var(--muted);
+}
+.onboarding-intro-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 99px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.onboarding-intro-close:hover {
+  background: var(--card-2);
+  color: var(--text);
+}
+
 .chart-col {
   display: flex;
   flex-direction: column;

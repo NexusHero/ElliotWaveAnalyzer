@@ -116,11 +116,17 @@ describe('AutoAnalysisPanel', () => {
       expect(screen.getByRole('button', { name: /auto-analyze/i })).toBeEnabled()
     })
 
-    it('does not show any state card in idle', () => {
+    it('does not show any other state card in idle', () => {
       renderPanel()
       expect(screen.queryByText(/No API key/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/Scanning the market/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/Couldn't complete/i)).not.toBeInTheDocument()
+    })
+
+    it('shows a "do this next" hint instead of a blank panel (#176 AC2)', () => {
+      renderPanel()
+      expect(screen.getByText('No count yet')).toBeInTheDocument()
+      expect(screen.getByText(/Auto-analyze/i, { selector: 'p' })).toBeInTheDocument()
     })
   })
 

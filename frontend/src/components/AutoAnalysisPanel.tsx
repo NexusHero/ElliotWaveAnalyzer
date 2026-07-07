@@ -132,6 +132,16 @@ export default function AutoAnalysisPanel({
         </div>
       </div>
 
+      {state === 'idle' && (
+        <div className="state-card fade-up">
+          <span className="state-ico">
+            <Seal size={22} />
+          </span>
+          <h4>No count yet</h4>
+          <p>Click "Auto-analyze" and the engine detects, rule-checks and ranks counts for you.</p>
+        </div>
+      )}
+
       {state === 'needkey' && (
         <div className="state-card warn fade-up">
           <span className="state-ico">
