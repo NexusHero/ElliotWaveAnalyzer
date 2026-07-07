@@ -719,6 +719,39 @@ export interface AnalogResponse {
   narrativeUnavailableReason: string | null
 }
 
+/** Request body for `POST /api/wave-analysis/sentiment` (mirrors backend `SentimentAnalysisRequest`). */
+export interface SentimentAnalysisRequest {
+  symbol: string
+  annotations: WaveAnnotation[]
+}
+
+/** One normalized daily mood reading in [-1, 1] (mirrors backend `SentimentPoint`). */
+export interface SentimentPoint {
+  date: string
+  score: number
+}
+
+/** Which way a mood-vs-price divergence points (mirrors backend `MoodDivergenceKind`). */
+export type MoodDivergenceKind = 'Bearish' | 'Bullish'
+
+/** A detected mood-vs-wave-position divergence (mirrors backend `MoodDivergence`). */
+export interface MoodDivergence {
+  pivotLabel: string
+  date: string
+  kind: MoodDivergenceKind
+  earlierMood: number
+  laterMood: number
+}
+
+/** The socionomics read for a symbol's current count (mirrors backend `SentimentReport`). */
+export interface SentimentReport {
+  hasCoverage: boolean
+  series: SentimentPoint[]
+  divergences: MoodDivergence[]
+  narrative: string | null
+  narrativeUnavailableReason: string | null
+}
+
 /** One proposed structure after the engine validated it (mirrors backend `HypothesisResult`). */
 export interface HypothesisResult {
   structure: string

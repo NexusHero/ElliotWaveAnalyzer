@@ -8,6 +8,7 @@ import {
   getHistoricalAnalogs,
   getMarketData,
   getPortfolioReview,
+  getSentimentAnalysis,
   listAnalyses,
   saveAnalysis,
   scanSetups,
@@ -45,6 +46,7 @@ import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioRevi
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
 import ScannerPanel, { type ScannerState } from './ScannerPanel'
+import SentimentPanel, { type SentimentState } from './SentimentPanel'
 import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
@@ -199,6 +201,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     : analogs.isError
       ? 'error'
       : analogs.isSuccess
+        ? 'result'
+        : 'idle'
+
+  // Socionomics (REQ-038): on-demand mood-vs-wave-position divergence over the analyst's own pivots.
+  const sentiment = useMutation({
+    mutationFn: () => getSentimentAnalysis({ symbol, annotations }),
+  })
+  const sentimentState: SentimentState = sentiment.isPending
+    ? 'loading'
+    : sentiment.isError
+      ? 'error'
+      : sentiment.isSuccess
         ? 'result'
         : 'idle'
 
@@ -997,6 +1011,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             data={hypotheses.data ?? null}
             error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
             onLoad={() => hypotheses.mutate()}
+          />
+
+          <SentimentPanel
+            symbol={symbol}
+            state={sentimentState}
+            data={sentiment.data ?? null}
+            error={sentiment.error instanceof Error ? sentiment.error.message : null}
+            onLoad={() => sentiment.mutate()}
           />
             </>
           )}

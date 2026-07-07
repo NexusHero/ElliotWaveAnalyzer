@@ -194,6 +194,7 @@ describe('WaveWorkspace', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Auto' }))
     expect(screen.getByText('Full-auto analysis')).toBeInTheDocument()
     expect(screen.getByText('Historical analogs')).toBeInTheDocument()
+    expect(screen.getByText('Mood vs. wave position')).toBeInTheDocument()
     expect(screen.queryByText('Your wave count')).not.toBeInTheDocument()
   })
 
