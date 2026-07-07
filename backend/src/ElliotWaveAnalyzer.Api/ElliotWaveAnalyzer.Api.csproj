@@ -8,6 +8,9 @@
     <AssemblyName>ElliotWaveAnalyzer.Api</AssemblyName>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <UserSecretsId>0d505492-a59f-40a8-9887-6e051bf1c5b4</UserSecretsId>
+    <!-- #197: write openapi/v1.json to the build output on every `dotnet build`, no server needed. -->
+    <OpenApiGenerateDocumentsOnBuild>true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/openapi</OpenApiDocumentsDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,6 +36,13 @@
          generator still assigns to (CS0200). Do not let Dependabot bump this to 3.x
          until Microsoft.AspNetCore.OpenApi references a 3.x-compatible generator. -->
     <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <!-- Writes the OpenAPI document to disk at build time (no server/DB needed) — the
+         frontend↔backend contract check (#197) generates from this file, never from a live
+         server, so it's deterministic in CI with no manual step (AC5). -->
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
 
     <!-- Scalar: modern interactive API UI for .NET 10 built-in OpenAPI.
          Accessible at /scalar/v1 in Development.
