@@ -6,8 +6,9 @@ import {
   type ProviderMeta,
   type SavedKey,
 } from '../hooks/useApiKeys'
-import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
+import { type ConsentCategories, useConsent } from '../hooks/useConsent'
 import DepotImportPanel from './DepotImportPanel'
+import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
 
 interface SettingsPageProps {
   keys: KeyState
@@ -76,6 +77,8 @@ export default function SettingsPage({
         <DepotImportPanel />
 
         <CoachingPreferences />
+
+        <ConsentPreferences />
       </div>
     </div>
   )
@@ -239,6 +242,78 @@ function CoachingPreferences() {
           </button>
         </div>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Cookie preferences (#169 AC3): review or withdraw a previously-given consent decision. Reuses
+ * the same categories and `saveConsent` seam the first-visit banner writes through, so a change
+ * made here takes effect (and is re-recorded) exactly the same way.
+ */
+function ConsentPreferences() {
+  const { consent, saveConsent } = useConsent()
+  const [draft, setDraft] = useState<ConsentCategories>(() => ({
+    analytics: consent?.analytics ?? false,
+    marketing: consent?.marketing ?? false,
+  }))
+
+  return (
+    <section className="set-section">
+      <h2>Cookie preferences</h2>
+      <div className="pref-rows">
+        <div className="pref-row">
+          <div className="pref-text">
+            <strong>Essential</strong>
+            <span>Session, security, and core functionality. Always on.</span>
+          </div>
+          <button
+            type="button"
+            className="switch on"
+            role="switch"
+            aria-checked={true}
+            aria-label="Essential cookies (always on)"
+            disabled
+          >
+            <span />
+          </button>
+        </div>
+        <div className="pref-row">
+          <div className="pref-text">
+            <strong>Analytics</strong>
+            <span>Helps us understand how the app is used.</span>
+          </div>
+          <button
+            type="button"
+            className={`switch${draft.analytics ? ' on' : ''}`}
+            role="switch"
+            aria-checked={draft.analytics}
+            aria-label="Analytics cookies"
+            onClick={() => setDraft((d) => ({ ...d, analytics: !d.analytics }))}
+          >
+            <span />
+          </button>
+        </div>
+        <div className="pref-row">
+          <div className="pref-text">
+            <strong>Marketing</strong>
+            <span>Used to measure the effectiveness of campaigns.</span>
+          </div>
+          <button
+            type="button"
+            className={`switch${draft.marketing ? ' on' : ''}`}
+            role="switch"
+            aria-checked={draft.marketing}
+            aria-label="Marketing cookies"
+            onClick={() => setDraft((d) => ({ ...d, marketing: !d.marketing }))}
+          >
+            <span />
+          </button>
+        </div>
+      </div>
+      <button type="button" className="btn-primary" onClick={() => saveConsent(draft)}>
+        Save cookie preferences
+      </button>
     </section>
   )
 }

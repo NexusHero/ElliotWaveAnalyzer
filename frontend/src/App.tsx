@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { getAuthProviders, getCurrentUser, login, logout, register } from './api/client'
+import ConsentBanner from './components/ConsentBanner'
 import { Alert, Gear, WaveLogo } from './components/Icons'
 import LoginForm, { type AuthMode } from './components/LoginForm'
 import SettingsPage from './components/SettingsPage'
@@ -76,23 +77,34 @@ export default function App() {
       : 'Authentication failed'
     : null
 
+  // Consent must be capturable before login too (#169) — mounted unconditionally, above every
+  // other branch, so it covers the login screen and the workspace alike.
   if (authChecking) {
-    return <div className="center-view">Loading…</div>
+    return (
+      <>
+        <ConsentBanner />
+        <div className="center-view">Loading…</div>
+      </>
+    )
   }
 
   if (!user) {
     return (
-      <LoginForm
-        onSubmit={handleAuth}
-        error={authError}
-        loading={authMutation.isPending}
-        googleEnabled={googleEnabled}
-      />
+      <>
+        <ConsentBanner />
+        <LoginForm
+          onSubmit={handleAuth}
+          error={authError}
+          loading={authMutation.isPending}
+          googleEnabled={googleEnabled}
+        />
+      </>
     )
   }
 
   return (
     <div className="ws">
+      <ConsentBanner />
       <header className="topbar">
         <div className="tb-left">
           <span className="tb-logo">
