@@ -51,6 +51,7 @@ import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecor
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { treeToDegreeMarkers } from './degreeMarkers'
 import { type LegMeasurement, legMeasurements } from './legMeasurements'
+import { branchesToProjectionPaths, deriveProjectionTimeWindow } from './projectionPath'
 import { toWaveLinePoints } from './waveLine'
 
 /**
@@ -102,6 +103,7 @@ const DEFAULT_SENSITIVITY = 2.5
  */
 const WORKSPACE_TABS = [
   { key: 'count', label: 'Count' },
+  { key: 'auto', label: 'Auto' },
   { key: 'scan', label: 'Scan' },
   { key: 'verify', label: 'Verify chart' },
   { key: 'portfolio', label: 'Portfolio' },
@@ -160,7 +162,10 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   // Analyst-in-the-loop: a deterministic re-verification (no LLM) runs on every edit, debounced.
   const liveVerify = useMutation({
-    mutationFn: (payload: WaveAnnotation[]) => verifyEditedCount({ symbol, annotations: payload }),
+    // Verify on the same timeframe the pivots were placed on — the server snaps against the
+    // interval-resampled series, so weekly/intraday pivots land on the bars the analyst clicked.
+    mutationFn: (payload: WaveAnnotation[]) =>
+      verifyEditedCount({ symbol, annotations: payload, interval: timeframe.code }),
   })
   const { mutate: verifyMutate, reset: verifyReset } = liveVerify
   useEffect(() => {
@@ -410,6 +415,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     return [...confirmed, ...branchBands]
   }, [activeLevels, effectiveLayers, pro, liveVerify.data?.branches, promoted])
 
+  // Forward projection paths (#223): from the last confirmed pivot, a dashed connector into a
+  // time-bounded target box for each branch — the "analyst arrow" the zone bands alone don't show.
+  // The time window rides on the same leg-duration pace as the live per-leg readout (#165); Pro-only,
+  // like the branch zone bands above.
+  const projectionPaths = useMemo(() => {
+    if (!pro) return []
+    const sorted = [...annotations].sort((a, b) => a.date.localeCompare(b.date))
+    const last = sorted[sorted.length - 1]
+    const window = deriveProjectionTimeWindow(annotations)
+    return branchesToProjectionPaths(liveVerify.data?.branches ?? null, last ?? null, window, promoted)
+  }, [pro, annotations, liveVerify.data?.branches, promoted])
+
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
@@ -544,9 +561,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   }, [annotations, runAnalysis])
 
   // "Analyze for me" runs the real backend parser (grammar + beam search + guideline scoring),
-  // the same engine as the Auto-analysis panel — never a client-side heuristic (#160). The best
-  // ranked count is drawn as the AI count below; the panel shows its reading.
-  const handleAnalyze = handleAutoAnalyze
+  // the same engine as the Auto-analysis panel — never a client-side heuristic (#160). Its result
+  // renders in the Auto section, so the click also navigates there.
+  const handleAnalyze = useCallback(() => {
+    setTab('auto')
+    handleAutoAnalyze()
+  }, [handleAutoAnalyze])
 
   // The AI's primary line: the selected auto count's own pivots (origin + waves) from the real
   // parser once it has run; nothing before that (no heuristic fallback — #160).
@@ -801,6 +821,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 annotations={markers}
                 waveLines={waveLines}
                 zoneBands={zoneBands}
+                projectionPaths={projectionPaths}
                 priceLines={
                   overlayPriceLines.length > 0 ? [...priceLines, ...overlayPriceLines] : priceLines
                 }
@@ -934,6 +955,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
             savedId={manualSave.data?.id ?? null}
           />
 
+            </>
+          )}
+
+          {/* The AI workbench gets its own section — the auto-analysis result (market read, ranked
+              counts, levels) is by far the tallest content and buried the manual loop when stacked
+              beneath it. Chart overlays still follow the active auto count regardless of tab. */}
+          {tab === 'auto' && (
+            <>
           <AutoAnalysisPanel
             state={autoState}
             data={auto.data ?? null}

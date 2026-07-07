@@ -19,6 +19,8 @@ import {
 import { useEffect, useRef } from 'react'
 import type { MarketCandle } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
+import type { ProjectionPath } from './projectionPath'
+import { type ProjectionPathColors, ProjectionPathPrimitive } from './projectionPathPrimitive'
 import type { WaveLinePoint } from './waveLine'
 import { type ZoneBandColors, ZoneBandsPrimitive } from './zoneBandsPrimitive'
 import type { ZoneBand } from './zoneOverlay'
@@ -64,6 +66,8 @@ interface PriceChartProps {
   waveLines?: WaveLine[]
   /** Shaded price bands (entry/target/confluence zones) to draw behind the candles. */
   zoneBands?: ZoneBand[]
+  /** Forward projection paths (#223): a dashed connector into a time-bounded target box. */
+  projectionPaths?: ProjectionPath[]
   /** Horizontal level lines (invalidation / fib zones) to overlay. */
   priceLines?: PriceLineSpec[]
   /** Render the price axis logarithmically (so the log-correct Fibonacci levels line up). */
@@ -84,6 +88,7 @@ export default function PriceChart({
   annotations = [],
   waveLines = [],
   zoneBands = [],
+  projectionPaths = [],
   priceLines = [],
   logScale = false,
   onPointClick,
@@ -100,6 +105,11 @@ export default function PriceChart({
   const waveLineSeriesRef = useRef<ISeriesApi<'Line'>[]>([])
   // The shaded-zone primitive attached to the candle series (draws entry/target/confluence bands).
   const zoneBandsRef = useRef<ZoneBandsPrimitive | null>(null)
+  // The projection-path primitive (#223), plus a hidden whitespace series that extends the time
+  // axis into the future — Lightweight-Charts' documented trick, since the axis is built from the
+  // union of every series' own time points and no candle exists yet for a projected date.
+  const projectionPathRef = useRef<ProjectionPathPrimitive | null>(null)
+  const projectionTimeSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -140,6 +150,20 @@ export default function PriceChart({
     series.attachPrimitive(zonePrimitive)
     zoneBandsRef.current = zonePrimitive
 
+    // The hidden time-extension series (#223): whitespace-only points so the axis reaches into
+    // projected future dates; never drawn (no line, no axis furniture, no crosshair).
+    const projectionTimeSeries = chart.addSeries(LineSeries, {
+      lineVisible: false,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    })
+    projectionTimeSeriesRef.current = projectionTimeSeries
+
+    const projectionPrimitive = new ProjectionPathPrimitive(projectionColors(colors))
+    series.attachPrimitive(projectionPrimitive)
+    projectionPathRef.current = projectionPrimitive
+
     const handleClick = (param: MouseEventParams) => {
       const callback = onPointClickRef.current
       if (!callback || !param.point || param.time === undefined) return
@@ -166,6 +190,8 @@ export default function PriceChart({
       markersRef.current = null
       // The primitive was destroyed with the chart; drop the stale ref so a remount re-attaches fresh.
       zoneBandsRef.current = null
+      projectionPathRef.current = null
+      projectionTimeSeriesRef.current = null
       // The wave-line series were destroyed with the chart; drop the stale refs so a remount
       // doesn't try to remove them from a new chart.
       waveLineSeriesRef.current = []
@@ -244,6 +270,24 @@ export default function PriceChart({
   useEffect(() => {
     zoneBandsRef.current?.update(zoneBands, zoneColors(chartColors(theme)))
   }, [zoneBands, theme])
+
+  // ── Draw forward projection paths when they (or theme) change (#223) ───────
+  useEffect(() => {
+    const timeSeries = projectionTimeSeriesRef.current
+    if (timeSeries) {
+      // Extend the shared time axis to every future date a path reaches, so the primitive's
+      // timeToCoordinate resolves for them (whitespace points carry no OHLC/value, never drawn).
+      const futureTimes = new Set<string>()
+      for (const path of projectionPaths) {
+        futureTimes.add(path.toTimeMin)
+        futureTimes.add(path.toTimeMax)
+      }
+      timeSeries.setData(
+        [...futureTimes].sort().map((time) => ({ time: time as Time }))
+      )
+    }
+    projectionPathRef.current?.update(projectionPaths, projectionColors(chartColors(theme)))
+  }, [projectionPaths, theme])
 
   // ── Draw connected wave lines through the pivots when they (or theme) change ──
   useEffect(() => {
@@ -353,6 +397,15 @@ function zoneColors(colors: ChartColors): ZoneBandColors {
     entry: { fill: colors.zoneEntryFill, border: colors.zoneEntryBorder },
     target: { fill: colors.zoneTargetFill, border: colors.zoneTargetBorder },
     alternate: { fill: colors.zoneAltFill, border: colors.zoneAltBorder },
+  }
+}
+
+/** The speculative/alternate palettes for the projection-path primitive (#223), mirroring the
+ * zone-band colours so a branch's dashed path and its target box read as one shape. */
+function projectionColors(colors: ChartColors): ProjectionPathColors {
+  return {
+    speculative: { line: colors.target, fill: colors.zoneTargetFill, border: colors.zoneTargetBorder },
+    alternate: { line: colors.invalid, fill: colors.zoneAltFill, border: colors.zoneAltBorder },
   }
 }
 

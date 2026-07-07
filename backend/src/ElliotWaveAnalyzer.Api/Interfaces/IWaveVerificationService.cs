@@ -11,12 +11,14 @@ public interface IWaveVerificationService
 {
     /// <summary>
     /// Verifies <paramref name="annotations"/> for <paramref name="symbol"/> over the last
-    /// <paramref name="lookbackDays"/> days of candles.
+    /// <paramref name="lookbackDays"/> days of candles at <paramref name="interval"/> — the same
+    /// series the chart displayed, so snapped pivots match what the analyst actually clicked.
     /// </summary>
     /// <exception cref="ArgumentException">When no provider supports the symbol.</exception>
     Task<WaveVerification> VerifyAsync(
         string symbol,
         IReadOnlyList<WaveAnnotation> annotations,
         int lookbackDays,
+        CandleInterval interval = CandleInterval.OneDay,
         CancellationToken cancellationToken = default);
 }

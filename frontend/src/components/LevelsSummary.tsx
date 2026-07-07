@@ -1,6 +1,10 @@
-import type { WaveLevels } from '../api/types'
+import { useState } from 'react'
+import type { ConfluenceZone, WaveLevels } from '../api/types'
 import { distancePercent } from './levelOverlay'
 import RiskBox from './RiskBox'
+
+/** Zones shown before the rest collapses behind a "+N more" toggle (strongest come first). */
+const VISIBLE_ZONES = 3
 
 interface LevelsSummaryProps {
   levels: WaveLevels | null
@@ -88,27 +92,7 @@ export default function LevelsSummary({
         </div>
       ))}
 
-      {levels.confluenceZones.length > 0 && (
-        <div className="confluence" data-testid="confluence-zones">
-          <div className="confluence-head">Confluence zones</div>
-          {levels.confluenceZones.map((z, i) => (
-            <div key={i} className={`confluence-zone ${z.kind === 'Entry' ? 'entry' : 'target'}`}>
-              <span className="confluence-kind">{z.kind === 'Entry' ? 'Entry' : 'Target'}</span>
-              <span className="confluence-range mono">{zoneRange(z.low, z.high)}</span>
-              <span className="confluence-score" title="Sum of contributing degree weights">
-                ×{z.score.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-              </span>
-              <ul className="confluence-contribs">
-                {z.contributions.map((c, j) => (
-                  <li key={j}>
-                    <span className="mono">{fmt(c.price)}</span> — {c.basis}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
+      {levels.confluenceZones.length > 0 && <ConfluenceZones zones={levels.confluenceZones} />}
 
       {levels.alternative && (
         <div className="level-row alt">
@@ -124,6 +108,57 @@ export default function LevelsSummary({
           currentPrice={currentPrice}
           speculativeLevels={speculativeLevels}
         />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Compact confluence-zone list: the strongest zones as one-line rows (kind · range · score), each
+ * zone's Fibonacci contributions behind a per-zone expand, and everything beyond the first few
+ * behind a "+N more" toggle — the full breakdown is a click away instead of a wall of text.
+ */
+function ConfluenceZones({ zones }: { zones: ConfluenceZone[] }) {
+  const [showAll, setShowAll] = useState(false)
+  const [openZone, setOpenZone] = useState<number | null>(null)
+  const visible = showAll ? zones : zones.slice(0, VISIBLE_ZONES)
+  const hidden = zones.length - VISIBLE_ZONES
+
+  return (
+    <div className="confluence" data-testid="confluence-zones">
+      <div className="confluence-head">Confluence zones</div>
+      {visible.map((z, i) => (
+        <div key={i} className={`confluence-zone ${z.kind === 'Entry' ? 'entry' : 'target'}`}>
+          <button
+            type="button"
+            className="confluence-row"
+            aria-expanded={openZone === i}
+            onClick={() => setOpenZone((prev) => (prev === i ? null : i))}
+          >
+            <span className="confluence-kind">{z.kind === 'Entry' ? 'Entry' : 'Target'}</span>
+            <span className="confluence-range mono">{zoneRange(z.low, z.high)}</span>
+            <span className="confluence-score" title="Sum of contributing degree weights">
+              ×{z.score.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+            </span>
+            <span className="confluence-chevron" aria-hidden>
+              {openZone === i ? '⌃' : '⌄'}
+            </span>
+          </button>
+          {openZone === i && (
+            <ul className="confluence-contribs">
+              {z.contributions.map((c, j) => (
+                <li key={j}>
+                  <span className="mono">{fmt(c.price)}</span> — {c.basis}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+      {hidden > 0 && (
+        <button type="button" className="confluence-more" onClick={() => setShowAll((v) => !v)}>
+          {showAll ? 'Show fewer zones' : `+${hidden} more zone${hidden === 1 ? '' : 's'}`}
+        </button>
       )}
     </div>
   )

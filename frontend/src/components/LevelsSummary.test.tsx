@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render as rtlRender, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import type { WaveLevels } from '../api/types'
@@ -132,12 +133,29 @@ describe('LevelsSummary', () => {
     expect(em?.textContent).toMatch(/5\.0%/)
   })
 
-  it('renders confluence zones with score and contributing levels', () => {
+  it('renders confluence zones compactly; contributions expand per zone on click', async () => {
+    const user = userEvent.setup()
     render(<LevelsSummary levels={baseLevels} currentPrice={null} />)
     expect(screen.getByTestId('confluence-zones')).toBeInTheDocument()
     expect(screen.getByText('Confluence zones')).toBeInTheDocument()
     expect(screen.getByText('×3')).toBeInTheDocument()
+    // The Fibonacci contribution breakdown is a click away, not a wall of text.
+    expect(screen.queryByText(/161.8% extension of Wave 1/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { expanded: false }))
     expect(screen.getByText(/161.8% extension of Wave 1/)).toBeInTheDocument()
+  })
+
+  it('collapses zones beyond the first three behind a "+N more" toggle', async () => {
+    const user = userEvent.setup()
+    const zone = baseLevels.confluenceZones[0]!
+    const five = Array.from({ length: 5 }, (_, i) => ({ ...zone, low: 50000 + i, high: 50500 + i }))
+    render(
+      <LevelsSummary levels={{ ...baseLevels, confluenceZones: five }} currentPrice={null} />
+    )
+    // three visible rows + the "+2 more" toggle
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(3)
+    await user.click(screen.getByRole('button', { name: '+2 more zones' }))
+    expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(5)
   })
 
   it('omits the confluence block when there are no zones', () => {
