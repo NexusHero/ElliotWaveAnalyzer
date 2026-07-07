@@ -7,20 +7,25 @@ using UglyToad.PdfPig;
 namespace ElliotWaveAnalyzer.Api.Infrastructure.DepotImport;
 
 /// <summary>
-/// Imports a Smartbroker+ "Depotübersicht" PDF export into a <see cref="DepotSnapshot"/>.
+/// Imports a Trade Republic "Depotübersicht" PDF export into a <see cref="DepotSnapshot"/> (#113).
 ///
-/// The statement is a fixed-layout table: each holding occupies two text rows — a name row
-/// (Assetname, Anzahl, Einstandskurs, Marktkurs, G/V absolut, Börse) and, directly below it, an
-/// ISIN row (ISIN, Einstandswert, Marktwert, G/V prozentual). Columns sit at stable horizontal
-/// bands. We extract every word with its bounding box, group words into rows by their vertical
-/// position, anchor a position on its ISIN row, pair it with the name row above, and read each
-/// field by the column its word falls in. Numbers are German-formatted (<c>1.234,56</c>) with
-/// € / % suffixes as separate tokens.
+/// Trade Republic has no official public API (ADR-017 already ruled out the unofficial
+/// reverse-engineered one), so — like Smartbroker+ — this is a file-based, PdfPig-text-extraction
+/// importer. Unlike Smartbroker+'s two-row-per-position layout, Trade Republic's statement lists
+/// one holding per row: Name, ISIN, quantity, average buy-in price, current price, current value,
+/// gain absolute, gain percent, all on stable horizontal column bands. We cluster words into rows by
+/// vertical position, anchor a position on the row carrying an ISIN-shaped token, and read every
+/// other field from the same row by column.
 ///
-/// ISOLATION: PdfPig (UglyToad.PdfPig) is used only inside this file — no PdfPig type crosses
-/// into the domain, application or endpoint layers (mirrors the Skender convention, ADR-017).
+/// <see cref="CanHandle"/> sniffs the extracted text for a Trade Republic marker (not merely "is this
+/// a PDF") — Smartbroker+ is also PDF-based and the router (<see cref="DepotImportService"/>) takes
+/// the first importer whose <see cref="CanHandle"/> returns true, so a content-blind check here would
+/// silently misroute one broker's export into the other's parser depending on registration order.
+///
+/// ISOLATION: PdfPig (UglyToad.PdfPig) is used only inside this file — no PdfPig type crosses into
+/// the domain, application or endpoint layers (mirrors the Skender convention, ADR-017).
 /// </summary>
-internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : IDepotImporter
+internal sealed class TradeRepublicPdfImporter(TimeProvider timeProvider) : IDepotImporter
 {
     private static readonly Regex IsinPattern = new("^[A-Z]{2}[A-Z0-9]{9}[0-9]$", RegexOptions.Compiled);
     private static readonly Regex DatePattern = new(@"^\d{2}\.\d{2}\.\d{4}$", RegexOptions.Compiled);
@@ -28,15 +33,11 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
     private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
 
     /// <summary>Column bands by a word's horizontal centre (PDF points), left → right.</summary>
-    private enum Column { Name, Quantity, Cost, Market, GainLoss, Exchange }
+    private enum Column { Name, Isin, Quantity, AvgPrice, CurrentPrice, CurrentValue, GainAbs, GainPct }
 
-    public BrokerSource Source => BrokerSource.SmartbrokerPlus;
+    public BrokerSource Source => BrokerSource.TradeRepublic;
 
-    // Content-aware, not just "is this a PDF": the router (DepotImportService) takes the first
-    // importer whose CanHandle returns true, and Trade Republic (#113) is also PDF-based — a
-    // content-blind check here would silently swallow a Trade Republic export before it ever
-    // reaches TradeRepublicPdfImporter, depending on DI registration order.
-    public bool CanHandle(DepotImportFile file) => IsPdf(file) && HasSmartbrokerMarker(file.Content);
+    public bool CanHandle(DepotImportFile file) => IsPdf(file) && HasTradeRepublicMarker(file.Content);
 
     public Task<DepotImportResult> ImportAsync(
         DepotImportFile file, CancellationToken cancellationToken = default)
@@ -46,17 +47,17 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
         {
             var lines = ExtractLines(file.Content);
 
-            if (!lines.Any(HasSmartbrokerMarker))
+            if (!lines.Any(HasTradeRepublicMarker))
             {
-                result = DepotImportResult.Fail("This PDF is not a Smartbroker+ depot export.");
+                result = DepotImportResult.Fail("This PDF is not a Trade Republic depot export.");
             }
             else
             {
                 var positions = ParsePositions(lines);
                 result = positions.Count == 0
-                    ? DepotImportResult.Fail("No holdings found in the Smartbroker+ statement.")
+                    ? DepotImportResult.Fail("No holdings found in the Trade Republic statement.")
                     : DepotImportResult.Ok(new DepotSnapshot(
-                        BrokerSource.SmartbrokerPlus,
+                        BrokerSource.TradeRepublic,
                         timeProvider.GetUtcNow(),
                         ParseExportTimestamp(lines),
                         "EUR",
@@ -121,48 +122,40 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
 
     private static Column Classify(double centerX) => centerX switch
     {
-        < 255 => Column.Name,
-        < 305 => Column.Quantity,
-        < 372 => Column.Cost,
-        < 430 => Column.Market,
-        < 498 => Column.GainLoss,
-        _ => Column.Exchange,
+        < 178 => Column.Name,
+        < 262 => Column.Isin,
+        < 310 => Column.Quantity,
+        < 360 => Column.AvgPrice,
+        < 412 => Column.CurrentPrice,
+        < 465 => Column.CurrentValue,
+        < 517 => Column.GainAbs,
+        _ => Column.GainPct,
     };
 
     private static List<DepotPosition> ParsePositions(List<Line> lines)
     {
         var positions = new List<DepotPosition>();
 
-        for (var i = 0; i < lines.Count; i++)
+        foreach (var line in lines)
         {
-            var isin = lines[i].Tokens.FirstOrDefault(t => IsinPattern.IsMatch(t.Text));
+            var isin = line.Tokens.FirstOrDefault(t => IsinPattern.IsMatch(t.Text) && Classify(t.CenterX) == Column.Isin);
             if (isin is null)
             {
                 continue;
             }
 
-            // The name row is the line directly above the ISIN row.
-            var nameLine = i > 0 ? lines[i - 1] : null;
-            if (nameLine is null || !nameLine.Tokens.Any(t => Classify(t.CenterX) == Column.Name))
-            {
-                continue;
-            }
-
-            var isinLine = lines[i];
             positions.Add(new DepotPosition(
                 Isin: isin.Text,
                 Wkn: null,
-                Name: string.Join(" ", nameLine.Tokens
-                    .Where(t => Classify(t.CenterX) == Column.Name)
-                    .Select(t => t.Text)),
-                Quantity: Number(nameLine, Column.Quantity) ?? 0m,
-                CostPrice: Number(nameLine, Column.Cost),
-                CostValue: Number(isinLine, Column.Cost),
-                MarketPrice: Number(nameLine, Column.Market),
-                MarketValue: Number(isinLine, Column.Market),
-                GainAbsolute: Number(nameLine, Column.GainLoss),
-                GainRelativePercent: Number(isinLine, Column.GainLoss),
-                Exchange: Text(nameLine, Column.Exchange)));
+                Name: string.Join(" ", line.Tokens.Where(t => Classify(t.CenterX) == Column.Name).Select(t => t.Text)),
+                Quantity: Number(line, Column.Quantity) ?? 0m,
+                CostPrice: Number(line, Column.AvgPrice),
+                CostValue: null,
+                MarketPrice: Number(line, Column.CurrentPrice),
+                MarketValue: Number(line, Column.CurrentValue),
+                GainAbsolute: Number(line, Column.GainAbs),
+                GainRelativePercent: Number(line, Column.GainPct),
+                Exchange: null));
         }
 
         return positions;
@@ -171,8 +164,8 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
     private static DepotTotals? ParseTotals(List<Line> lines)
     {
         var total = LabeledNumber(lines, l => Has(l, "Depotwert"));
-        var gainAbsolute = LabeledNumber(lines, l => Has(l, "Gewinn") && Has(l, "absolut"));
-        var gainRelative = LabeledNumber(lines, l => Has(l, "Gewinn") && Has(l, "relativ"));
+        var gainAbsolute = LabeledNumber(lines, l => Has(l, "Gewinn/Verlust") && Has(l, "absolut"));
+        var gainRelative = LabeledNumber(lines, l => Has(l, "Gewinn/Verlust") && Has(l, "%"));
 
         return total is null && gainAbsolute is null && gainRelative is null
             ? null
@@ -203,12 +196,6 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
             .Select(t => ParseGermanNumber(t.Text))
             .FirstOrDefault(v => v is not null);
 
-    private static string? Text(Line line, Column column)
-        => line.Tokens
-            .Where(t => Classify(t.CenterX) == column)
-            .Select(t => t.Text)
-            .FirstOrDefault(t => ParseGermanNumber(t) is null && t is not ("€" or "%"));
-
     private static decimal? LabeledNumber(List<Line> lines, Func<Line, bool> match)
     {
         var line = lines.FirstOrDefault(match);
@@ -223,7 +210,8 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
             .FirstOrDefault(pattern.IsMatch);
 
     private static bool Has(Line line, string text)
-        => line.Tokens.Any(t => t.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
+        => line.Tokens.Any(t => t.Text.Contains(text, StringComparison.OrdinalIgnoreCase))
+            || string.Join(" ", line.Tokens.Select(t => t.Text)).Contains(text, StringComparison.OrdinalIgnoreCase);
 
     private static decimal? ParseGermanNumber(string raw)
     {
@@ -231,6 +219,21 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
         return s.Length > 0 && decimal.TryParse(s, NumberStyles.Number, German, out var value)
             ? value
             : null;
+    }
+
+    private static bool HasTradeRepublicMarker(Line line)
+        => line.Tokens.Any(t => t.Text.Contains("Republic", StringComparison.OrdinalIgnoreCase));
+
+    private static bool HasTradeRepublicMarker(byte[] pdf)
+    {
+        try
+        {
+            return ExtractLines(pdf).Any(HasTradeRepublicMarker);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool IsPdf(DepotImportFile file)
@@ -242,20 +245,5 @@ internal sealed class SmartbrokerPlusPdfImporter(TimeProvider timeProvider) : ID
 
         return file.ContentType?.Contains("pdf", StringComparison.OrdinalIgnoreCase) == true
             || file.FileName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) == true;
-    }
-
-    private static bool HasSmartbrokerMarker(Line line)
-        => line.Tokens.Any(t => t.Text.Contains("Smartbroker", StringComparison.OrdinalIgnoreCase));
-
-    private static bool HasSmartbrokerMarker(byte[] pdf)
-    {
-        try
-        {
-            return ExtractLines(pdf).Any(HasSmartbrokerMarker);
-        }
-        catch
-        {
-            return false;
-        }
     }
 }

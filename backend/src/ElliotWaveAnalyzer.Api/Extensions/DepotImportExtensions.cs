@@ -18,6 +18,7 @@ internal static class DepotImportExtensions
 
         services.AddSingleton<IDepotImporter, SmartbrokerPlusPdfImporter>();
         services.AddSingleton<IDepotImporter, ScalableCapitalCsvImporter>();
+        services.AddSingleton<IDepotImporter, TradeRepublicPdfImporter>();
         services.AddSingleton<IDepotImportService, DepotImportService>();
 
         // Persists the user's most recent import (uses the scoped AppDbContext).
