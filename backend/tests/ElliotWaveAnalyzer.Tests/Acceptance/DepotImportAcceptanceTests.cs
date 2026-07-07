@@ -16,6 +16,9 @@ public sealed class DepotImportAcceptanceTests
     private static readonly string FixturePath =
         Path.Combine(AppContext.BaseDirectory, "TestData", "Depot", "smartbroker_plus_sample.pdf");
 
+    private static readonly string TradeRepublicFixturePath =
+        Path.Combine(AppContext.BaseDirectory, "TestData", "Depot", "trade_republic_sample.pdf");
+
     private AcceptanceWebApplicationFactory _factory = null!;
     private HttpClient _client = null!;
 
@@ -62,6 +65,27 @@ public sealed class DepotImportAcceptanceTests
                 Is.EqualTo("US0000000001"));
             Assert.That(body.GetProperty("totals").GetProperty("totalValue").GetDecimal(),
                 Is.EqualTo(2055.00m));
+        });
+    }
+
+    [Test]
+    public async Task ImportDepot_TradeRepublicPdf_Returns200WithParsedHoldings()
+    {
+        var file = new ByteArrayContent(File.ReadAllBytes(TradeRepublicFixturePath));
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        using var upload = new MultipartFormDataContent { { file, "file", "trade_republic_sample.pdf" } };
+
+        var response = await _client.PostAsync("/api/depot/import", upload);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(body.GetProperty("source").GetString(), Is.EqualTo("TradeRepublic"));
+            Assert.That(body.GetProperty("currency").GetString(), Is.EqualTo("EUR"));
+            Assert.That(body.GetProperty("positions").GetArrayLength(), Is.EqualTo(3));
+            Assert.That(body.GetProperty("positions")[0].GetProperty("isin").GetString(),
+                Is.EqualTo("US0000000001"));
         });
     }
 
