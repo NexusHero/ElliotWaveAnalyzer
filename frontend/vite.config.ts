@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { configDefaults } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -35,6 +36,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Playwright owns e2e/ (#196) — it has its own `test`/`expect`, not Vitest's, and needs a real
+    // browser rather than jsdom; keep the two runners from ever picking up each other's specs.
+    // Spread Vitest's own defaultExclude first so this doesn't drop node_modules/dist/etc.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

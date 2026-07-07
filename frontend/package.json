@@ -13,7 +13,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "generate:api": "openapi-typescript ../backend/src/ElliotWaveAnalyzer.Api/openapi/ElliotWaveAnalyzer.Api.json -o src/api/generated.ts"
+    "generate:api": "openapi-typescript ../backend/src/ElliotWaveAnalyzer.Api/openapi/ElliotWaveAnalyzer.Api.json -o src/api/generated.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
+    "@playwright/test": "1.56.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
