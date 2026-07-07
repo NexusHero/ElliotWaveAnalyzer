@@ -21,6 +21,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<BacktestRun> BacktestRuns => Set<BacktestRun>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<UserLlmUsagePeriod> UserLlmUsagePeriods => Set<UserLlmUsagePeriod>();
+    public DbSet<AccountDeletionAudit> AccountDeletionAudits => Set<AccountDeletionAudit>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -32,6 +33,11 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(s => s.TokenHash).HasMaxLength(64).IsRequired();
             entity.HasIndex(s => s.TokenHash).IsUnique();
             entity.HasIndex(s => s.UserId);
+            // Account deletion (#168, AC3) relies on this FK cascading at the database level —
+            // without it, UserManager.DeleteAsync would remove only the AspNetUsers row and leave
+            // this table's rows orphaned (a plain uuid column with no FK, discovered while
+            // implementing #168).
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<AnalysisSnapshot>(entity =>
@@ -50,6 +56,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithOne()
                 .HasForeignKey(e => e.AnalysisSnapshotId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<AnalysisScenarioRow>(entity =>
@@ -78,6 +86,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(k => k.CipherText).IsRequired();
             // One key per (user, provider).
             entity.HasIndex(k => new { k.UserId, k.Provider }).IsUnique();
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(k => k.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<SavedDepot>(entity =>
@@ -91,6 +101,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
                 .WithOne()
                 .HasForeignKey(p => p.SavedDepotId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<SavedDepotPosition>(entity =>
@@ -131,6 +143,16 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasKey(p => p.Id);
             // One row per (user, period) — the unit TryConsumeAsync's atomic UPDATE targets.
             entity.HasIndex(p => new { p.UserId, p.PeriodStart }).IsUnique();
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<AccountDeletionAudit>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.HasIndex(a => a.DeletedUserId);
+            // Deliberately no FK to AspNetUsers — the audit row (#168 AC4) must survive the very
+            // deletion it records, so it cannot cascade with the user it references.
         });
     }
 }

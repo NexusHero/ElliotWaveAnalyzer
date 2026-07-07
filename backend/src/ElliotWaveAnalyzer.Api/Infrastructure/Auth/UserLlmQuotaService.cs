@@ -4,6 +4,7 @@ using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 
@@ -70,10 +71,13 @@ internal sealed class UserLlmQuotaService(
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // A concurrent request raced us to create the same (user, period) row — the unique index
-            // means exactly one insert wins; the row exists either way, so just proceed.
+            // means exactly one insert wins; the row exists either way, so just proceed. Narrowed to
+            // this specific error (rather than any DbUpdateException) so an unrelated failure — e.g.
+            // UserId not matching a real account (#168's FK) — surfaces instead of being silently
+            // read back as "quota denied".
             db.ChangeTracker.Clear();
         }
     }
