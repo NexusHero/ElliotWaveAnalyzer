@@ -54,7 +54,7 @@ public sealed class AccountRightsAcceptanceTests
         const string otherEmail = "other-user@example.com";
         using var otherClient = _factory.CreateClient();
         await otherClient.PostAsJsonAsync(
-            "/api/auth/register", new { email = otherEmail, password = "AnotherStr0ng!Pass" });
+            "/api/auth/register", new { email = otherEmail, password = "AnotherStr0ng!Pass", acceptTerms = true });
         var otherLogin = await otherClient.PostAsJsonAsync(
             "/api/auth/login", new { email = otherEmail, password = "AnotherStr0ng!Pass" });
         Assert.That(otherLogin.StatusCode, Is.EqualTo(HttpStatusCode.OK));

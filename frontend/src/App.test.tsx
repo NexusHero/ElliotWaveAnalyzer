@@ -65,6 +65,39 @@ describe('App', () => {
     expect(mockClient.login).toHaveBeenCalledWith('me@example.com', 'secret123456')
   })
 
+  it('registers with acceptTerms=true once Terms + Privacy are accepted (#167 AC2)', async () => {
+    mockClient.getCurrentUser.mockResolvedValueOnce(null) // initial probe
+    mockClient.register.mockResolvedValue()
+    mockClient.login.mockResolvedValue()
+    mockClient.getCurrentUser.mockResolvedValue({ id: '1', email: 'me@example.com' }) // after login
+
+    renderApp()
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Create account' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } })
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'secret123456' },
+    })
+    fireEvent.click(screen.getByRole('checkbox', { name: /market-analysis tool/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /terms of service/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByTestId('workspace')).toBeInTheDocument()
+    expect(mockClient.register).toHaveBeenCalledWith('me@example.com', 'secret123456', true)
+  })
+
+  it('shows the legal footer links before login too (#167 AC1)', async () => {
+    mockClient.getCurrentUser.mockResolvedValue(null)
+    renderApp()
+
+    await screen.findByLabelText('Email')
+    expect(screen.getByRole('link', { name: 'Impressum' })).toHaveAttribute(
+      'href',
+      '/legal/impressum'
+    )
+  })
+
   it('logs out and returns to the login form', async () => {
     mockClient.getCurrentUser.mockResolvedValue({ id: '1', email: 'me@example.com' })
     mockClient.logout.mockResolvedValue()

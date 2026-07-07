@@ -71,6 +71,16 @@ describe('ScannerPanel', () => {
     expect(screen.getByText(/try a different symbol list/i)).toBeInTheDocument()
   })
 
+  it('shows the not-investment-advice disclaimer on a result (#167 AC3)', () => {
+    renderPanel({ state: 'result', result: result() })
+    expect(screen.getByText(/not investment advice/i)).toBeInTheDocument()
+  })
+
+  it('shows the not-investment-advice disclaimer even with zero hits (#167 AC3)', () => {
+    renderPanel({ state: 'result', result: { scanned: 3, matched: 0, hits: [] } })
+    expect(screen.getByText(/not investment advice/i)).toBeInTheDocument()
+  })
+
   it('shows an error state', () => {
     renderPanel({ state: 'error', error: 'boom' })
     expect(screen.getByText(/scan failed/i)).toBeInTheDocument()

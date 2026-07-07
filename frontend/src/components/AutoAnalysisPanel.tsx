@@ -7,6 +7,7 @@ import type {
   TopDownAnalysis,
   WaveNode,
 } from '../api/types'
+import { NOT_INVESTMENT_ADVICE_DISCLAIMER } from '../constants/legal'
 import { Alert, CheckCircle, Lock, Seal, Spark, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
 import TopDownBreadcrumb from './TopDownBreadcrumb'
@@ -220,6 +221,7 @@ function AutoResult({
         <TopDownBreadcrumb analysis={topDown} />
         <h4>No clear structure found</h4>
         <p>{data.marketSummary}</p>
+        <p className="panel-disclaimer">{NOT_INVESTMENT_ADVICE_DISCLAIMER}</p>
       </div>
     )
   }
@@ -369,6 +371,8 @@ function AutoResultBody({
           />
         ))}
       </ul>
+
+      <p className="panel-disclaimer">{NOT_INVESTMENT_ADVICE_DISCLAIMER}</p>
     </div>
   )
 }

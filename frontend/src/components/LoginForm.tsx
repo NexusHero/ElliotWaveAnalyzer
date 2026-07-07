@@ -4,7 +4,7 @@ import { Check, GoogleG, WaveLogo } from './Icons'
 export type AuthMode = 'login' | 'register'
 
 interface LoginFormProps {
-  onSubmit: (mode: AuthMode, email: string, password: string) => void
+  onSubmit: (mode: AuthMode, email: string, password: string, acceptTerms: boolean) => void
   error: string | null
   loading: boolean
   /** When true, render the "Continue with Google" option (backend has Google OAuth configured). */
@@ -32,6 +32,7 @@ export default function LoginForm({
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [agreed, setAgreed] = useState(false)
+  const [acceptTerms, setAcceptTerms] = useState(false)
 
   const isRegister = mode === 'register'
   const mismatch = isRegister && confirm.length > 0 && confirm !== password
@@ -39,12 +40,12 @@ export default function LoginForm({
     !loading &&
     email.length > 0 &&
     password.length > 0 &&
-    (!isRegister || (!mismatch && agreed && confirm.length > 0))
+    (!isRegister || (!mismatch && agreed && acceptTerms && confirm.length > 0))
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
     if (!canSubmit) return
-    onSubmit(mode, email, password)
+    onSubmit(mode, email, password, isRegister ? acceptTerms : true)
   }
 
   return (
@@ -179,13 +180,29 @@ export default function LoginForm({
                   placeholder="••••••••"
                 />
               </label>
-              <label className="check" style={{ marginBottom: 22 }}>
+              <label className="check">
                 <input
                   type="checkbox"
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
                 />
                 I understand this is a market-analysis tool and not financial advice.
+              </label>
+              <label className="check" style={{ marginBottom: 22 }}>
+                <input
+                  type="checkbox"
+                  checked={acceptTerms}
+                  onChange={(e) => setAcceptTerms(e.target.checked)}
+                />
+                I accept the{' '}
+                <a href="/legal/terms" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </a>{' '}
+                and{' '}
+                <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>
+                .
               </label>
             </div>
           )}

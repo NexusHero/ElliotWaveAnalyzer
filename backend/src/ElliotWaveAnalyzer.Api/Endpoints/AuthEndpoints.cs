@@ -122,6 +122,12 @@ public static class AuthEndpoints
             return Results.Problem(title: "Registration failed", detail: "Email and password are required.", statusCode: StatusCodes.Status400BadRequest);
         }
 
+        // #167 AC2: no account without explicit acceptance of the Terms + Privacy Policy.
+        if (!request.AcceptTerms)
+        {
+            return Results.Problem(title: "Registration failed", detail: "You must accept the Terms of Service and Privacy Policy to create an account.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var result = await auth.RegisterAsync(request.Email, request.Password, ct);
         return result.Succeeded
             ? Results.Ok()

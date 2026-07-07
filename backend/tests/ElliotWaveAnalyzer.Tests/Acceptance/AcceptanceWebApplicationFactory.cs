@@ -119,7 +119,7 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
     /// </summary>
     public async Task AuthenticateAsync(HttpClient client)
     {
-        var credentials = new { email = TestEmail, password = TestPassword };
+        var credentials = new { email = TestEmail, password = TestPassword, acceptTerms = true };
         await client.PostAsJsonAsync("/api/auth/register", credentials);
         await client.PostAsJsonAsync("/api/auth/login", credentials);
     }

@@ -23,6 +23,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<UserLlmUsagePeriod> UserLlmUsagePeriods => Set<UserLlmUsagePeriod>();
     public DbSet<AccountDeletionAudit> AccountDeletionAudits => Set<AccountDeletionAudit>();
     public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
+    public DbSet<LegalAcceptance> LegalAcceptances => Set<LegalAcceptance>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -167,6 +168,17 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             // to null values, but a row that does carry one is genuinely this account's data, so it
             // cascades like every other per-user table (#168 AC3), unlike AccountDeletionAudit above.
             entity.HasOne<AppUser>().WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<LegalAcceptance>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.TermsVersion).HasMaxLength(16).IsRequired();
+            entity.Property(a => a.PrivacyVersion).HasMaxLength(16).IsRequired();
+            entity.HasIndex(a => a.UserId);
+            // Written once, unconditionally, at signup (#167 AC4) — always tied to a real account,
+            // so this cascades like every other per-user table (#168 AC3), unlike AccountDeletionAudit.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

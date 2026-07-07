@@ -209,6 +209,19 @@ describe('AutoAnalysisPanel', () => {
       expect(screen.getByText(/high confidence/i)).toBeInTheDocument()
     })
 
+    it('shows the not-investment-advice disclaimer (#167 AC3)', () => {
+      renderPanel({ state: 'result', data: sampleData })
+      expect(screen.getByText(/not investment advice/i)).toBeInTheDocument()
+    })
+
+    it('shows the not-investment-advice disclaimer even with no clear structure (#167 AC3)', () => {
+      renderPanel({
+        state: 'result',
+        data: { ...sampleData, rankings: [] },
+      })
+      expect(screen.getByText(/not investment advice/i)).toBeInTheDocument()
+    })
+
     it('shows the rationale block', () => {
       renderPanel({ state: 'result', data: sampleData })
       expect(screen.getByText('Classic five-wave impulse')).toBeInTheDocument()
@@ -305,9 +318,7 @@ describe('AutoAnalysisPanel', () => {
       expect(screen.getByText('A corrective alternative worth watching')).toBeInTheDocument()
 
       await user.click(screen.getByRole('button', { name: /collapse alt 1/i }))
-      expect(
-        screen.queryByText('A corrective alternative worth watching')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText('A corrective alternative worth watching')).not.toBeInTheDocument()
     })
   })
 

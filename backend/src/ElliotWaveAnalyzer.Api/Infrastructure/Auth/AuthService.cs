@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using ElliotWaveAnalyzer.Api.Application;
+using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,19 @@ internal sealed class AuthService(
 
         if (result.Succeeded)
         {
+            // The caller (AuthEndpoints.Register, #167 AC2) already rejected the request if Terms +
+            // Privacy weren't accepted, so by the time we get here acceptance is a given — record
+            // which version was accepted (AC4), the same "new dedicated table" pattern as ConsentRecord.
+            db.LegalAcceptances.Add(new LegalAcceptance
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TermsVersion = LegalDocuments.TermsVersion,
+                PrivacyVersion = LegalDocuments.PrivacyVersion,
+                AcceptedAt = timeProvider.GetUtcNow(),
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
             // Log the non-PII user id, never the email (cs/exposure-of-sensitive-information).
             logger.LogInformation("Registered new user {UserId}", user.Id);
             return new AuthResult(true, []);

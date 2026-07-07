@@ -1,6 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ElliotWaveAnalyzer.Tests.Acceptance;
 
@@ -36,6 +40,7 @@ public sealed class AuthAcceptanceTests
     {
         email = AcceptanceWebApplicationFactory.TestEmail,
         password = AcceptanceWebApplicationFactory.TestPassword,
+        acceptTerms = true,
     };
 
     [Test]
@@ -88,6 +93,45 @@ public sealed class AuthAcceptanceTests
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task Register_WithoutAcceptingTerms_Returns400AndCreatesNoAccount()
+    {
+        using var client = _factory.CreateClient();
+
+        var register = await client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email = AcceptanceWebApplicationFactory.TestEmail,
+            password = AcceptanceWebApplicationFactory.TestPassword,
+            acceptTerms = false,
+        });
+
+        Assert.That(register.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+
+        var login = await client.PostAsJsonAsync("/api/auth/login", Credentials);
+        Assert.That(login.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task Register_AcceptingTerms_RecordsTheCurrentLegalDocumentVersions()
+    {
+        using var client = _factory.CreateClient();
+
+        var register = await client.PostAsJsonAsync("/api/auth/register", Credentials);
+        Assert.That(register.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.SingleAsync(u => u.Email == AcceptanceWebApplicationFactory.TestEmail);
+        var acceptance = await db.LegalAcceptances.SingleAsync(a => a.UserId == user.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(acceptance.TermsVersion, Is.EqualTo(LegalDocuments.TermsVersion));
+            Assert.That(acceptance.PrivacyVersion, Is.EqualTo(LegalDocuments.PrivacyVersion));
+            Assert.That(acceptance.AcceptedAt, Is.GreaterThan(DateTimeOffset.UtcNow.AddMinutes(-5)));
+        });
     }
 
     [Test]

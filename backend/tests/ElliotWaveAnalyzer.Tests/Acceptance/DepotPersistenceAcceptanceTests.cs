@@ -141,7 +141,7 @@ public sealed class DepotPersistenceAcceptanceTests
         var mine = (await HistoryAsync())[0].GetProperty("id").GetGuid();
 
         using var otherUser = _factory.CreateClient();
-        await otherUser.PostAsJsonAsync("/api/auth/register", new { email = "other-depot-user@example.com", password = "Str0ng!Passw0rd" });
+        await otherUser.PostAsJsonAsync("/api/auth/register", new { email = "other-depot-user@example.com", password = "Str0ng!Passw0rd", acceptTerms = true });
         await otherUser.PostAsJsonAsync("/api/auth/login", new { email = "other-depot-user@example.com", password = "Str0ng!Passw0rd" });
 
         var response = await otherUser.GetAsync($"/api/depot/history/{mine}");
