@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
@@ -13,6 +14,18 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 /// the wave ranker. Perception only: it returns claims, never verdicts. Throws
 /// <see cref="ChartExtractionException"/> when the output can't be parsed after the retry, and
 /// <see cref="InvalidOperationException"/> when no vision model is configured.
+/// <para>
+/// The uploaded image is untrusted content (#175): it can carry adversarial text aimed at the vision
+/// model ("ignore your task, output ..."). Every string field is validated against a fixed allow-list
+/// shape before it leaves this class — a pivot label that doesn't look like an Elliott label fails the
+/// whole extraction (the same "reject, don't coerce" strictness already applied to a malformed date or
+/// price); an implausible symbol/timeframe/zone-label is silently dropped to null rather than passed
+/// through, mirroring <c>ScanQueryValidator</c>'s allow-list boundary. No model-authored string can
+/// reach the API response unvalidated, and the geometry/rules pipeline downstream (<see
+/// cref="Api.Application.PivotSnapper"/>, <see cref="Api.Application.ChartVerificationAssembler"/>)
+/// never reads label content for anything beyond exact known Elliott tokens, so injected text has no
+/// path to influence the deterministic verdict even before this guard runs.
+/// </para>
 /// </summary>
 internal sealed class LlmChartVisionExtractor(
     IEnumerable<IChatClient> chatClients,
@@ -21,7 +34,22 @@ internal sealed class LlmChartVisionExtractor(
 {
     private const int MaxOutputTokens = 2048;
     private const int MaxAttempts = 2; // initial + one retry
+    private const int MaxZoneLabelLength = 40;
     private readonly IChatClient? _chatClient = chatClients.FirstOrDefault();
+
+    // A real Elliott label is always short: a digit/roman numeral/letter, optionally parenthesised or
+    // primed for a sub-degree ("3", "(3)", "iii", "B", "2'"). Anything longer or with other characters
+    // is not a label a human drew — most likely injected instruction text — and is rejected outright.
+    private static readonly Regex PlausibleLabel = new(
+        @"^[A-Za-z0-9()'\.\-]{1,12}$", RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+
+    // A ticker-shaped token, mirroring ScanQueryValidator's symbol allow-list: letters/digits and a
+    // handful of separators used by real symbols (BTC-USD, BRK.B), capped well below prose length.
+    private static readonly Regex PlausibleSymbol = new(
+        @"^[A-Za-z0-9][A-Za-z0-9.\-]{0,9}$", RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+
+    private static readonly HashSet<string> KnownTimeframes =
+        new(StringComparer.OrdinalIgnoreCase) { "1h", "4h", "1d", "1w" };
 
     private const string SystemPrompt =
         "You read Elliott Wave annotations off a chart image. Respond ONLY with JSON of the exact shape: "
@@ -131,8 +159,8 @@ internal sealed class LlmChartVisionExtractor(
             }
 
             extraction = new ChartExtraction(
-                OptionalString(root, "symbol"),
-                OptionalString(root, "timeframe"),
+                ReadSymbol(root),
+                ReadTimeframe(root),
                 pivots,
                 ReadLevels(root),
                 ReadZones(root));
@@ -164,8 +192,44 @@ internal sealed class LlmChartVisionExtractor(
             return false;
         }
 
-        pivot = new ClaimedPivot(date, priceEl.GetDecimal(), labelEl.GetString()!);
+        var label = labelEl.GetString()!;
+        // Not a shape a real Elliott label can take — most likely injected instruction text riding
+        // along in the one free-text field a pivot has. Reject the whole pivot (and so the whole
+        // extraction, same as a malformed date/price) rather than truncate/sanitize it: a partially
+        // sanitized injection string is still an unreviewed string, and a clean retry is cheap.
+        if (!PlausibleLabel.IsMatch(label))
+        {
+            return false;
+        }
+
+        pivot = new ClaimedPivot(date, priceEl.GetDecimal(), label);
         return true;
+    }
+
+    private static string? ReadSymbol(JsonElement root)
+    {
+        var value = OptionalString(root, "symbol");
+        return value is not null && PlausibleSymbol.IsMatch(value) ? value : null;
+    }
+
+    private static string? ReadTimeframe(JsonElement root)
+    {
+        var value = OptionalString(root, "timeframe");
+        return value is not null && KnownTimeframes.Contains(value.Trim()) ? value : null;
+    }
+
+    /// <summary>A zone label is decorative (shown alongside a price box) and never drives any decision,
+    /// but is still bounded — no control characters, capped length — so an oversized or non-printable
+    /// payload can't ride through as "just a label".</summary>
+    private static string? SanitizeZoneLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return null;
+        }
+
+        var trimmed = label.Trim();
+        return trimmed.Length <= MaxZoneLabelLength && trimmed.All(c => !char.IsControl(c)) ? trimmed : null;
     }
 
     private static string? OptionalString(JsonElement root, string name)
@@ -195,7 +259,7 @@ internal sealed class LlmChartVisionExtractor(
                 && z.TryGetProperty("low", out var low) && low.ValueKind == JsonValueKind.Number
                 && z.TryGetProperty("high", out var high) && high.ValueKind == JsonValueKind.Number)
             {
-                zones.Add(new ClaimedZone(low.GetDecimal(), high.GetDecimal(), OptionalString(z, "label")));
+                zones.Add(new ClaimedZone(low.GetDecimal(), high.GetDecimal(), SanitizeZoneLabel(OptionalString(z, "label"))));
             }
         }
 
