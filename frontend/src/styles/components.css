@@ -528,6 +528,21 @@
     display: none;
   }
 }
+@media (max-width: 480px) {
+  /* #177 AC1: the title text alone is wider than the buttons/avatar it shares the bar with need
+     to overflow — drop it and let the logo stand for the brand at phone width. flex-wrap is a
+     backstop so an unusually long future button set degrades to a taller bar, not a wider one. */
+  .tb-title {
+    display: none;
+  }
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 60px;
+    row-gap: 8px;
+    padding: 10px 14px;
+  }
+}
 
 /* ============================================================
    WORKSPACE
@@ -614,10 +629,28 @@
   }
 }
 
+/* Phone-width (#177): reclaim padding so the chart-head clusters (which already wrap) have room
+   before wrapping, and let the symbol search input shrink below its desktop floor instead of
+   forcing the row wider than the viewport. */
+@media (max-width: 480px) {
+  .ws-grid {
+    padding: 10px;
+    gap: 12px;
+  }
+  .chart-panel {
+    padding: 8px;
+  }
+  .sym-input {
+    min-width: 0;
+  }
+}
+
 .chart-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   padding: 2px 4px;
 }
 .symbol {
@@ -1468,7 +1501,10 @@
   font-size: 13px;
 }
 .depot-result {
+  /* #177 AC4: the table has more columns than a phone-width container — scroll within this
+     wrapper, never the page. */
   margin-top: 14px;
+  overflow-x: auto;
 }
 .depot-summary {
   font-size: 13px;

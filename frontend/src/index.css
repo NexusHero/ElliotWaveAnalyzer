@@ -121,6 +121,10 @@ body {
     radial-gradient(120% 80% at 85% -10%, var(--acc-soft) 0%, transparent 46%),
     linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
   background-attachment: fixed;
+  /* Defense-in-depth for #177 AC1: the real fix is every wide/unwrapped element getting its own
+     reflow or scroll container, but this is the backstop so a missed one degrades to clipped
+     rather than a page-body horizontal scrollbar. */
+  overflow-x: hidden;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
