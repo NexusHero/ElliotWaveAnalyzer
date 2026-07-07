@@ -81,6 +81,39 @@ describe('PriceChart', () => {
     ).not.toThrow()
   })
 
+  it('renders forward projection paths without throwing (#223)', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() =>
+      render(
+        <PriceChart
+          candles={candles}
+          projectionPaths={[
+            {
+              fromTime: '2024-01-10',
+              fromPrice: 130,
+              toTimeMin: '2024-01-15',
+              toTimeMax: '2024-01-25',
+              toLow: 150,
+              toHigh: 160,
+              variant: 'speculative',
+              promoted: false,
+            },
+            {
+              fromTime: '2024-01-10',
+              fromPrice: 130,
+              toTimeMin: '2024-01-15',
+              toTimeMax: '2024-01-25',
+              toLow: 90,
+              toHigh: 100,
+              variant: 'alternate',
+              promoted: true,
+            },
+          ]}
+        />
+      )
+    ).not.toThrow()
+  })
+
   it('renders an overlaid alternate count (alt wave line + alt price line) without throwing', () => {
     const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
     expect(() =>

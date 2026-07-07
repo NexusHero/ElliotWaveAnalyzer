@@ -51,6 +51,7 @@ import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecor
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { treeToDegreeMarkers } from './degreeMarkers'
 import { type LegMeasurement, legMeasurements } from './legMeasurements'
+import { branchesToProjectionPaths, deriveProjectionTimeWindow } from './projectionPath'
 import { toWaveLinePoints } from './waveLine'
 
 /**
@@ -413,6 +414,18 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       : []
     return [...confirmed, ...branchBands]
   }, [activeLevels, effectiveLayers, pro, liveVerify.data?.branches, promoted])
+
+  // Forward projection paths (#223): from the last confirmed pivot, a dashed connector into a
+  // time-bounded target box for each branch — the "analyst arrow" the zone bands alone don't show.
+  // The time window rides on the same leg-duration pace as the live per-leg readout (#165); Pro-only,
+  // like the branch zone bands above.
+  const projectionPaths = useMemo(() => {
+    if (!pro) return []
+    const sorted = [...annotations].sort((a, b) => a.date.localeCompare(b.date))
+    const last = sorted[sorted.length - 1]
+    const window = deriveProjectionTimeWindow(annotations)
+    return branchesToProjectionPaths(liveVerify.data?.branches ?? null, last ?? null, window, promoted)
+  }, [pro, annotations, liveVerify.data?.branches, promoted])
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -808,6 +821,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 annotations={markers}
                 waveLines={waveLines}
                 zoneBands={zoneBands}
+                projectionPaths={projectionPaths}
                 priceLines={
                   overlayPriceLines.length > 0 ? [...priceLines, ...overlayPriceLines] : priceLines
                 }
