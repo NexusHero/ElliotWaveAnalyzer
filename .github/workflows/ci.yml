@@ -143,6 +143,53 @@ jobs:
         run: npm run build
         working-directory: frontend
 
+  # ── Frontend↔backend contract drift (#197) ───────────────────────────────
+  # Catches the case that already happened once: a backend DTO changed and nobody re-ran
+  # generate:api. The .ts-level structural check (contract.check.ts, representative DTOs) already
+  # runs as part of the frontend job's blocking `tsc --noEmit` step against the *committed*
+  # generated.ts — this job instead proves generated.ts itself hasn't drifted from the real,
+  # freshly-built backend contract (AC1, AC5): rebuild the backend (regenerates the OpenAPI
+  # document at build time, no server/DB needed — see OpenApiGenerateDocumentsOnBuild in the API
+  # csproj), regenerate generated.ts from it, and fail if that differs from what's committed.
+  contract:
+    name: Contract drift — frontend↔backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build backend (writes openapi/ElliotWaveAnalyzer.Api.json)
+        run: dotnet build --configuration Release
+        working-directory: backend/src/ElliotWaveAnalyzer.Api
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Regenerate frontend/src/api/generated.ts from the fresh OpenAPI document
+        run: npm run generate:api
+        working-directory: frontend
+
+      - name: Fail if generated.ts drifted from the committed copy
+        run: |
+          if ! git diff --exit-code -- frontend/src/api/generated.ts; then
+            echo "::error::frontend/src/api/generated.ts is out of sync with the backend's OpenAPI contract."
+            echo "::error::Fix: run 'npm run generate:api' in frontend/, reconcile any type in src/api/types.ts tsc then points at, and commit both files (#197 AC4)."
+            exit 1
+          fi
+
   # ── Docker image (production artifact) ───────────────────────────────────
   # Builds the production image on every PR/push so the Dockerfile can't silently break, and
   # publishes it to GHCR on pushes to main (PRs stay build-only — no push, no login, no secrets).
