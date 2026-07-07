@@ -4,6 +4,7 @@ using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElliotWaveAnalyzer.Api.Extensions;
@@ -48,7 +49,14 @@ internal static class AuthExtensions
         services.AddScoped<IScenarioPriorProvider, BacktestScenarioPriorProvider>();
 
         // Encrypt per-user API keys at rest with ASP.NET Core Data Protection (no bespoke crypto).
-        services.AddDataProtection();
+        // The key ring is persisted to the same PostgreSQL database (#171, ADR-052) rather than the
+        // framework's default local-only store, so encrypted keys stay decryptable across restarts
+        // and across multiple instances sharing this database. A fixed application name keeps the
+        // key ring's purpose string stable across deployments (required for AC2's cross-instance
+        // decryption — an unset/changing name would make instances derive different keys).
+        services.AddDataProtection()
+            .PersistKeysToDbContext<AppDbContext>()
+            .SetApplicationName("ElliotWaveAnalyzer");
         services.AddScoped<IUserKeyStore, UserKeyStore>();
 
         var authBuilder = services

@@ -61,6 +61,11 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
 
+    <!-- Data Protection key ring persisted to the same PostgreSQL database (#171) — so encrypted
+         per-user API keys stay decryptable across restarts and across multiple instances, instead
+         of the framework's default local-only key ring. -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.9" />
+
     <!-- Depot import: PdfPig extracts text with word bounding boxes from broker PDF
          statements (Smartbroker+). MIT, pure managed code, no native deps. Isolated in
          a single Infrastructure file (SmartbrokerPlusPdfImporter) like Skender. -->

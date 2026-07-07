@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -5,17 +6,20 @@ using Microsoft.EntityFrameworkCore;
 namespace ElliotWaveAnalyzer.Api.Infrastructure.Auth;
 
 /// <summary>
-/// EF Core context for authentication: the ASP.NET Core Identity tables plus the
-/// server-side <see cref="UserSession"/> store.
+/// EF Core context for authentication: the ASP.NET Core Identity tables, the server-side
+/// <see cref="UserSession"/> store, and the Data Protection key ring (<see cref="IDataProtectionKeyContext"/>,
+/// #171) — so encrypted per-user API keys stay decryptable across restarts and across multiple
+/// instances sharing this database, instead of the framework's default local-only key ring.
 /// </summary>
 internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
-    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options)
+    : IdentityDbContext<AppUser, IdentityRole<Guid>, Guid>(options), IDataProtectionKeyContext
 {
     public DbSet<UserSession> Sessions => Set<UserSession>();
     public DbSet<AnalysisSnapshot> AnalysisSnapshots => Set<AnalysisSnapshot>();
     public DbSet<UserApiKey> UserApiKeys => Set<UserApiKey>();
     public DbSet<SavedDepot> SavedDepots => Set<SavedDepot>();
     public DbSet<BacktestRun> BacktestRuns => Set<BacktestRun>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
