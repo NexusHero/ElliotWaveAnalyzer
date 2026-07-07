@@ -17,6 +17,7 @@ try
     builder.Services.AddAppCaching();
     builder.Services.AddAppCors(builder.Configuration);
     builder.Services.AddMarketDataProviders(builder.Configuration);
+    builder.Services.AddSentimentProviders();
     builder.Services.AddLlmServices(builder.Configuration);
     builder.Services.AddWaveAnalysisServices();
     builder.Services.AddAppAuth(builder.Configuration, out var googleEnabled);
