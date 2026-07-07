@@ -21,7 +21,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libfontconfig1 \
+    && apt-get install -y --no-install-recommends libfontconfig1 curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish ./
@@ -30,6 +30,13 @@ COPY --from=build /app/publish ./
 # (e.g. ConnectionStrings__Postgres, Gemini__ApiKey) — never baked into the image.
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
+
+# Container-level readiness (#173 AC4): lets `docker ps`/compose's `service_healthy` condition,
+# or any orchestrator that honours the Docker HEALTHCHECK, gate on the same dependency checks
+# (database, market-data provider) the app itself exposes at /health/ready — not just "is the
+# process running". --start-period gives the app time to boot before the first check counts.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8080/health/ready || exit 1
 
 # Run as the image's non-root user (defined by the .NET base image).
 USER $APP_UID

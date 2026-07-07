@@ -26,6 +26,7 @@ try
     builder.Services.AddDepotImport();
     builder.Services.AddPortfolioReviewSchedule(builder.Configuration);
     builder.Services.AddAppTelemetry(builder.Configuration);
+    builder.Services.AddAppHealthChecks(builder.Configuration);
     builder.Services.AddProblemDetails(); // RFC 9457 for unhandled exceptions
     builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -63,6 +64,7 @@ try
     app.MapKeyEndpoints();
     app.MapDepotEndpoints();
     app.MapSymbolEndpoints();
+    app.MapAppHealthChecks();
 
     app.Run();
 }
