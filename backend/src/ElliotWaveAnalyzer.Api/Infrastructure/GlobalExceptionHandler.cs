@@ -1,3 +1,4 @@
+using ElliotWaveAnalyzer.Api.Domain;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,6 +26,23 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
             var safePath = httpContext.Request.Path.Value?.ReplaceLineEndings(" ") ?? string.Empty;
             logger.LogDebug("Request was canceled by the client: {Path}", safePath);
             httpContext.Response.StatusCode = 499;
+            return true;
+        }
+
+        // Quota refusal (#174) is not a server fault — surface the clear, actionable message
+        // straight from the exception rather than dressing it up as a generic 500.
+        if (exception is LlmQuotaExceededException quotaExceeded)
+        {
+            var quotaProblem = new ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Title = "LLM usage quota exceeded",
+                Detail = quotaExceeded.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.30",
+            };
+
+            httpContext.Response.StatusCode = quotaProblem.Status!.Value;
+            await httpContext.Response.WriteAsJsonAsync(quotaProblem, cancellationToken);
             return true;
         }
 

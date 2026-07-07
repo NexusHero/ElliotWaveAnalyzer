@@ -20,6 +20,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SavedDepot> SavedDepots => Set<SavedDepot>();
     public DbSet<BacktestRun> BacktestRuns => Set<BacktestRun>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+    public DbSet<UserLlmUsagePeriod> UserLlmUsagePeriods => Set<UserLlmUsagePeriod>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -123,6 +124,13 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(b => b.Dimension).HasMaxLength(16).IsRequired();
             entity.Property(b => b.Key).HasMaxLength(32).IsRequired();
             entity.HasIndex(b => b.BacktestRunId);
+        });
+
+        builder.Entity<UserLlmUsagePeriod>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            // One row per (user, period) — the unit TryConsumeAsync's atomic UPDATE targets.
+            entity.HasIndex(p => new { p.UserId, p.PeriodStart }).IsUnique();
         });
     }
 }

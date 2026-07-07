@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.AI;
@@ -61,14 +62,22 @@ internal sealed class UserAwareChatClient(
         var active = ActiveProvider;
         if (CurrentUserId() is { } userId)
         {
-            // IUserKeyStore is scoped (touches the DbContext); this client is a singleton, so open a
-            // short-lived scope just to read the user's key.
+            // IUserKeyStore/IUserLlmQuotaService are scoped (touch the DbContext); this client is a
+            // singleton, so open a short-lived scope just to read the user's key and quota.
             await using var scope = scopeFactory.CreateAsyncScope();
             var vault = scope.ServiceProvider.GetRequiredService<IUserKeyStore>();
             var key = await vault.GetDecryptedAsync(userId, active, cancellationToken);
             if (!string.IsNullOrWhiteSpace(key))
             {
+                // The user's own key — they cost the operator nothing, so no quota applies (#174).
                 return factory.Create(active, key);
+            }
+
+            // Falling back to the operator's shared key: the per-user quota applies here (#174).
+            var quota = scope.ServiceProvider.GetRequiredService<IUserLlmQuotaService>();
+            if (!await quota.TryConsumeAsync(userId, cancellationToken))
+            {
+                throw new LlmQuotaExceededException(await quota.GetStatusAsync(userId, cancellationToken));
             }
         }
 

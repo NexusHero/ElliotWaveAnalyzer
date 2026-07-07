@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Infrastructure.Auth;
+using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -58,6 +59,12 @@ internal static class AuthExtensions
             .PersistKeysToDbContext<AppDbContext>()
             .SetApplicationName("ElliotWaveAnalyzer");
         services.AddScoped<IUserKeyStore, UserKeyStore>();
+
+        // Per-user LLM call quota on the operator's shared key (#174) — a hard, persisted ceiling so
+        // an unauthenticated cost/abuse surface doesn't exist on the shared key. A user calling on
+        // their own configured key is never quota-limited (see UserQuotaStatus's remarks).
+        services.AddOptions<LlmQuotaOptions>().BindConfiguration(LlmQuotaOptions.SectionName);
+        services.AddScoped<IUserLlmQuotaService, UserLlmQuotaService>();
 
         var authBuilder = services
             .AddAuthentication(SessionAuthenticationHandler.SchemeName)
