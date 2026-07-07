@@ -1,0 +1,140 @@
+name: Browser E2E
+
+# Real browser, real composed app (built frontend served by the Vite dev proxy, real backend, real
+# migrated PostgreSQL) — the layer above the in-process WebApplicationFactory acceptance tests and
+# the jsdom Vitest/RTL suite (#196). No LLM key is configured: every step this journey drives
+# (count, live-verify, scan, save, export) is deterministic and LLM-free by this codebase's own
+# architecture, so "no key configured" isn't a stand-in for AC2's degraded state — it genuinely is
+# that state. Nightly and non-blocking (mirrors mutation.yml) rather than gating every PR: it hits a
+# real, keyless, rate-limited market-data provider (the same one the app's own default onboarding
+# already relies on, #176) and drives real browser clicks — both are more failure-prone than the
+# fully-faked per-PR gates, so a PR must never be blocked by a flake here.
+on:
+  schedule:
+    - cron: '30 3 * * *' # 03:30 UTC nightly, staggered a half-hour after mutation.yml
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Playwright — composed app journey
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ewa_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Restore backend dependencies
+        run: dotnet restore
+        working-directory: backend
+
+      - name: Restore local .NET tools (dotnet-ef)
+        run: dotnet tool restore
+        working-directory: backend
+
+      - name: Apply migrations to the real Postgres service
+        run: dotnet ef database update
+        working-directory: backend/src/ElliotWaveAnalyzer.Api
+        env:
+          ConnectionStrings__Postgres: "Host=localhost;Port=5432;Database=ewa_e2e;Username=postgres;Password=postgres"
+
+      - name: Build backend
+        run: dotnet build --no-restore --configuration Release
+        working-directory: backend
+
+      - name: Create the local HTTPS dev cert
+        # Only needs to exist — the Vite proxy already accepts a self-signed backend cert
+        # (secure: false, see vite.config.ts) exactly for this local/dev scenario.
+        run: dotnet dev-certs https
+
+      - name: Start the backend (no LLM key configured — the AC2 degraded state, for real)
+        run: |
+          nohup dotnet run --no-build --configuration Release --urls "https://localhost:5001" > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sk -o /dev/null https://localhost:5001/health/ready; then
+              echo "backend ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::backend did not become ready in time"
+          cat /tmp/backend.log
+          exit 1
+        working-directory: backend/src/ElliotWaveAnalyzer.Api
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__Postgres: "Host=localhost;Port=5432;Database=ewa_e2e;Username=postgres;Password=postgres"
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright's Chromium
+        # GitHub-hosted runners have no browser pre-installed (unlike this repo's own authoring
+        # environment, which does — see playwright.config.ts's comment).
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Start the frontend dev server
+        run: |
+          nohup npm run dev > /tmp/frontend.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null http://localhost:5173; then
+              echo "frontend ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::frontend dev server did not become ready in time"
+          cat /tmp/frontend.log
+          exit 1
+        working-directory: frontend
+
+      - name: Run the Playwright journey suite
+        run: npm run test:e2e
+        working-directory: frontend
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report (traces, screenshots — AC5)
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/**
+            frontend/test-results/**
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Backend log (on failure)
+        if: failure()
+        run: cat /tmp/backend.log || true
