@@ -504,6 +504,27 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   return (await response.json()) as CurrentUser
 }
 
+/**
+ * Persists a cookie-consent decision (#169 AC5) via `POST /api/consent`. Anonymous — works before
+ * login. Best-effort: the caller decides whether a failure should be surfaced, since the actual
+ * gate (what a tracker is allowed to do) is the localStorage record, not this network call.
+ */
+export async function recordConsent(record: {
+  visitorId: string
+  analytics: boolean
+  marketing: boolean
+  policyVersion: string
+}): Promise<void> {
+  const response = await fetch('/api/consent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  })
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
 /** Pulls a human-readable message out of an RFC7807 problem response, with a fallback. */
 async function extractErrorDetail(response: Response): Promise<string> {
   try {

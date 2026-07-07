@@ -22,6 +22,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<UserLlmUsagePeriod> UserLlmUsagePeriods => Set<UserLlmUsagePeriod>();
     public DbSet<AccountDeletionAudit> AccountDeletionAudits => Set<AccountDeletionAudit>();
+    public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -153,6 +154,19 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.HasIndex(a => a.DeletedUserId);
             // Deliberately no FK to AspNetUsers — the audit row (#168 AC4) must survive the very
             // deletion it records, so it cannot cascade with the user it references.
+        });
+
+        builder.Entity<ConsentRecord>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.VisitorId).HasMaxLength(64).IsRequired();
+            entity.Property(c => c.PolicyVersion).HasMaxLength(16).IsRequired();
+            entity.HasIndex(c => c.VisitorId);
+            entity.HasIndex(c => c.UserId);
+            // UserId is nullable (an anonymous visitor has none yet) — the FK simply doesn't apply
+            // to null values, but a row that does carry one is genuinely this account's data, so it
+            // cascades like every other per-user table (#168 AC3), unlike AccountDeletionAudit above.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
