@@ -59,8 +59,8 @@ public sealed class UserLlmQuotaServiceAcceptanceTests
     [Test]
     public async Task TryConsumeAsync_NthCallAllowed_NPlusOnethCallRefused()
     {
-        var userId = Guid.NewGuid();
         await using var provider = BuildProvider(TimeProvider.System, maxCallsPerPeriod: 3);
+        var userId = await CreateUserAsync(provider);
         using var scope = provider.CreateScope();
         var quota = scope.ServiceProvider.GetRequiredService<IUserLlmQuotaService>();
 
@@ -76,8 +76,8 @@ public sealed class UserLlmQuotaServiceAcceptanceTests
     [Test]
     public async Task GetStatusAsync_ReflectsConsumedCallsAndTheConfiguredLimit()
     {
-        var userId = Guid.NewGuid();
         await using var provider = BuildProvider(TimeProvider.System, maxCallsPerPeriod: 3);
+        var userId = await CreateUserAsync(provider);
         using var scope = provider.CreateScope();
         var quota = scope.ServiceProvider.GetRequiredService<IUserLlmQuotaService>();
 
@@ -96,9 +96,10 @@ public sealed class UserLlmQuotaServiceAcceptanceTests
     [Test]
     public async Task TryConsumeAsync_UsageFromOneInstance_IsVisibleOnAnIndependentlyBuiltInstance()
     {
-        var userId = Guid.NewGuid();
+        Guid userId;
         await using (var instanceA = BuildProvider(TimeProvider.System, maxCallsPerPeriod: 1))
         {
+            userId = await CreateUserAsync(instanceA);
             using var scope = instanceA.CreateScope();
             var quota = scope.ServiceProvider.GetRequiredService<IUserLlmQuotaService>();
             Assert.That(await quota.TryConsumeAsync(userId), Is.True);
@@ -116,9 +117,9 @@ public sealed class UserLlmQuotaServiceAcceptanceTests
     [Test]
     public async Task TryConsumeAsync_NextPeriod_ResetsTheCount()
     {
-        var userId = Guid.NewGuid();
         var clock = new ManualTimeProvider(new DateTimeOffset(2026, 3, 15, 12, 0, 0, TimeSpan.Zero));
         await using var provider = BuildProvider(clock, maxCallsPerPeriod: 1, periodDays: 1);
+        var userId = await CreateUserAsync(provider);
         using var scope = provider.CreateScope();
         var quota = scope.ServiceProvider.GetRequiredService<IUserLlmQuotaService>();
 
@@ -128,6 +129,26 @@ public sealed class UserLlmQuotaServiceAcceptanceTests
         clock.Advance(TimeSpan.FromDays(1));
 
         Assert.That(await quota.TryConsumeAsync(userId), Is.True);
+    }
+
+    /// <summary>
+    /// A quota row's UserId is a real foreign key to AspNetUsers (#168) — inserts a minimal user
+    /// row directly (bypassing UserManager, which these tests have no need for) so TryConsumeAsync
+    /// has a real account to attach usage to.
+    /// </summary>
+    private static async Task<Guid> CreateUserAsync(ServiceProvider provider)
+    {
+        var userId = Guid.NewGuid();
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.Users.Add(new AppUser
+        {
+            Id = userId,
+            UserName = $"quota-{userId:N}@example.com",
+            Email = $"quota-{userId:N}@example.com",
+        });
+        await db.SaveChangesAsync();
+        return userId;
     }
 
     private ServiceProvider BuildProvider(TimeProvider timeProvider, int maxCallsPerPeriod, int periodDays = 1)

@@ -67,10 +67,16 @@ public sealed class AlertServiceAcceptanceTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // AnalysisSnapshot.UserId is a real foreign key to AspNetUsers (#168) — a row for it
+            // must exist first.
+            var userId = Guid.NewGuid();
+            db.Users.Add(new AppUser { Id = userId, UserName = $"alert-{userId:N}@example.com", Email = $"alert-{userId:N}@example.com" });
+
             db.AnalysisSnapshots.Add(new AnalysisSnapshot
             {
                 Id = snapshotId,
-                UserId = Guid.NewGuid(),
+                UserId = userId,
                 Symbol = "BTC",
                 CreatedAt = new DateTimeOffset(2023, 12, 1, 0, 0, 0, TimeSpan.Zero),
                 Structure = "Impulse",

@@ -36,6 +36,16 @@ public static class AuthEndpoints
             .WithSummary("Return the currently authenticated user")
             .RequireAuthorization();
 
+        group.MapGet("/export", ExportData)
+            .WithName("ExportAccountData")
+            .WithSummary("Export all of the caller's personal data as JSON (DSGVO Art. 20)")
+            .RequireAuthorization();
+
+        group.MapPost("/delete-account", DeleteAccount)
+            .WithName("DeleteAccount")
+            .WithSummary("Irreversibly delete the caller's account and all associated data (DSGVO Art. 17)")
+            .RequireAuthorization();
+
         return app;
     }
 
@@ -166,4 +176,34 @@ public static class AuthEndpoints
             id = user.FindFirstValue(ClaimTypes.NameIdentifier),
             email = user.FindFirstValue(ClaimTypes.Email),
         });
+
+    private static async Task<IResult> ExportData(ClaimsPrincipal user, IAccountRightsService rights, CancellationToken ct)
+    {
+        var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var export = await rights.ExportDataAsync(userId, ct);
+        return Results.Ok(export);
+    }
+
+    private static async Task<IResult> DeleteAccount(
+        DeleteAccountRequest request,
+        HttpContext context,
+        ClaimsPrincipal user,
+        IAccountRightsService rights,
+        IOptions<AuthOptions> options,
+        CancellationToken ct)
+    {
+        var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        var ip = context.Connection.RemoteIpAddress?.ToString();
+
+        var result = await rights.DeleteAccountAsync(userId, request.CurrentPassword, ip, ct);
+        if (!result.Succeeded)
+        {
+            return Results.Problem(title: "Account deletion failed", detail: result.Error, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        // The session row is already gone (cascaded with the user), so this just clears the
+        // now-meaningless cookie from the browser.
+        context.Response.Cookies.Delete(options.Value.CookieName);
+        return Results.Ok();
+    }
 }

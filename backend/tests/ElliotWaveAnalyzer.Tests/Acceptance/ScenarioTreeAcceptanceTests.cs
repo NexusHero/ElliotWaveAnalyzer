@@ -68,10 +68,15 @@ public sealed class ScenarioTreeAcceptanceTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // AnalysisSnapshot.UserId is a real foreign key to AspNetUsers (#168).
+            var userId = Guid.NewGuid();
+            db.Users.Add(new AppUser { Id = userId, UserName = $"scenario-{userId:N}@example.com", Email = $"scenario-{userId:N}@example.com" });
+
             db.AnalysisSnapshots.Add(new AnalysisSnapshot
             {
                 Id = snapshotId,
-                UserId = Guid.NewGuid(),
+                UserId = userId,
                 Symbol = "BTC",
                 CreatedAt = new DateTimeOffset(2023, 12, 1, 0, 0, 0, TimeSpan.Zero),
                 Structure = "Impulse",
@@ -149,10 +154,15 @@ public sealed class ScenarioTreeAcceptanceTests
         using (var scope = host.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            // AnalysisSnapshot.UserId is a real foreign key to AspNetUsers (#168).
+            var userId = Guid.NewGuid();
+            db.Users.Add(new AppUser { Id = userId, UserName = $"scenario-{userId:N}@example.com", Email = $"scenario-{userId:N}@example.com" });
+
             db.AnalysisSnapshots.Add(new AnalysisSnapshot
             {
                 Id = snapshotId,
-                UserId = Guid.NewGuid(),
+                UserId = userId,
                 Symbol = "BTC",
                 CreatedAt = new DateTimeOffset(2023, 12, 1, 0, 0, 0, TimeSpan.Zero),
                 Structure = "Impulse",

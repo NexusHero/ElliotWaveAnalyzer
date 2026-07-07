@@ -42,6 +42,7 @@ internal static class AuthExtensions
             .AddEntityFrameworkStores<AppDbContext>();
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAccountRightsService, AccountRightsService>();
         services.AddScoped<ITrackRecordService, TrackRecordService>();
 
         // Backtest harness (REQ-026): runs the pipeline over history and feeds priors into scenario
