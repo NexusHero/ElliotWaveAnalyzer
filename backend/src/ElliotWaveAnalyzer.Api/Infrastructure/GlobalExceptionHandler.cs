@@ -20,7 +20,10 @@ internal sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log
         // "client closed request" status; the client is gone and never sees it anyway.
         if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
         {
-            logger.LogDebug("Request was canceled by the client: {Path}", httpContext.Request.Path);
+            // The path is client-controlled; strip line breaks before logging so a crafted request
+            // can't forge fake log entries (CodeQL cs/log-forging).
+            var safePath = httpContext.Request.Path.Value?.ReplaceLineEndings(" ") ?? string.Empty;
+            logger.LogDebug("Request was canceled by the client: {Path}", safePath);
             httpContext.Response.StatusCode = 499;
             return true;
         }
