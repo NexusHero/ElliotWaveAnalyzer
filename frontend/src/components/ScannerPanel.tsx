@@ -54,6 +54,16 @@ export default function ScannerPanel({ state, result, error, onScan }: ScannerPa
         </button>
       </form>
 
+      {state === 'idle' && (
+        <div className="state-card fade-up">
+          <span className="state-ico">
+            <Seal size={22} />
+          </span>
+          <h4>No scan yet</h4>
+          <p>Click Scan to sweep the universe for rule-valid setups — deterministic, no LLM.</p>
+        </div>
+      )}
+
       {state === 'error' && (
         <div className="state-card warn fade-up">
           <span className="state-ico">
@@ -72,6 +82,7 @@ export default function ScannerPanel({ state, result, error, onScan }: ScannerPa
           {result.hits.length === 0 ? (
             <div className="state-card fade-up">
               <h4>No setups matched</h4>
+              <p>Try a different symbol list, or turn off "in zone only" to widen the sweep.</p>
             </div>
           ) : (
             <ul className="sc-list">

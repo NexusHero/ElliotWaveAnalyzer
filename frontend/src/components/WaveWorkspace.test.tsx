@@ -58,6 +58,18 @@ function renderWorkspace(hasApiKey = true) {
 describe('WaveWorkspace', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  it('loads a working demo symbol on first render, without picking one or setting a key (#176 AC1)', () => {
+    renderWorkspace(false)
+
+    expect(screen.getByLabelText('Selected symbol')).toHaveTextContent('SP500')
+    expect(mockClient.getMarketData).toHaveBeenCalledWith(
+      'SP500',
+      expect.any(Number),
+      expect.any(String),
+      expect.anything()
+    )
+  })
+
   it('groups the toolbar into labeled Resolution/Window sections with Log/Pro toggles (#216)', () => {
     renderWorkspace()
     // The timeframe and range pills read as two distinct, labeled groups …

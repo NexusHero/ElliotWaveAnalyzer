@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   autoAnalyzeWaves,
   deleteAnalysis,
-  getBacktestSummary,
   getAlternateHypotheses,
+  getBacktestSummary,
   getHistoricalAnalogs,
   getMarketData,
   getPortfolioReview,
@@ -31,30 +31,31 @@ import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
+import { treeToDegreeMarkers } from './degreeMarkers'
 import HistoricalAnalogsPanel, { type AnalogsState } from './HistoricalAnalogsPanel'
 import HypothesesPanel, { type HypothesesState } from './HypothesesPanel'
 import { Trash } from './Icons'
 import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
+import { type LegMeasurement, legMeasurements } from './legMeasurements'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
-import {
-  type ZoneBand,
-  branchesToZoneBands,
-  hasCrossedInvalidation,
-  levelsToZoneBands,
-} from './zoneOverlay'
+import OnboardingIntro from './OnboardingIntro'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
+import { branchesToProjectionPaths, deriveProjectionTimeWindow } from './projectionPath'
 import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import SentimentPanel, { type SentimentState } from './SentimentPanel'
 import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
 import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
-import { treeToDegreeMarkers } from './degreeMarkers'
-import { type LegMeasurement, legMeasurements } from './legMeasurements'
-import { branchesToProjectionPaths, deriveProjectionTimeWindow } from './projectionPath'
 import { toWaveLinePoints } from './waveLine'
+import {
+  branchesToZoneBands,
+  hasCrossedInvalidation,
+  levelsToZoneBands,
+  type ZoneBand,
+} from './zoneOverlay'
 
 /**
  * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
@@ -193,8 +194,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   // Historical analogs (REQ-034): on-demand (the corpus sweep is heavy), daily/weekly only.
   const analogs = useMutation({
-    mutationFn: () =>
-      getHistoricalAnalogs(symbol, timeframe.code === '1w' ? '1w' : '1d'),
+    mutationFn: () => getHistoricalAnalogs(symbol, timeframe.code === '1w' ? '1w' : '1d'),
   })
   const analogsState: AnalogsState = analogs.isPending
     ? 'loading'
@@ -438,7 +438,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     const sorted = [...annotations].sort((a, b) => a.date.localeCompare(b.date))
     const last = sorted[sorted.length - 1]
     const window = deriveProjectionTimeWindow(annotations)
-    return branchesToProjectionPaths(liveVerify.data?.branches ?? null, last ?? null, window, promoted)
+    return branchesToProjectionPaths(
+      liveVerify.data?.branches ?? null,
+      last ?? null,
+      window,
+      promoted
+    )
   }, [pro, annotations, liveVerify.data?.branches, promoted])
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
@@ -661,6 +666,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
   return (
     <div className="ws">
+      <OnboardingIntro />
       <div className="ws-grid">
         {/* ---- chart column ---- */}
         <div className="chart-col">
@@ -866,109 +872,108 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
 
           {tab === 'count' && (
             <>
-          <div className="anno-card">
-            <div className="anno-head">
-              <h3>Your wave count</h3>
-              <span className="anno-count mono">{annotations.length} labels</span>
-            </div>
-            {annotations.length === 0 ? (
-              <p className="anno-empty">No labels yet — click the chart to begin.</p>
-            ) : (
-              <ul className="anno-list">
-                {annotations.map((a, i) => (
-                  <li key={`${a.date}-${i}`} className="anno-item">
-                    <select
-                      className="anno-sel mono"
-                      aria-label={`Label for annotation ${i + 1}`}
-                      value={a.label}
-                      onChange={(e) => handleRelabel(i, e.target.value)}
-                    >
-                      {WAVE_LABELS.map((label) => (
-                        <option key={label} value={label}>
-                          {label}
-                        </option>
+              <div className="anno-card">
+                <div className="anno-head">
+                  <h3>Your wave count</h3>
+                  <span className="anno-count mono">{annotations.length} labels</span>
+                </div>
+                {annotations.length === 0 ? (
+                  <p className="anno-empty">No labels yet — click the chart to begin.</p>
+                ) : (
+                  <ul className="anno-list">
+                    {annotations.map((a, i) => (
+                      <li key={`${a.date}-${i}`} className="anno-item">
+                        <select
+                          className="anno-sel mono"
+                          aria-label={`Label for annotation ${i + 1}`}
+                          value={a.label}
+                          onChange={(e) => handleRelabel(i, e.target.value)}
+                        >
+                          {WAVE_LABELS.map((label) => (
+                            <option key={label} value={label}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="anno-info mono">
+                          {a.date.split('T')[0]} · {fmtMoney(a.price)}
+                        </span>
+                        <button
+                          className="anno-nudge"
+                          type="button"
+                          aria-label={`Move annotation ${i + 1} earlier`}
+                          onClick={() => handleNudge(i, -1)}
+                        >
+                          ◀
+                        </button>
+                        <button
+                          className="anno-nudge"
+                          type="button"
+                          aria-label={`Move annotation ${i + 1} later`}
+                          onClick={() => handleNudge(i, 1)}
+                        >
+                          ▶
+                        </button>
+                        <button
+                          className="anno-del"
+                          type="button"
+                          aria-label={`Remove annotation ${i + 1}`}
+                          onClick={() => handleRemove(i)}
+                        >
+                          <Trash size={16} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {legs.length > 0 && (
+                  <div className="leg-readout" data-testid="leg-readout">
+                    <div className="leg-readout-head mono">Δ price · % · days · ratio</div>
+                    <ul>
+                      {legs.map((leg, i) => (
+                        <li key={i} className="mono">
+                          <span className="leg-name">{leg.label}</span>
+                          <span className={leg.deltaPrice >= 0 ? 'up' : 'down'}>
+                            {leg.deltaPrice >= 0 ? '+' : ''}
+                            {fmtMoney(leg.deltaPrice)}
+                          </span>
+                          <span className={leg.deltaPercent >= 0 ? 'up' : 'down'}>
+                            {leg.deltaPercent >= 0 ? '+' : ''}
+                            {leg.deltaPercent.toFixed(1)}%
+                          </span>
+                          <span className="leg-days">{leg.deltaDays}d</span>
+                          <span className="leg-ratio">
+                            {leg.ratioToPrev == null ? '—' : `${leg.ratioToPrev.toFixed(3)}×`}
+                          </span>
+                        </li>
                       ))}
-                    </select>
-                    <span className="anno-info mono">
-                      {a.date.split('T')[0]} · {fmtMoney(a.price)}
-                    </span>
-                    <button
-                      className="anno-nudge"
-                      type="button"
-                      aria-label={`Move annotation ${i + 1} earlier`}
-                      onClick={() => handleNudge(i, -1)}
-                    >
-                      ◀
-                    </button>
-                    <button
-                      className="anno-nudge"
-                      type="button"
-                      aria-label={`Move annotation ${i + 1} later`}
-                      onClick={() => handleNudge(i, 1)}
-                    >
-                      ▶
-                    </button>
-                    <button
-                      className="anno-del"
-                      type="button"
-                      aria-label={`Remove annotation ${i + 1}`}
-                      onClick={() => handleRemove(i)}
-                    >
-                      <Trash size={16} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {legs.length > 0 && (
-              <div className="leg-readout" data-testid="leg-readout">
-                <div className="leg-readout-head mono">Δ price · % · days · ratio</div>
-                <ul>
-                  {legs.map((leg, i) => (
-                    <li key={i} className="mono">
-                      <span className="leg-name">{leg.label}</span>
-                      <span className={leg.deltaPrice >= 0 ? 'up' : 'down'}>
-                        {leg.deltaPrice >= 0 ? '+' : ''}
-                        {fmtMoney(leg.deltaPrice)}
-                      </span>
-                      <span className={leg.deltaPercent >= 0 ? 'up' : 'down'}>
-                        {leg.deltaPercent >= 0 ? '+' : ''}
-                        {leg.deltaPercent.toFixed(1)}%
-                      </span>
-                      <span className="leg-days">{leg.deltaDays}d</span>
-                      <span className="leg-ratio">
-                        {leg.ratioToPrev == null ? '—' : `${leg.ratioToPrev.toFixed(3)}×`}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <CoachPanel
-            labelCount={annotations.length}
-            state={coachState}
-            mode={mode}
-            result={validation.data ?? null}
-            currentPrice={lastPrice}
-            error={analysisError}
-            onValidate={handleValidate}
-            onAnalyze={handleAnalyze}
-            onOpenSettings={onOpenSettings}
-          />
+              <CoachPanel
+                labelCount={annotations.length}
+                state={coachState}
+                mode={mode}
+                result={validation.data ?? null}
+                currentPrice={lastPrice}
+                error={analysisError}
+                onValidate={handleValidate}
+                onAnalyze={handleAnalyze}
+                onOpenSettings={onOpenSettings}
+              />
 
-          <LiveVerifyPanel
-            state={liveVerifyState}
-            verification={liveVerify.data ?? null}
-            error={liveVerifyError}
-            currentPrice={lastPrice}
-            onSave={handleSaveManualCount}
-            savePending={manualSave.isPending}
-            saveError={manualSave.error instanceof Error ? manualSave.error.message : null}
-            savedId={manualSave.data?.id ?? null}
-          />
-
+              <LiveVerifyPanel
+                state={liveVerifyState}
+                verification={liveVerify.data ?? null}
+                error={liveVerifyError}
+                currentPrice={lastPrice}
+                onSave={handleSaveManualCount}
+                savePending={manualSave.isPending}
+                saveError={manualSave.error instanceof Error ? manualSave.error.message : null}
+                savedId={manualSave.data?.id ?? null}
+              />
             </>
           )}
 
@@ -977,49 +982,49 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               beneath it. Chart overlays still follow the active auto count regardless of tab. */}
           {tab === 'auto' && (
             <>
-          <AutoAnalysisPanel
-            state={autoState}
-            data={auto.data ?? null}
-            topDown={topDown.data ?? null}
-            error={autoError}
-            sensitivity={sensitivity}
-            sensitivities={SENSITIVITIES}
-            onSensitivityChange={handleSensitivity}
-            pro={pro}
-            activeCount={activeCount}
-            onSelectCount={handleSelectCount}
-            overlayCount={overlayCount}
-            onToggleOverlay={toggleOverlay}
-            currentPrice={lastPrice}
-            onRun={handleAutoAnalyze}
-            onOpenSettings={onOpenSettings}
-            onSaveCount={handleSaveCount}
-            savePending={saveMutation.isPending}
-          />
+              <AutoAnalysisPanel
+                state={autoState}
+                data={auto.data ?? null}
+                topDown={topDown.data ?? null}
+                error={autoError}
+                sensitivity={sensitivity}
+                sensitivities={SENSITIVITIES}
+                onSensitivityChange={handleSensitivity}
+                pro={pro}
+                activeCount={activeCount}
+                onSelectCount={handleSelectCount}
+                overlayCount={overlayCount}
+                onToggleOverlay={toggleOverlay}
+                currentPrice={lastPrice}
+                onRun={handleAutoAnalyze}
+                onOpenSettings={onOpenSettings}
+                onSaveCount={handleSaveCount}
+                savePending={saveMutation.isPending}
+              />
 
-          <HistoricalAnalogsPanel
-            symbol={symbol}
-            state={analogsState}
-            data={analogs.data ?? null}
-            error={analogs.error instanceof Error ? analogs.error.message : null}
-            onLoad={() => analogs.mutate()}
-          />
+              <HistoricalAnalogsPanel
+                symbol={symbol}
+                state={analogsState}
+                data={analogs.data ?? null}
+                error={analogs.error instanceof Error ? analogs.error.message : null}
+                onLoad={() => analogs.mutate()}
+              />
 
-          <HypothesesPanel
-            symbol={symbol}
-            state={hypothesesState}
-            data={hypotheses.data ?? null}
-            error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
-            onLoad={() => hypotheses.mutate()}
-          />
+              <HypothesesPanel
+                symbol={symbol}
+                state={hypothesesState}
+                data={hypotheses.data ?? null}
+                error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
+                onLoad={() => hypotheses.mutate()}
+              />
 
-          <SentimentPanel
-            symbol={symbol}
-            state={sentimentState}
-            data={sentiment.data ?? null}
-            error={sentiment.error instanceof Error ? sentiment.error.message : null}
-            onLoad={() => sentiment.mutate()}
-          />
+              <SentimentPanel
+                symbol={symbol}
+                state={sentimentState}
+                data={sentiment.data ?? null}
+                error={sentiment.error instanceof Error ? sentiment.error.message : null}
+                onLoad={() => sentiment.mutate()}
+              />
             </>
           )}
 
