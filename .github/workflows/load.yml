@@ -1,0 +1,75 @@
+name: Load & soak
+
+# Proves "reliable under load" instead of asserting it (#199) — validates the two 1.0 reliability
+# blockers this exists for (#170 market-data, #173 health/monitoring). Runs in-process against
+# AcceptanceWebApplicationFactory's TestServer (see the load tests' own doc comments for why: no
+# separate deployed instance exists yet to point a real load generator at). Scheduled and
+# non-blocking, like mutation.yml/e2e.yml — these tests are [Explicit] precisely so this workflow's
+# --filter is the only thing that ever runs them; a normal `dotnet test` PR gate never does.
+on:
+  schedule:
+    - cron: '0 4 * * *' # 04:00 UTC nightly, staggered after mutation.yml (03:00) and e2e.yml (03:30)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Load/soak — deterministic endpoints
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ewa_load
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: backend
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+        working-directory: backend
+
+      - name: Run the load/soak suite
+        run: >
+          dotnet test
+          --no-build
+          --configuration Release
+          --filter "FullyQualifiedName~LoadTests.DeterministicEndpointLoadTests"
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=load-results.trx"
+          --results-directory ./LoadTestResults
+        working-directory: backend
+        env:
+          # Same managed Postgres service the backend/mutation jobs use — real database, real
+          # migrations, no throwaway Testcontainers needed for a single scheduled run.
+          ACCEPTANCE_PG_CONNSTRING: "Host=localhost;Port=5432;Database=ewa_load;Username=postgres;Password=postgres"
+
+      - name: Upload load-test results (scorecard artifact — AC4)
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: load-test-results
+          path: backend/LoadTestResults/**
+          if-no-files-found: warn
+          retention-days: 14
