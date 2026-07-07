@@ -56,6 +56,7 @@ try
     app.MapAuthEndpoints();
     app.MapConsentEndpoints();
     app.MapLegalEndpoints();
+    app.MapMarketingEndpoints();
     app.MapMarketDataEndpoints();
     app.MapWaveAnalysisEndpoints();
     app.MapScanEndpoints();
