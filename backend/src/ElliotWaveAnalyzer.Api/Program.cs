@@ -55,6 +55,7 @@ try
     app.MapGoogleAuthEndpoints(builder.Configuration, googleEnabled);
     app.MapAuthEndpoints();
     app.MapConsentEndpoints();
+    app.MapLegalEndpoints();
     app.MapMarketDataEndpoints();
     app.MapWaveAnalysisEndpoints();
     app.MapScanEndpoints();

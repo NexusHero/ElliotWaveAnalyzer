@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import type { ScanFilters, ScanResult } from '../api/types'
+import { NOT_INVESTMENT_ADVICE_DISCLAIMER } from '../constants/legal'
 import { Alert, Seal } from './Icons'
 
 export type ScannerState = 'idle' | 'scanning' | 'error' | 'result'
@@ -47,7 +48,8 @@ export default function ScannerPanel({ state, result, error, onScan }: ScannerPa
           onChange={(e) => setSymbols(e.target.value)}
         />
         <label className="sc-check">
-          <input type="checkbox" checked={inZone} onChange={(e) => setInZone(e.target.checked)} /> in zone only
+          <input type="checkbox" checked={inZone} onChange={(e) => setInZone(e.target.checked)} />{' '}
+          in zone only
         </label>
         <button type="submit" disabled={state === 'scanning'}>
           {state === 'scanning' ? 'Scanning…' : 'Scan'}
@@ -92,7 +94,9 @@ export default function ScannerPanel({ state, result, error, onScan }: ScannerPa
                   <span className="sc-structure">
                     {h.structure} · {h.unfoldingWave} · {h.bullish ? 'bullish' : 'bearish'}
                   </span>
-                  {(h.inEntryZone || h.inConfluenceZone) && <span className="verdict-badge warn">in zone</span>}
+                  {(h.inEntryZone || h.inConfluenceZone) && (
+                    <span className="verdict-badge warn">in zone</span>
+                  )}
                   <span className="sc-score mono">score {h.score.toFixed(2)}</span>
                   <span className="sc-price mono">
                     {fmtPrice(h.currentPrice)}
@@ -103,6 +107,7 @@ export default function ScannerPanel({ state, result, error, onScan }: ScannerPa
               ))}
             </ul>
           )}
+          <p className="panel-disclaimer">{NOT_INVESTMENT_ADVICE_DISCLAIMER}</p>
         </>
       )}
     </section>

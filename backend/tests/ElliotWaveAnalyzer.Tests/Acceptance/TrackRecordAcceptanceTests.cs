@@ -96,7 +96,7 @@ public sealed class TrackRecordAcceptanceTests
 
         // A brand-new user (fresh cookie jar) must not see it.
         using var otherClient = _factory.CreateClient();
-        var credentials = new { email = "other@example.com", password = "An0ther!Passw0rd" };
+        var credentials = new { email = "other@example.com", password = "An0ther!Passw0rd", acceptTerms = true };
         await otherClient.PostAsJsonAsync("/api/auth/register", credentials);
         await otherClient.PostAsJsonAsync("/api/auth/login", credentials);
 

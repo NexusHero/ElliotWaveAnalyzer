@@ -82,7 +82,7 @@ public sealed class AnalysisChartAcceptanceTests
         var id = await SaveAsync();
 
         using var otherClient = _factory.CreateClient();
-        var credentials = new { email = "chart-other@example.com", password = "An0ther!Passw0rd" };
+        var credentials = new { email = "chart-other@example.com", password = "An0ther!Passw0rd", acceptTerms = true };
         await otherClient.PostAsJsonAsync("/api/auth/register", credentials);
         await otherClient.PostAsJsonAsync("/api/auth/login", credentials);
 

@@ -441,12 +441,19 @@ export interface CurrentUser {
   email: string
 }
 
-/** Creates an account. Throws with the problem detail on failure (e.g. weak password). */
-export async function register(email: string, password: string): Promise<void> {
+/**
+ * Creates an account. `acceptTerms` must be true — the backend rejects registration otherwise
+ * (#167 AC2). Throws with the problem detail on failure (e.g. weak password, terms not accepted).
+ */
+export async function register(
+  email: string,
+  password: string,
+  acceptTerms: boolean
+): Promise<void> {
   const response = await fetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, acceptTerms }),
   })
   if (!response.ok) {
     throw new Error(await extractErrorDetail(response))

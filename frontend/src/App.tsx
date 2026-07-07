@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { getAuthProviders, getCurrentUser, login, logout, register } from './api/client'
 import ConsentBanner from './components/ConsentBanner'
+import Footer from './components/Footer'
 import { Alert, Gear, WaveLogo } from './components/Icons'
 import LoginForm, { type AuthMode } from './components/LoginForm'
 import SettingsPage from './components/SettingsPage'
@@ -42,13 +43,15 @@ export default function App() {
       mode,
       email,
       password,
+      acceptTerms,
     }: {
       mode: AuthMode
       email: string
       password: string
+      acceptTerms: boolean
     }) => {
       if (mode === 'register') {
-        await register(email, password)
+        await register(email, password, acceptTerms)
       }
       await login(email, password)
       return getCurrentUser()
@@ -65,8 +68,8 @@ export default function App() {
   })
 
   const handleAuth = useCallback(
-    (mode: AuthMode, email: string, password: string) => {
-      authMutation.mutate({ mode, email, password })
+    (mode: AuthMode, email: string, password: string, acceptTerms: boolean) => {
+      authMutation.mutate({ mode, email, password, acceptTerms })
     },
     [authMutation]
   )
@@ -84,6 +87,7 @@ export default function App() {
       <>
         <ConsentBanner />
         <div className="center-view">Loading…</div>
+        <Footer />
       </>
     )
   }
@@ -98,6 +102,7 @@ export default function App() {
           loading={authMutation.isPending}
           googleEnabled={googleEnabled}
         />
+        <Footer />
       </>
     )
   }
@@ -157,6 +162,8 @@ export default function App() {
           onOpenSettings={() => setView('settings')}
         />
       )}
+
+      <Footer />
     </div>
   )
 }

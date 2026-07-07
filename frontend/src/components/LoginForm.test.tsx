@@ -11,7 +11,7 @@ describe('LoginForm', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
 
-    expect(onSubmit).toHaveBeenCalledWith('login', 'a@b.com', 'secret123456')
+    expect(onSubmit).toHaveBeenCalledWith('login', 'a@b.com', 'secret123456', true)
   })
 
   it('switches to register mode and submits once the form is complete', () => {
@@ -25,9 +25,10 @@ describe('LoginForm', () => {
       target: { value: 'secret123456' },
     })
     fireEvent.click(screen.getByRole('checkbox', { name: /market-analysis tool/i }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /terms of service/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    expect(onSubmit).toHaveBeenCalledWith('register', 'a@b.com', 'secret123456')
+    expect(onSubmit).toHaveBeenCalledWith('register', 'a@b.com', 'secret123456', true)
   })
 
   it('keeps register submit disabled until the passwords match and the terms are accepted', () => {
@@ -43,6 +44,38 @@ describe('LoginForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('keeps register submit disabled until the Terms + Privacy checkbox is accepted (#167 AC2)', () => {
+    const onSubmit = vi.fn()
+    render(<LoginForm onSubmit={onSubmit} error={null} loading={false} />)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Create account' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret123456' } })
+    fireEvent.change(screen.getByLabelText('Confirm password'), {
+      target: { value: 'secret123456' },
+    })
+    fireEvent.click(screen.getByRole('checkbox', { name: /market-analysis tool/i }))
+    // Terms + Privacy checkbox deliberately left unchecked.
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('links the Terms + Privacy checkbox to the served legal pages', () => {
+    render(<LoginForm onSubmit={vi.fn()} error={null} loading={false} />)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Create account' }))
+
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
+      'href',
+      '/legal/terms'
+    )
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
+    )
   })
 
   it('shows a Google sign-in link to the OAuth endpoint when Google is enabled', () => {
