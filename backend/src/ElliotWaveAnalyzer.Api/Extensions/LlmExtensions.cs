@@ -70,6 +70,9 @@ internal static class LlmExtensions
         // Historical-analog summaries (REQ-034): fact-guarded; degrades to a reason without a key.
         services.AddScoped<IAnalogNarrator, LlmAnalogNarrator>();
 
+        // Socionomics summaries (REQ-038): fact-guarded; degrades to a reason without a key or coverage.
+        services.AddScoped<ISentimentNarrator, LlmSentimentNarrator>();
+
         // Alternate-hypothesis proposals (REQ-035): the LLM only names structures to test; the engine
         // validates them. Absent (feature off) when no key is configured.
         services.AddScoped<IHypothesisProposer, LlmHypothesisProposer>();

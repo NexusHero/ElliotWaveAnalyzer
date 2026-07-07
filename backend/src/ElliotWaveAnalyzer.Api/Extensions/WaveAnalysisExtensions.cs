@@ -25,6 +25,10 @@ internal static class WaveAnalysisExtensions
         // no-lookahead corpus; the narrator (registered in the LLM extensions) only summarises it.
         services.AddTransient<IHistoricalAnalogService, HistoricalAnalogService>();
 
+        // Socionomics (REQ-038): deterministic mood index + divergence detection; the narrator
+        // (registered in the LLM extensions) only summarises it.
+        services.AddTransient<ISentimentAnalysisService, SentimentAnalysisService>();
+
         // Alternate-hypothesis generation (REQ-035): the LLM proposes structures (registered in the LLM
         // extensions); this service validates each deterministically via the shared rule checkers.
         services.AddTransient<IAlternateHypothesisService, AlternateHypothesisService>();

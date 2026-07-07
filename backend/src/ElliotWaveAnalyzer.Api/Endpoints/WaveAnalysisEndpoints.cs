@@ -114,6 +114,30 @@ public static class WaveAnalysisEndpoints
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
 
+        // ── POST /api/wave-analysis/sentiment ─────────────────────────────────
+        // Socionomics (#183): a deterministic mood index + wave-position divergence detector, plus a
+        // fact-guarded narrative. Takes the caller's own pivots (like /verify) so it works for both a
+        // manual and an auto-ranked count. Makes at most one small LLM call for the prose → strict
+        // throttle. No concrete sentiment provider ships yet — reports "no coverage" honestly.
+        group.MapPost("/wave-analysis/sentiment", AnalyzeSentiment)
+            .WithName("AnalyzeSentiment")
+            .WithSummary("Socionomics: mood index + wave-position divergence for the current count")
+            .WithDescription("""
+                Elliott's own theoretical foundation is social mood: impulse waves are meant to ride
+                rising optimism, and tops classically form on a divergence between mood and price.
+                Given a symbol and the caller's placed pivots, normalizes the covering sentiment
+                provider's readings to [-1, 1] and flags a divergence where price extends past the
+                count's conviction wave (3, or A for a correction) into its extension wave (5, or C)
+                without mood confirming. Never touches the count's own geometry. Adds a short
+                fact-guarded natural-language summary; the LLM cannot cite a mood score the engine did
+                not compute. With no sentiment provider covering the symbol, returns an explicit
+                no-coverage state rather than a fabricated series.
+                """)
+            .Produces<SentimentReport>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
+
         // ── GET /api/wave-analysis/hypotheses ─────────────────────────────────
         // Intelligent alternate-hypothesis generation (#186): the LLM proposes which structures are
         // worth testing; the deterministic engine generates + rule-checks each. Makes one LLM call.
@@ -432,6 +456,48 @@ public static class WaveAnalysisEndpoints
             return Results.Problem(
                 title: "Analysis unavailable",
                 detail: "The market-data service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    /// <summary>How far back to read sentiment coverage — enough to span most placed counts.</summary>
+    private const int SentimentLookbackDays = 180;
+
+    private static async Task<IResult> AnalyzeSentiment(
+        SentimentAnalysisRequest request,
+        ISentimentAnalysisService sentimentService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!Application.SymbolInput.IsValidSymbol(request.Symbol))
+        {
+            return Results.Problem(
+                title: "Invalid symbol",
+                detail: "Symbol must be a short ticker of letters, digits and . - ^ = / characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (request.Annotations.Count == 0)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: "At least one annotation is required.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var report = await sentimentService.AnalyzeAsync(
+                request.Symbol.ToUpperInvariant(), request.Annotations, SentimentLookbackDays, cancellationToken);
+            return Results.Ok(report);
+        }
+        catch (HttpRequestException ex)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Sentiment analysis failed for {Symbol}", request.Symbol);
+            return Results.Problem(
+                title: "Sentiment analysis unavailable",
+                detail: "The sentiment service is currently unavailable. Please try again later.",
                 statusCode: StatusCodes.Status502BadGateway);
         }
     }
