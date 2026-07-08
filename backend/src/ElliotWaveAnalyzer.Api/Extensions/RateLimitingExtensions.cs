@@ -10,7 +10,7 @@ namespace ElliotWaveAnalyzer.Api.Extensions;
 /// Four named policies:
 ///   ip-global       — 30 req/min per IP, for cheap read endpoints
 ///   gemini-analysis — 5 req/min global, for expensive LLM calls
-///   login           — 5 req/min global, brute-force protection
+///   login           — 60 req/min global, brute-force protection
 ///   per-user        — 20 req/min partitioned by userId (falls back to IP)
 /// </summary>
 internal static class RateLimitingExtensions
@@ -38,7 +38,7 @@ internal static class RateLimitingExtensions
 
             opts.AddFixedWindowLimiter("login", limiter =>
             {
-                limiter.PermitLimit = 5;
+                limiter.PermitLimit = 60;
                 limiter.Window = TimeSpan.FromMinutes(1);
                 limiter.QueueLimit = 0;
             });

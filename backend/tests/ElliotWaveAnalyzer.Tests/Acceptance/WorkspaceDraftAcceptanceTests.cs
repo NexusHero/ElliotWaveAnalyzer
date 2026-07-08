@@ -154,7 +154,8 @@ public sealed class WorkspaceDraftAcceptanceTests
         using var otherUserClient = _factory.CreateClient();
         var credentials = new { email = "draft-other@example.com", password = "An0ther!Passw0rd", acceptTerms = true };
         await otherUserClient.PostAsJsonAsync("/api/auth/register", credentials);
-        await otherUserClient.PostAsJsonAsync("/api/auth/login", credentials);
+        var login = await otherUserClient.PostAsJsonAsync("/api/auth/login", credentials);
+        login.EnsureSuccessStatusCode();
 
         var get = await otherUserClient.GetAsync("/api/workspace-drafts/GOOG/1d");
         Assert.That(get.StatusCode, Is.EqualTo(HttpStatusCode.NotFound),
