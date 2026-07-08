@@ -389,4 +389,78 @@ public sealed class ProjectionServiceTests
     [Test]
     public void Branches_FewerThanTwoPivots_ReturnsNull()
         => Assert.That(ProjectionService.Branches(Pivots(100m)), Is.Null);
+
+    // ─── second-order branches (#166 follow-up: "one more step" bullish and bearish) ─────────────
+
+    [Test]
+    public void Branches_Wave3_SpeculativeNext_ProjectsWave5AfterSpeculativeWave4()
+    {
+        // Wave 3 unfolding (bull): Speculative completes Wave 3 -> projects Wave 4 (existing,
+        // one-step). SpeculativeNext completes that Wave 4 too -> projects Wave 5.
+        var branches = ProjectionService.Branches(Pivots(100m, 120m, 110m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branches.Speculative!.UnfoldingWave, Is.EqualTo("Wave 4"));
+            Assert.That(branches.SpeculativeNext, Is.Not.Null);
+            Assert.That(branches.SpeculativeNext!.UnfoldingWave, Is.EqualTo("Wave 5"));
+        });
+    }
+
+    [Test]
+    public void Branches_Wave3_AlternateNext_ProjectsCorrectionCompleteAfterAlternateWaveC()
+    {
+        // The alternate reading at Wave 3 is a Zigzag Wave C (the "it's actually a B-wave rally"
+        // duality from #218). AlternateNext completes that Wave C too -> the correction is over and
+        // recovery is expected, exactly what an analyst would sketch two steps ahead by hand.
+        var branches = ProjectionService.Branches(Pivots(100m, 120m, 110m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branches.Alternate!.UnfoldingWave, Is.EqualTo("Wave C"));
+            Assert.That(branches.AlternateNext, Is.Not.Null);
+            Assert.That(branches.AlternateNext!.UnfoldingWave, Is.EqualTo("Correction complete"));
+        });
+    }
+
+    [Test]
+    public void Branches_Wave4_SpeculativeNext_ProjectsCorrectionAfterSpeculativeWave5()
+    {
+        // Symmetry check on the bullish side one stage later: Wave 4 unfolding -> Speculative is
+        // Wave 5 (existing) -> SpeculativeNext is the ABC correction expected once Wave 5 completes.
+        var branches = ProjectionService.Branches(Pivots(100m, 120m, 110m, 140m))!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(branches.Speculative!.UnfoldingWave, Is.EqualTo("Wave 5"));
+            Assert.That(branches.SpeculativeNext, Is.Not.Null);
+            Assert.That(branches.SpeculativeNext!.UnfoldingWave, Is.EqualTo("Correction (ABC)"));
+        });
+    }
+
+    [Test]
+    public void Branches_SecondOrder_ScalesWithPrice()
+    {
+        // Metamorphic, mirroring Branches_SpeculativeTarget_ScalesWithPrice for the new second-order
+        // fields: scaling every price by k scales both second-order projections by k.
+        const decimal k = 2.5m;
+        var basePivots = new[] { 100m, 120m, 110m };
+        var scaled = basePivots.Select(p => p * k).ToArray();
+
+        var a = ProjectionService.Branches(Pivots(basePivots))!;
+        var b = ProjectionService.Branches(Pivots(scaled))!;
+
+        Assert.Multiple(() =>
+        {
+            // SpeculativeNext here is Wave 5 (see the two-step test above) — target-shaped.
+            Assert.That(a.SpeculativeNext!.TargetZones, Is.Not.Empty);
+            Assert.That(
+                b.SpeculativeNext!.TargetZones[0].Low,
+                Is.EqualTo(a.SpeculativeNext!.TargetZones[0].Low * k).Within(0.01m));
+            // AlternateNext here is "Correction complete" — also target-shaped (a recovery target).
+            Assert.That(
+                b.AlternateNext!.TargetZones[0].Low,
+                Is.EqualTo(a.AlternateNext!.TargetZones[0].Low * k).Within(0.01m));
+        });
+    }
 }

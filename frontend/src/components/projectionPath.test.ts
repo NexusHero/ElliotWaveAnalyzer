@@ -81,7 +81,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: 61.8,
       speculative: levels(150, 160),
+      speculativeNext: null,
       alternate: levels(90, 100),
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(branches, lastPivot, window)
 
@@ -95,12 +97,14 @@ describe('branchesToProjectionPaths (#223)', () => {
       toHigh: 160,
       variant: 'speculative',
       promoted: false,
+      order: 1,
     })
     expect(paths[1]).toMatchObject({
       toLow: 90,
       toHigh: 100,
       variant: 'alternate',
       promoted: false,
+      order: 1,
     })
   })
 
@@ -108,7 +112,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: null,
       speculative: null,
+      speculativeNext: null,
       alternate: levels(90, 100),
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(branches, lastPivot, window)
     expect(paths).toHaveLength(1)
@@ -119,12 +125,20 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: 61.8,
       speculative: levels(150, 160),
+      speculativeNext: null,
       alternate: levels(90, 100),
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(branches, lastPivot, window, true)
 
     expect(paths).toHaveLength(1)
-    expect(paths[0]).toMatchObject({ variant: 'alternate', promoted: true, toLow: 90, toHigh: 100 })
+    expect(paths[0]).toMatchObject({
+      variant: 'alternate',
+      promoted: true,
+      toLow: 90,
+      toHigh: 100,
+      order: 1,
+    })
   })
 
   it('draws a retracing branch (Wave 2/4/B — support zone, no target zone) instead of dropping it', () => {
@@ -134,7 +148,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: 38.2,
       speculative: supportOnlyLevels(115, 122),
+      speculativeNext: null,
       alternate: levels(90, 100),
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(branches, lastPivot, window)
 
@@ -150,7 +166,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: null,
       speculative: both,
+      speculativeNext: null,
       alternate: null,
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(branches, lastPivot, window)
     expect(paths).toMatchObject([{ toLow: 150, toHigh: 160 }])
@@ -162,7 +180,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: null,
       speculative: levels(150, 160),
+      speculativeNext: null,
       alternate: null,
+      alternateNext: null,
     }
     const now = '2024-03-01T00:00:00Z' // ~4 weeks after lastPivot, well past window.maxDays (15d)
     const paths = branchesToProjectionPaths(branches, lastPivot, window, false, now)
@@ -179,7 +199,9 @@ describe('branchesToProjectionPaths (#223)', () => {
     const branches: ProjectionBranches = {
       invalidationRetracePercent: null,
       speculative: levels(150, 160),
+      speculativeNext: null,
       alternate: null,
+      alternateNext: null,
     }
     const paths = branchesToProjectionPaths(
       branches,
@@ -189,5 +211,75 @@ describe('branchesToProjectionPaths (#223)', () => {
       '2024-01-15T00:00:00Z'
     )
     expect(paths[0]).toMatchObject({ toTimeMin: '2024-02-06', toTimeMax: '2024-02-16' })
+  })
+
+  // ─── second-order paths ("one more step", #166 follow-up) ─────────────────────────────────
+
+  it('chains a second-order box onto the first (both bullish and bearish, symmetrically)', () => {
+    const branches: ProjectionBranches = {
+      invalidationRetracePercent: 61.8,
+      speculative: levels(150, 160),
+      speculativeNext: levels(170, 185),
+      alternate: levels(90, 100),
+      alternateNext: levels(70, 85),
+    }
+    const paths = branchesToProjectionPaths(branches, lastPivot, window)
+
+    expect(paths).toHaveLength(4)
+    const specNext = paths.find((p) => p.variant === 'speculative' && p.order === 2)
+    const altNext = paths.find((p) => p.variant === 'alternate' && p.order === 2)
+    expect(specNext).toMatchObject({
+      fromTime: '2024-02-16', // chained from the first speculative box's own far time edge
+      fromPrice: 155, // the midpoint of that first box (150–160)
+      toTimeMin: '2024-02-21',
+      toTimeMax: '2024-03-02',
+      toLow: 170,
+      toHigh: 185,
+      promoted: false,
+      order: 2,
+    })
+    expect(altNext).toMatchObject({ toLow: 70, toHigh: 85, promoted: false, order: 2 })
+  })
+
+  it('drops the second-order path when there is no *Next branch, without dropping the first', () => {
+    const branches: ProjectionBranches = {
+      invalidationRetracePercent: null,
+      speculative: levels(150, 160),
+      speculativeNext: null,
+      alternate: null,
+      alternateNext: null,
+    }
+    const paths = branchesToProjectionPaths(branches, lastPivot, window)
+    expect(paths).toHaveLength(1)
+    expect(paths[0]!.order).toBe(1)
+  })
+
+  it('drops the second-order path when the first-order branch itself was dropped (no chain point)', () => {
+    const branches: ProjectionBranches = {
+      invalidationRetracePercent: null,
+      speculative: null,
+      speculativeNext: levels(170, 185), // present, but nothing to chain it from
+      alternate: null,
+      alternateNext: null,
+    }
+    const paths = branchesToProjectionPaths(branches, lastPivot, window)
+    expect(paths).toEqual([])
+  })
+
+  it("once promoted, still chains the alternate's own second-order box (#220 + #166 follow-up)", () => {
+    const branches: ProjectionBranches = {
+      invalidationRetracePercent: 61.8,
+      speculative: levels(150, 160),
+      speculativeNext: levels(170, 185), // dead alongside the rest of the speculative chain
+      alternate: levels(90, 100),
+      alternateNext: levels(70, 85),
+    }
+    const paths = branchesToProjectionPaths(branches, lastPivot, window, true)
+
+    expect(paths).toHaveLength(2)
+    expect(paths[0]).toMatchObject({ variant: 'alternate', order: 1, promoted: true })
+    // The second-order continuation is never itself "promoted" — a projection of a projection
+    // doesn't confirm just because the first step did.
+    expect(paths[1]).toMatchObject({ variant: 'alternate', order: 2, promoted: false })
   })
 })
