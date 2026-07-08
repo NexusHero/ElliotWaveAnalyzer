@@ -48,6 +48,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             entity.Property(s => s.Symbol).HasMaxLength(32).IsRequired();
             entity.Property(s => s.Structure).HasMaxLength(64).IsRequired();
             entity.Property(s => s.Confidence).HasMaxLength(16).IsRequired();
+            entity.Property(s => s.Persona).HasMaxLength(32);
             // List the newest first per user — the history's natural order.
             entity.HasIndex(s => new { s.UserId, s.CreatedAt });
             entity.HasMany(s => s.Scenarios)

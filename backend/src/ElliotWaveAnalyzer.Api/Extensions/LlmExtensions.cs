@@ -64,6 +64,11 @@ internal static class LlmExtensions
         // In-memory per instance; see InMemoryTokenTracker for the distributed seam.
         services.AddSingleton<ITokenTracker, InMemoryTokenTracker>();
 
+        // Calibrated, self-weighting analyst panel (#184): runs every catalog persona over the
+        // same IChatClient seam. Scoped because it depends on the scoped calibration provider
+        // (touches AppDbContext), unlike the single-shot rankers above.
+        services.AddScoped<IPersonaAnalystPanel, PersonaAnalystPanel>();
+
         // Portfolio-review narratives (fact-checked; degrades to null without a key).
         services.AddScoped<IPositionNarrator, LlmPositionNarrator>();
 

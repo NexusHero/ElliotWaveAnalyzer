@@ -398,3 +398,29 @@ textarea {
   font-size: 0.84rem;
   font-style: italic;
 }
+
+/* ── Calibrated analyst panel (#184): personas rank, the engine weights + merges ── */
+.persona-panel {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.persona-weights {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.persona-weight-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.persona-weight-row .mono {
+  margin-left: auto;
+  color: var(--muted);
+}

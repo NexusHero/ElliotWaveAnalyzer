@@ -301,6 +301,44 @@ export interface AutoWaveAnalysisResponse {
   searchTruncated?: boolean
 }
 
+/** One candidate in a persona-panel response — mirrors the backend `PersonaRankedCount`. */
+export interface PersonaRankedCount {
+  structure: string
+  origin: WaveAnnotation
+  waves: WaveAnnotation[]
+  ruleReport: WaveRuleReport
+  levels: WaveLevels | null
+  confidence: string
+  rationale: string
+  outlook: string
+  isBest: boolean
+  /** Which personas independently picked this candidate as their own top choice. */
+  endorsingPersonas: string[]
+  tree?: WaveNode
+  score?: number
+}
+
+/** A persona's measured panel-vote weight — mirrors the backend `PersonaWeight`. */
+export interface PersonaWeight {
+  persona: string
+  weight: number
+  /** True when this persona has no concluded track-record history yet (documented neutral prior). */
+  isNeutralPrior: boolean
+}
+
+/** Response of `POST /api/wave-analysis/persona-panel` — mirrors the backend `PersonaPanelResponse`. */
+export interface PersonaPanelResponse {
+  rankings: PersonaRankedCount[]
+  weights: PersonaWeight[]
+  /** Fraction of total persona weight behind the winning candidate: 1.0 = unanimous, lower = split. */
+  consensusScore: number
+  marketSummary: string
+  usage: TokenUsage
+  searchTruncated?: boolean
+  /** How many of the three catalog personas actually ran (fewer = degraded under quota pressure). */
+  personasAttempted: number
+}
+
 /** Net price direction of a wave or timeframe move (mirrors backend `TrendDirection`). */
 export type TrendDirection = 'Up' | 'Down'
 
@@ -379,6 +417,8 @@ export interface TrackAnalysisRequest {
   entryHigh?: number | null
   /** Backup counts (up to two) the auto-switch promotes from if the primary is invalidated. */
   alternates?: ScenarioInput[]
+  /** Persona-panel (#184) persona key whose own top pick this count was, if exactly one endorsed it. */
+  persona?: string | null
 }
 
 /** Whether a scenario's probability is measured or withheld (mirrors backend `ProbabilityBasis`). */

@@ -37,6 +37,14 @@ internal sealed class AnalysisSnapshot
     public decimal? Score { get; set; }
 
     /// <summary>
+    /// The persona-panel (#184) persona whose own top pick this saved analysis was, or null for
+    /// every analysis saved outside the panel (the vast majority). Only tagged saves feed
+    /// <see cref="Interfaces.IPersonaCalibrationProvider"/> — untagged analyses carry no signal
+    /// about any individual persona's reliability.
+    /// </summary>
+    public string? Persona { get; set; }
+
+    /// <summary>
     /// The outcome this analysis was last alerted on. Starts at <see cref="AnalysisOutcome.Pending"/>;
     /// advanced to a terminal outcome once an alert has fired, so a transition alerts exactly once.
     /// The auto-switch resets it to Pending when it promotes an alternate, so the new primary is

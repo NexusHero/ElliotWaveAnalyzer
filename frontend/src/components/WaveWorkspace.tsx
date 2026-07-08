@@ -10,6 +10,7 @@ import {
   getPortfolioReview,
   getSentimentAnalysis,
   listAnalyses,
+  personaAnalystPanel,
   saveAnalysis,
   scanSetups,
   topDownAnalysis,
@@ -20,6 +21,7 @@ import {
 import {
   type CandleIntervalCode,
   type MarketCandle,
+  type PersonaRankedCount,
   type RankedWaveCount,
   type ScanFilters,
   type TrackAnalysisRequest,
@@ -39,6 +41,7 @@ import LiveVerifyPanel, { type LiveVerifyState } from './LiveVerifyPanel'
 import { type LegMeasurement, legMeasurements } from './legMeasurements'
 import { CLEAN_LAYERS, type LevelLayers, levelsToPriceLines } from './levelOverlay'
 import OnboardingIntro from './OnboardingIntro'
+import PersonaPanel, { type PersonaPanelState } from './PersonaPanel'
 import PortfolioReviewPanel, { type PortfolioReviewState } from './PortfolioReviewPanel'
 import PriceChart, { type ChartMarker, type PriceLineSpec, type WaveLine } from './PriceChart'
 import { nudgePivot, snapToCandle } from './pivotSnap'
@@ -47,7 +50,11 @@ import ScannerPanel, { type ScannerState } from './ScannerPanel'
 import SentimentPanel, { type SentimentState } from './SentimentPanel'
 import SymbolSearch from './SymbolSearch'
 import TrackRecordPanel, { type TrackRecordState } from './TrackRecordPanel'
-import { toTrackAnalysisRequest, verificationToTrackRequest } from './trackRecord'
+import {
+  toPersonaTrackAnalysisRequest,
+  toTrackAnalysisRequest,
+  verificationToTrackRequest,
+} from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
 import { toWaveLinePoints } from './waveLine'
 import {
@@ -192,6 +199,29 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     mutationFn: () => topDownAnalysis(symbol, sensitivity),
   })
 
+  // Calibrated, self-weighting analyst panel (#184): on-demand, three LLM calls is real cost.
+  const [personaPanelNeedKey, setPersonaPanelNeedKey] = useState(false)
+  const personaPanel = useMutation({
+    mutationFn: () => personaAnalystPanel({ symbol, thresholdPercent: sensitivity }),
+  })
+  const handleRunPersonaPanel = useCallback(() => {
+    if (!hasApiKey) {
+      setPersonaPanelNeedKey(true)
+      return
+    }
+    setPersonaPanelNeedKey(false)
+    personaPanel.mutate()
+  }, [hasApiKey, personaPanel])
+  const personaPanelState: PersonaPanelState = personaPanelNeedKey
+    ? 'needkey'
+    : personaPanel.isPending
+      ? 'loading'
+      : personaPanel.isError
+        ? 'error'
+        : personaPanel.isSuccess
+          ? 'result'
+          : 'idle'
+
   // Historical analogs (REQ-034): on-demand (the corpus sweep is heavy), daily/weekly only.
   const analogs = useMutation({
     mutationFn: () => getHistoricalAnalogs(symbol, timeframe.code === '1w' ? '1w' : '1d'),
@@ -295,6 +325,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       saveMutation.mutate(toTrackAnalysisRequest(symbol, count, alternates))
     },
     [auto.data, saveMutation, symbol]
+  )
+  const handleSavePersonaCount = useCallback(
+    (count: PersonaRankedCount, alternates: PersonaRankedCount[]) => {
+      saveMutation.mutate(toPersonaTrackAnalysisRequest(symbol, count, alternates))
+    },
+    [saveMutation, symbol]
   )
   const handleSaveManualCount = useCallback(() => {
     if (liveVerify.data) {
@@ -999,6 +1035,17 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 onRun={handleAutoAnalyze}
                 onOpenSettings={onOpenSettings}
                 onSaveCount={handleSaveCount}
+                savePending={saveMutation.isPending}
+              />
+
+              <PersonaPanel
+                symbol={symbol}
+                state={personaPanelState}
+                data={personaPanel.data ?? null}
+                error={personaPanel.error instanceof Error ? personaPanel.error.message : null}
+                onRun={handleRunPersonaPanel}
+                onOpenSettings={onOpenSettings}
+                onSaveCount={handleSavePersonaCount}
                 savePending={saveMutation.isPending}
               />
 

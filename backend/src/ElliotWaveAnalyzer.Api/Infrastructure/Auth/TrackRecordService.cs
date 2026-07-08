@@ -46,6 +46,7 @@ internal sealed class TrackRecordService(
             EntryHigh = request.EntryHigh,
             Confidence = request.Confidence,
             Score = request.Score,
+            Persona = request.Persona,
         };
 
         // Scenario tree: the primary is the flat request, alternates (capped at two) are the backups.

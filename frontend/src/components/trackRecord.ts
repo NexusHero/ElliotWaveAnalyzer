@@ -1,5 +1,6 @@
 import type {
   AnalysisOutcome,
+  PersonaRankedCount,
   RankedWaveCount,
   ScenarioInput,
   TrackAnalysisRequest,
@@ -67,6 +68,41 @@ export function toTrackAnalysisRequest(
     symbol,
     ...geometryOf(count),
     alternates: alternates.slice(0, 2).map(geometryOf),
+  }
+}
+
+/**
+ * Builds the `POST /api/analyses` payload from a persona-panel candidate (#184). Tags the save
+ * with the persona key only when exactly one persona endorsed this specific candidate as its own
+ * top pick — a genuinely ambiguous or unendorsed candidate is saved untagged rather than guessing,
+ * since an untagged save simply contributes no signal to any persona's measured weight.
+ */
+export function toPersonaTrackAnalysisRequest(
+  symbol: string,
+  count: PersonaRankedCount,
+  alternates: PersonaRankedCount[] = []
+): TrackAnalysisRequest {
+  return {
+    symbol,
+    ...scenarioFromLevels(
+      count.structure,
+      count.ruleReport.bullishAssumed,
+      count.levels ?? null,
+      count.confidence,
+      count.score ?? null
+    ),
+    alternates: alternates
+      .slice(0, 2)
+      .map((a) =>
+        scenarioFromLevels(
+          a.structure,
+          a.ruleReport.bullishAssumed,
+          a.levels ?? null,
+          a.confidence,
+          a.score ?? null
+        )
+      ),
+    persona: count.endorsingPersonas.length === 1 ? count.endorsingPersonas[0] : null,
   }
 }
 
