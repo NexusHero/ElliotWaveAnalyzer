@@ -121,6 +121,7 @@ public sealed class AcceptanceWebApplicationFactory : WebApplicationFactory<Prog
     {
         var credentials = new { email = TestEmail, password = TestPassword, acceptTerms = true };
         await client.PostAsJsonAsync("/api/auth/register", credentials);
-        await client.PostAsJsonAsync("/api/auth/login", credentials);
+        var login = await client.PostAsJsonAsync("/api/auth/login", credentials);
+        login.EnsureSuccessStatusCode();
     }
 }

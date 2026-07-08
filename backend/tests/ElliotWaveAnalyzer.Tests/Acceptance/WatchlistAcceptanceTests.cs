@@ -41,7 +41,8 @@ public sealed class WatchlistAcceptanceTests
         var client = _factory.CreateClient();
         var credentials = new { email, password = "An0ther!Passw0rd", acceptTerms = true };
         await client.PostAsJsonAsync("/api/auth/register", credentials);
-        await client.PostAsJsonAsync("/api/auth/login", credentials);
+        var login = await client.PostAsJsonAsync("/api/auth/login", credentials);
+        login.EnsureSuccessStatusCode();
         return client;
     }
 
