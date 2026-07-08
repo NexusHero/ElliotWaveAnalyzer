@@ -14,6 +14,7 @@ public sealed class PersonaPanelAnalysisService(
     IEnumerable<IMarketDataProvider> marketDataProviders,
     IPersonaAnalystPanel panel,
     ITokenTracker tokenTracker,
+    IIndicatorCalculator indicatorCalculator,
     ILogger<PersonaPanelAnalysisService> logger) : IPersonaPanelAnalysisService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
@@ -41,7 +42,7 @@ public sealed class PersonaPanelAnalysisService(
 
         var pivots = SwingPivotDetector.Detect(candles, thresholdPercent);
         var (candidates, searchTruncated) = WaveCandidateGenerator.GenerateParsed(
-            pivots, cancellationToken: cancellationToken);
+            pivots, candles: candles, indicatorCalculator: indicatorCalculator, cancellationToken: cancellationToken);
 
         logger.LogInformation(
             "Persona panel for {Symbol}: {Pivots} pivots → {Candidates} parsed candidates (truncated: {Truncated})",

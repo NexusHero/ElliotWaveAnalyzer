@@ -401,6 +401,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   }, [pro])
 
   const [layers, setLayers] = useState<LevelLayers>(CLEAN_LAYERS)
+  // RSI sub-pane (#224 AC3) — off by default, a second chart pane costs vertical space.
+  const [showOscillator, setShowOscillator] = useState(false)
   // On-chart degree notation + sub-wave nesting (#161): null = off (plain labels, the default),
   // 0 = top-level labels decorated by degree, 1 = also nest one level of sub-waves. Opt-in so the
   // chart stays legible by default.
@@ -847,6 +849,14 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                         : 'Targets'}
                   </label>
                 ))}
+                <label className="layer-chk">
+                  <input
+                    type="checkbox"
+                    checked={showOscillator}
+                    onChange={() => setShowOscillator((v) => !v)}
+                  />
+                  RSI
+                </label>
               </div>
             )}
             {pro && activeRanked?.tree && (
@@ -882,6 +892,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                   overlayPriceLines.length > 0 ? [...priceLines, ...overlayPriceLines] : priceLines
                 }
                 logScale={logScale}
+                rsi={marketQuery.data?.rsi}
+                showOscillator={showOscillator}
                 onPointClick={handlePointClick}
                 theme={theme}
               />

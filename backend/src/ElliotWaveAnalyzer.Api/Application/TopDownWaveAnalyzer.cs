@@ -35,7 +35,7 @@ public static class TopDownWaveAnalyzer
             var tf = timeframesCoarseToFine[i];
             var degree = DegreeForLevel(i);
             var (candidates, truncated) =
-                WaveCandidateGenerator.GenerateParsed(tf.Pivots, opts, degree, cancellationToken);
+                WaveCandidateGenerator.GenerateParsed(tf.Pivots, opts, degree, cancellationToken: cancellationToken);
 
             WaveCandidate? best;
             if (parentContext is null)

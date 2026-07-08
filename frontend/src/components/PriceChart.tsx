@@ -17,7 +17,7 @@ import {
   type Time,
 } from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
-import type { MarketCandle } from '../api/types'
+import type { MarketCandle, RsiResult } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import type { ProjectionPath } from './projectionPath'
 import { type ProjectionPathColors, ProjectionPathPrimitive } from './projectionPathPrimitive'
@@ -72,6 +72,10 @@ interface PriceChartProps {
   priceLines?: PriceLineSpec[]
   /** Render the price axis logarithmically (so the log-correct Fibonacci levels line up). */
   logScale?: boolean
+  /** RSI series (#224) to plot in a sub-pane beneath the main chart, aligned to the same time axis. */
+  rsi?: RsiResult[]
+  /** Shows the RSI sub-pane (#224 AC3). Off by default — a second pane costs vertical space. */
+  showOscillator?: boolean
   /** Called when the user clicks a point on the chart (date + price at the click). */
   onPointClick?: (time: string, price: number) => void
   /** Current theme — drives the chart colours, which are read from the CSS variables. */
@@ -91,6 +95,8 @@ export default function PriceChart({
   projectionPaths = [],
   priceLines = [],
   logScale = false,
+  rsi = [],
+  showOscillator = false,
   onPointClick,
   theme = 'dark',
 }: PriceChartProps) {
@@ -110,6 +116,9 @@ export default function PriceChart({
   // union of every series' own time points and no candle exists yet for a projected date.
   const projectionPathRef = useRef<ProjectionPathPrimitive | null>(null)
   const projectionTimeSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
+  // The RSI sub-pane (#224) — created lazily on first toggle-on, removed on toggle-off, so a chart
+  // that never shows it never pays for a second pane.
+  const oscillatorSeriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
@@ -192,6 +201,7 @@ export default function PriceChart({
       zoneBandsRef.current = null
       projectionPathRef.current = null
       projectionTimeSeriesRef.current = null
+      oscillatorSeriesRef.current = null
       // The wave-line series were destroyed with the chart; drop the stale refs so a remount
       // doesn't try to remove them from a new chart.
       waveLineSeriesRef.current = []
@@ -282,9 +292,7 @@ export default function PriceChart({
         futureTimes.add(path.toTimeMin)
         futureTimes.add(path.toTimeMax)
       }
-      timeSeries.setData(
-        [...futureTimes].sort().map((time) => ({ time: time as Time }))
-      )
+      timeSeries.setData([...futureTimes].sort().map((time) => ({ time: time as Time })))
     }
     projectionPathRef.current?.update(projectionPaths, projectionColors(chartColors(theme)))
   }, [projectionPaths, theme])
@@ -322,6 +330,49 @@ export default function PriceChart({
       waveLineSeriesRef.current.push(line)
     }
   }, [waveLines, candles, theme])
+
+  // ── RSI sub-pane (#224 AC3): create on toggle-on, remove on toggle-off, update data/theme ──
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+
+    if (!showOscillator) {
+      if (oscillatorSeriesRef.current) {
+        chart.removeSeries(oscillatorSeriesRef.current)
+        oscillatorSeriesRef.current = null
+        // Reclaim the vertical space the sub-pane held — pane 1 exists only while shown.
+        if (chart.panes().length > 1) {
+          chart.removePane(1)
+        }
+      }
+      return
+    }
+
+    const colors = chartColors(theme)
+    if (!oscillatorSeriesRef.current) {
+      const series = chart.addSeries(
+        LineSeries,
+        {
+          color: colors.aiMarker,
+          lineWidth: 1,
+          lastValueVisible: true,
+          priceLineVisible: false,
+          title: 'RSI',
+        },
+        1 // paneIndex — creates the sub-pane on first use
+      )
+      oscillatorSeriesRef.current = series
+      chart.panes()[1]?.setHeight(120)
+    } else {
+      oscillatorSeriesRef.current.applyOptions({ color: colors.aiMarker })
+    }
+
+    const points = rsi
+      .filter((r) => r.value !== null && inWindow(candles, r.date))
+      .map((r) => ({ time: datePart(r.date) as Time, value: r.value! }))
+      .sort((l, r) => String(l.time).localeCompare(String(r.time)))
+    oscillatorSeriesRef.current.setData(points)
+  }, [showOscillator, rsi, candles, theme])
 
   // ── Draw level lines (invalidation / fib zones) when they (or theme) change ──
   useEffect(() => {
@@ -404,7 +455,11 @@ function zoneColors(colors: ChartColors): ZoneBandColors {
  * zone-band colours so a branch's dashed path and its target box read as one shape. */
 function projectionColors(colors: ChartColors): ProjectionPathColors {
   return {
-    speculative: { line: colors.target, fill: colors.zoneTargetFill, border: colors.zoneTargetBorder },
+    speculative: {
+      line: colors.target,
+      fill: colors.zoneTargetFill,
+      border: colors.zoneTargetBorder,
+    },
     alternate: { line: colors.invalid, fill: colors.zoneAltFill, border: colors.zoneAltBorder },
   }
 }

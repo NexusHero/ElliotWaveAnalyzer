@@ -95,7 +95,8 @@ public sealed class PersonaPanelAnalysisServiceTests
             .ToList();
         var panel = new FakePanel();
         var service = new PersonaPanelAnalysisService(
-            [new FakeProvider(flat)], panel, new FakeTokenTracker(), NullLogger<PersonaPanelAnalysisService>.Instance);
+            [new FakeProvider(flat)], panel, new FakeTokenTracker(),
+            NSubstitute.Substitute.For<IIndicatorCalculator>(), NullLogger<PersonaPanelAnalysisService>.Instance);
 
         var result = await service.AnalyzeAsync(Guid.NewGuid(), "BTC", 365, 2.5m);
 
@@ -127,7 +128,8 @@ public sealed class PersonaPanelAnalysisServiceTests
             },
         };
         var service = new PersonaPanelAnalysisService(
-            [new FakeProvider(candles)], panel, new FakeTokenTracker(), NullLogger<PersonaPanelAnalysisService>.Instance);
+            [new FakeProvider(candles)], panel, new FakeTokenTracker(),
+            NSubstitute.Substitute.For<IIndicatorCalculator>(), NullLogger<PersonaPanelAnalysisService>.Instance);
 
         var result = await service.AnalyzeAsync(Guid.NewGuid(), "BTC", 365, 2.5m);
 

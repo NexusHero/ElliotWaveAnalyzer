@@ -1,4 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Interfaces;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
@@ -11,9 +12,17 @@ namespace ElliotWaveAnalyzer.Api.Application;
 /// </summary>
 public static class WaveVerifier
 {
-    /// <summary>Verifies <paramref name="annotations"/> against <paramref name="candles"/>.</summary>
+    /// <summary>
+    /// Verifies <paramref name="annotations"/> against <paramref name="candles"/>. When
+    /// <paramref name="indicatorCalculator"/> is supplied, the momentum-divergence guideline
+    /// (#224) is computed too; the volume guideline always runs (it only needs candle volume).
+    /// Both are additive guideline rows (<see cref="RuleResult.IsGuideline"/>) — they can never
+    /// flip a count's hard-rule validity (AC4).
+    /// </summary>
     public static WaveVerification Verify(
-        IReadOnlyList<WaveAnnotation> annotations, IReadOnlyList<MarketCandle> candles)
+        IReadOnlyList<WaveAnnotation> annotations,
+        IReadOnlyList<MarketCandle> candles,
+        IIndicatorCalculator? indicatorCalculator = null)
     {
         ArgumentNullException.ThrowIfNull(annotations);
         ArgumentNullException.ThrowIfNull(candles);
@@ -32,6 +41,15 @@ public static class WaveVerifier
             .ToList();
 
         var rules = ElliottRuleChecker.Check(snappedAnnotations);
+
+        // Momentum/volume confirmation (#224) — additive guideline rows, computed once here so the
+        // hot grammar-parser search path (WaveCandidateGenerator) never recomputes indicators per
+        // partition; see MomentumDivergenceChecker/VolumeGuidelineChecker for the pure rule logic.
+        var momentum = MomentumDivergenceChecker.Check(
+            snappedAnnotations, indicatorCalculator?.CalculateRsi(candles), indicatorCalculator?.CalculateMacd(candles));
+        var volume = VolumeGuidelineChecker.Check(snappedAnnotations, candles);
+        rules = rules with { Rules = [.. rules.Rules, momentum, volume] };
+
         var levels = ProjectionService.Project(snappedAnnotations);
         var branches = ProjectionService.Branches(snappedAnnotations);
         var structure = InferStructure(snappedAnnotations.Select(a => a.Label));

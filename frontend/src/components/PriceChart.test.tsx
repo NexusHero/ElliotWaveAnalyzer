@@ -25,6 +25,8 @@ vi.mock('lightweight-charts', () => ({
     applyOptions: vi.fn(),
     resize: vi.fn(),
     remove: vi.fn(),
+    panes: vi.fn(() => [{ setHeight: vi.fn() }, { setHeight: vi.fn() }]),
+    removePane: vi.fn(),
   })),
   // v5: series type passed to addSeries, and markers are a separate primitive.
   CandlestickSeries: 'Candlestick',
@@ -64,6 +66,17 @@ describe('PriceChart', () => {
   it('renders with a logarithmic price axis without throwing', () => {
     const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
     expect(() => render(<PriceChart candles={candles} logScale />)).not.toThrow()
+  })
+
+  it('renders with the RSI sub-pane shown without throwing (#224)', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    const rsi = candles.map((c, i) => ({ date: c.openTime, value: 40 + i }))
+    expect(() => render(<PriceChart candles={candles} rsi={rsi} showOscillator />)).not.toThrow()
+  })
+
+  it('is off by default — no sub-pane touched when showOscillator is omitted (#224 AC3)', () => {
+    const candles = Array.from({ length: 10 }, (_, i) => makeCandle(i))
+    expect(() => render(<PriceChart candles={candles} />)).not.toThrow()
   })
 
   it('renders shaded zone bands without throwing', () => {
@@ -121,8 +134,20 @@ describe('PriceChart', () => {
         <PriceChart
           candles={candles}
           waveLines={[
-            { kind: 'ai', points: [{ time: '2024-01-01', value: 100 }, { time: '2024-01-05', value: 130 }] },
-            { kind: 'alt', points: [{ time: '2024-01-02', value: 95 }, { time: '2024-01-06', value: 120 }] },
+            {
+              kind: 'ai',
+              points: [
+                { time: '2024-01-01', value: 100 },
+                { time: '2024-01-05', value: 130 },
+              ],
+            },
+            {
+              kind: 'alt',
+              points: [
+                { time: '2024-01-02', value: 95 },
+                { time: '2024-01-06', value: 120 },
+              ],
+            },
           ]}
           priceLines={[
             { price: 90, kind: 'invalid', title: 'Invalidation' },

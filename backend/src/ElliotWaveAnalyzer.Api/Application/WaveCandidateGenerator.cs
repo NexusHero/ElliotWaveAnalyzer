@@ -1,4 +1,5 @@
 using ElliotWaveAnalyzer.Api.Domain;
+using ElliotWaveAnalyzer.Api.Interfaces;
 
 namespace ElliotWaveAnalyzer.Api.Application;
 
@@ -89,6 +90,19 @@ public static class WaveCandidateGenerator
     /// <param name="pivots">Alternating pivots, finest scale, chronological.</param>
     /// <param name="options">Scoring weights and search bounds; null for defaults.</param>
     /// <param name="rootDegree">Degree assigned to top-level structures.</param>
+    /// <param name="candles">
+    /// The same candle series the pivots were detected from (#224). When supplied, each
+    /// candidate's <see cref="WaveRuleReport"/> gains momentum-divergence and volume-signature
+    /// guideline rows, and its <see cref="WaveCandidate.Score"/> is penalized the same way a
+    /// failed guideline already is inside the parser (<see cref="WaveScoringOptions.GuidelinePenalty"/>).
+    /// Computed once here — never inside the grammar parser's beam search — so indicator
+    /// calculation cannot regress the search's performance (it can run thousands of partition
+    /// evaluations per parse).
+    /// </param>
+    /// <param name="indicatorCalculator">
+    /// Supplies RSI/MACD for the momentum guideline; omit to run only the volume guideline
+    /// (volume needs no indicator calculation, only candle volume).
+    /// </param>
     /// <param name="cancellationToken">Cancellation for the search budget.</param>
     /// <returns>The parsed candidates (best score first) and whether the search was
     /// truncated by the evaluation budget.</returns>
@@ -96,12 +110,20 @@ public static class WaveCandidateGenerator
         IReadOnlyList<SwingPivot> pivots,
         WaveScoringOptions? options = null,
         WaveDegree rootDegree = WaveDegree.Primary,
+        IReadOnlyList<MarketCandle>? candles = null,
+        IIndicatorCalculator? indicatorCalculator = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pivots);
 
         var parse = WaveGrammarParser.Parse(pivots, options, rootDegree, cancellationToken);
         var candidates = new List<WaveCandidate>(parse.Trees.Count);
+
+        // Computed once for the whole candidate set, not per candidate — RSI/MACD are series over
+        // the full window, not something a single wave's dates need recomputed.
+        var rsi = candles is not null ? indicatorCalculator?.CalculateRsi(candles) : null;
+        var macd = candles is not null ? indicatorCalculator?.CalculateMacd(candles) : null;
+        var guidelinePenalty = (options ?? new WaveScoringOptions()).GuidelinePenalty;
 
         foreach (var (tree, index) in parse.Trees.Select((t, idx) => (t, idx)))
         {
@@ -116,11 +138,36 @@ public static class WaveCandidateGenerator
                 ? ProjectionService.Project([origin, .. waves])
                 : ProjectionService.ProjectCorrective([origin, .. waves], root.Kind!.Value);
 
+            var report = root.RuleReport!;
+            var score = tree.Score;
+
+            // Momentum/volume checkers only understand a 5-wave impulse or a simple ABC correction
+            // (Zigzag/Flat) — a Triangle's 5 legs would coincidentally match the impulse pivot count
+            // but mean something else entirely, so it is deliberately excluded here.
+            var understood = root.Kind is StructureKind.Impulse or StructureKind.Diagonal
+                or StructureKind.Zigzag or StructureKind.Flat;
+            if (candles is not null && understood)
+            {
+                List<WaveAnnotation> pivotsForCheck = [origin, .. waves];
+                var momentum = MomentumDivergenceChecker.Check(pivotsForCheck, rsi, macd);
+                var volume = VolumeGuidelineChecker.Check(pivotsForCheck, candles);
+                report = report with { Rules = [.. report.Rules, momentum, volume] };
+
+                if (momentum.Status == RuleStatus.Fail)
+                {
+                    score *= (decimal)guidelinePenalty;
+                }
+                if (volume.Status == RuleStatus.Fail)
+                {
+                    score *= (decimal)guidelinePenalty;
+                }
+            }
+
             candidates.Add(new WaveCandidate(
-                index, root.Kind!.Value.ToString(), origin, waves, root.RuleReport!, levels)
+                index, root.Kind!.Value.ToString(), origin, waves, report, levels)
             {
                 Tree = root,
-                Score = tree.Score,
+                Score = score,
             });
         }
 
