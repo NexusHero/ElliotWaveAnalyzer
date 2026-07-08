@@ -3,7 +3,7 @@ using ElliotWaveAnalyzer.Api.Domain;
 namespace ElliotWaveAnalyzer.Api.Interfaces;
 
 /// <summary>
-/// Abstraction over a market data source (CoinGecko, Yahoo Finance, etc.).
+/// Abstraction over a market data source (Twelve Data, etc.).
 /// <para>
 /// ISP: deliberately narrow — one responsibility per method.
 /// OCP: new data sources add a class; nothing existing changes.

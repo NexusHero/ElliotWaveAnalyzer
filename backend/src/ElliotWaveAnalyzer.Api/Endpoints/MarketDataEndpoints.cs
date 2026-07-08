@@ -11,6 +11,14 @@ namespace ElliotWaveAnalyzer.Api.Endpoints;
 /// </summary>
 public static class MarketDataEndpoints
 {
+    /// <summary>
+    /// Upper bound for the <c>days</c> query parameter — 5 years, matching the frontend's own "5Y"
+    /// range button (#164) and <c>WaveAnalysisEndpoints</c>' existing <c>LookbackDays</c> clamp.
+    /// Previously hardcoded to 365, silently rejecting the "3Y"/"5Y" range buttons with a 400 —
+    /// found and fixed alongside the #170 market-data provider consolidation.
+    /// </summary>
+    private const int MaxDays = 1825;
+
     public static IEndpointRouteBuilder MapMarketDataEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app
@@ -23,12 +31,12 @@ public static class MarketDataEndpoints
             .WithName("GetMarketData")
             .WithSummary("Returns OHLCV candles + MACD + RSI for the requested symbol")
             .WithDescription("""
-                Symbol is any data-source ticker (resolve one via /api/symbols/search): BTC, ETH
-                (CoinGecko); any equity/ETF/index/metal ticker (Yahoo, e.g. RKLB, ^IXIC, SI=F).
-                Optional 'interval' selects the timeframe: '1d' (daily, default), '1w' (weekly,
-                resampled from daily), '4h' or '1h' (from hourly candles — intraday-capable
-                instruments only; a request past the source's hourly lookback returns 400 with the
-                supported range). Indicators are computed on the selected timeframe.
+                Symbol is any data-source ticker (resolve one via /api/symbols/search): BTC, ETH or
+                any equity/ETF/index ticker, all served by Twelve Data. 'days' selects the lookback
+                window (1-1825, i.e. up to 5 years). Optional 'interval' selects the timeframe: '1d'
+                (daily, default), '1w' (weekly, resampled from daily), '4h' or '1h' (from hourly
+                candles — intraday-capable instruments only). Indicators are computed on the
+                selected timeframe.
                 """)
             .Produces<TechnicalAnalysisResult>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -57,11 +65,11 @@ public static class MarketDataEndpoints
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        if (days is < 1 or > 365)
+        if (days is < 1 or > MaxDays)
         {
             return Results.Problem(
                 title: "Invalid range",
-                detail: "days must be between 1 and 365.",
+                detail: $"days must be between 1 and {MaxDays} (5 years).",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 

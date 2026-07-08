@@ -8,10 +8,10 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure;
 /// Caching decorator over an <see cref="IMarketDataProvider"/>. Adds short-lived
 /// in-memory caching of candle responses without the wrapped provider knowing about it
 /// (Decorator pattern — Open/Closed: caching is added by composition, not by editing
-/// CoinGecko/Yahoo/etc.).
+/// the provider itself).
 ///
 /// WHY this matters for scalability:
-/// upstream market APIs are rate-limited (CoinGecko free tier: ~10–30 req/min). Under
+/// the upstream market API is rate-limited/quota-metered per plan. Under
 /// concurrent load or repeated requests for the same symbol, hitting the network every
 /// time throttles and slows the app. Caching identical (symbol, days) requests for a
 /// short window absorbs that. <see cref="IMemoryCache"/> is per-instance; swap the
