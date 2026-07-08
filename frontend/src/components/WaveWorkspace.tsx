@@ -1,17 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  addWatchlistEntry,
   autoAnalyzeWaves,
   deleteAnalysis,
+  deleteWorkspaceDraft,
   getAlternateHypotheses,
   getBacktestSummary,
   getHistoricalAnalogs,
   getMarketData,
   getPortfolioReview,
   getSentimentAnalysis,
+  getWatchlist,
+  getWorkspaceDraft,
   listAnalyses,
   personaAnalystPanel,
+  removeWatchlistEntry,
   saveAnalysis,
+  saveWorkspaceDraft,
   scanSetups,
   topDownAnalysis,
   validateWaveCount,
@@ -28,6 +34,7 @@ import {
   WAVE_LABELS,
   type WaveAnnotation,
   type WaveLevels,
+  type WorkspaceDraftSettings,
 } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
@@ -56,6 +63,7 @@ import {
   verificationToTrackRequest,
 } from './trackRecord'
 import VerifyImagePanel, { type VerifyImageState } from './VerifyImagePanel'
+import Watchlist from './Watchlist'
 import { toWaveLinePoints } from './waveLine'
 import {
   branchesToZoneBands,
@@ -63,13 +71,6 @@ import {
   levelsToZoneBands,
   type ZoneBand,
 } from './zoneOverlay'
-
-/**
- * Symbols the backend can serve. SP500 / NASDAQ come from Yahoo Finance (no key);
- * BTC / ETH come from CoinGecko (which currently rate-limits keyless requests, so they
- * may be unavailable). Default to a Yahoo symbol so the workspace works out of the box.
- */
-const SYMBOLS = ['SP500', 'NASDAQ', 'BTC', 'ETH'] as const
 
 /**
  * The count types the analyst can place by click, each walking its own label sequence. Corrective,
@@ -625,6 +626,104 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     [auto, resetCoach]
   )
 
+  // ── Watchlist (#226) — replaces the old hardcoded SP500/NASDAQ/BTC/ETH quick buttons ──────
+  const watchlistQuery = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: ({ signal }) => getWatchlist(signal),
+    staleTime: 60_000,
+  })
+  const addWatchlistMutation = useMutation({
+    mutationFn: (sym: string) => addWatchlistEntry(sym),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist'] }),
+  })
+  const removeWatchlistMutation = useMutation({
+    mutationFn: (sym: string) => removeWatchlistEntry(sym),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist'] }),
+  })
+  const handleAddWatchlist = useCallback(
+    (sym: string) => addWatchlistMutation.mutate(sym),
+    [addWatchlistMutation]
+  )
+  const handleRemoveWatchlist = useCallback(
+    (sym: string) => removeWatchlistMutation.mutate(sym),
+    [removeWatchlistMutation]
+  )
+
+  // ── Per-symbol workspace drafts (#226) ─────────────────────────────────────────────────────
+  // Auto-restore: fetch the saved draft for the current symbol+interval and apply it once per
+  // switch. `restoredDraftKey` is STATE, not a ref — the auto-save effect below depends on it, so
+  // settling restoration (even when there's no draft to apply, i.e. nothing else changes) reliably
+  // re-arms auto-save for this key. A later refetch of the SAME key (e.g. the auto-save below
+  // invalidating the watchlist) is a no-op here since the key hasn't changed.
+  const draftQuery = useQuery({
+    queryKey: ['workspace-draft', symbol, timeframe.code],
+    queryFn: ({ signal }) => getWorkspaceDraft(symbol, timeframe.code, signal),
+  })
+  const [restoredDraftKey, setRestoredDraftKey] = useState<string | null>(null)
+  useEffect(() => {
+    const key = `${symbol}|${timeframe.code}`
+    if (!draftQuery.isSuccess || restoredDraftKey === key) return
+    setRestoredDraftKey(key)
+    const draftData = draftQuery.data
+    if (draftData) {
+      setAnnotations(draftData.annotations)
+      const knownCountType = COUNT_TYPES.find((t) => t.key === draftData.settings.countType)
+      setCountType(knownCountType ? knownCountType.key : 'impulse')
+      setLayers({
+        invalidation: draftData.settings.showInvalidationLayer,
+        support: draftData.settings.showSupportLayer,
+        targets: draftData.settings.showTargetsLayer,
+      })
+      setShowOscillator(draftData.settings.showOscillator)
+      setLogScale(draftData.settings.logScale)
+      setSubWaveDepth(draftData.settings.subWaveDepth)
+      resetCoach()
+    }
+  }, [draftQuery.isSuccess, draftQuery.data, symbol, timeframe.code, restoredDraftKey, resetCoach])
+
+  // Auto-save: debounced on every annotation/settings change for the CURRENT symbol+interval, once
+  // the restore above has landed for this key (so a save mid-restore can't overwrite a real draft
+  // with the transient empty state right after switching). No annotations ⇒ delete rather than
+  // persist an empty draft — a mere glance at a symbol shouldn't create one.
+  useEffect(() => {
+    const key = `${symbol}|${timeframe.code}`
+    if (restoredDraftKey !== key) return
+    const settings: WorkspaceDraftSettings = {
+      countType,
+      showInvalidationLayer: layers.invalidation,
+      showSupportLayer: layers.support,
+      showTargetsLayer: layers.targets,
+      showOscillator,
+      logScale,
+      subWaveDepth,
+    }
+    const handle = setTimeout(() => {
+      const persist = async () => {
+        if (annotations.length === 0) {
+          await deleteWorkspaceDraft(symbol, timeframe.code)
+        } else {
+          await saveWorkspaceDraft(symbol, timeframe.code, { annotations, settings })
+        }
+        queryClient.invalidateQueries({ queryKey: ['watchlist'] })
+      }
+      persist().catch(() => {
+        /* best-effort — a failed auto-save must not interrupt the analyst */
+      })
+    }, 800)
+    return () => clearTimeout(handle)
+  }, [
+    symbol,
+    timeframe.code,
+    restoredDraftKey,
+    annotations,
+    countType,
+    layers,
+    showOscillator,
+    logScale,
+    subWaveDepth,
+    queryClient,
+  ])
+
   const runAnalysis = useCallback(
     (which: CoachMode, payload: WaveAnnotation[]) => {
       setMode(which)
@@ -752,19 +851,13 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 {symbol}
               </div>
               <SymbolSearch value={symbol} onSelect={handleSymbol} />
-              <div className="sym-quick" role="group" aria-label="Quick symbols">
-                {SYMBOLS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={symbol === s ? 'on' : ''}
-                    aria-pressed={symbol === s}
-                    onClick={() => handleSymbol(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <Watchlist
+                entries={watchlistQuery.data ?? []}
+                activeSymbol={symbol}
+                onSelect={handleSymbol}
+                onAdd={handleAddWatchlist}
+                onRemove={handleRemoveWatchlist}
+              />
               <span className="sym-sub mono">
                 {marketQuery.isError
                   ? 'Live data unavailable'

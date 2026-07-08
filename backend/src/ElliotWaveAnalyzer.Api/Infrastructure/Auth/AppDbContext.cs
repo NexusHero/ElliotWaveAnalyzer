@@ -24,6 +24,8 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<AccountDeletionAudit> AccountDeletionAudits => Set<AccountDeletionAudit>();
     public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
     public DbSet<LegalAcceptance> LegalAcceptances => Set<LegalAcceptance>();
+    public DbSet<WorkspaceDraftRow> WorkspaceDrafts => Set<WorkspaceDraftRow>();
+    public DbSet<WatchlistEntryRow> WatchlistEntries => Set<WatchlistEntryRow>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -180,6 +182,32 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options)
             // Written once, unconditionally, at signup (#167 AC4) — always tied to a real account,
             // so this cascades like every other per-user table (#168 AC3), unlike AccountDeletionAudit.
             entity.HasOne<AppUser>().WithMany().HasForeignKey(a => a.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<WorkspaceDraftRow>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.Property(d => d.Symbol).HasMaxLength(32).IsRequired();
+            entity.Property(d => d.Interval).HasMaxLength(8).IsRequired();
+            entity.Property(d => d.AnnotationsJson).IsRequired();
+            entity.Property(d => d.SettingsJson).IsRequired();
+            // One draft per (user, symbol, interval) — a save upserts in place.
+            entity.HasIndex(d => new { d.UserId, d.Symbol, d.Interval }).IsUnique();
+            // The LRU-eviction scan orders by UpdatedAt within a user.
+            entity.HasIndex(d => new { d.UserId, d.UpdatedAt });
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<WatchlistEntryRow>(entity =>
+        {
+            entity.HasKey(w => w.Id);
+            entity.Property(w => w.Symbol).HasMaxLength(32).IsRequired();
+            // One watchlist row per (user, symbol) — add is idempotent.
+            entity.HasIndex(w => new { w.UserId, w.Symbol }).IsUnique();
+            entity.HasIndex(w => new { w.UserId, w.SortOrder });
+            // #168 AC3 — see the UserSession config above for why this is needed explicitly.
+            entity.HasOne<AppUser>().WithMany().HasForeignKey(w => w.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

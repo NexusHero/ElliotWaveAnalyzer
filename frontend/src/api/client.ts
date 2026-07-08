@@ -14,6 +14,7 @@ import type {
   RiskRequest,
   SavedAnalysisResponse,
   SavedApiKey,
+  SaveWorkspaceDraftRequest,
   ScanFilters,
   ScanResult,
   SentimentAnalysisRequest,
@@ -22,9 +23,11 @@ import type {
   TopDownAnalysis,
   TrackAnalysisRequest,
   TrackedAnalysis,
+  WatchlistEntry,
   WaveAnalysisResponse,
   WaveValidationRequest,
   WaveVerification,
+  WorkspaceDraft,
 } from './types'
 
 /**
@@ -552,6 +555,109 @@ export async function recordConsent(record: {
     body: JSON.stringify(record),
   })
   if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/**
+ * Fetches the saved in-progress draft for a symbol+interval via
+ * `GET /api/workspace-drafts/{symbol}/{interval}` (#226); null when none exists yet.
+ */
+export async function getWorkspaceDraft(
+  symbol: string,
+  interval: string,
+  signal?: AbortSignal
+): Promise<WorkspaceDraft | null> {
+  const response = await fetch(
+    `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(interval)}`,
+    { signal }
+  )
+
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as WorkspaceDraft
+}
+
+/**
+ * Upserts the in-progress draft for a symbol+interval via
+ * `PUT /api/workspace-drafts/{symbol}/{interval}` (#226). Meant for a debounced auto-save, not a
+ * deliberate save — overwrites the prior draft silently.
+ */
+export async function saveWorkspaceDraft(
+  symbol: string,
+  interval: string,
+  request: SaveWorkspaceDraftRequest,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(
+    `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(interval)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+      signal,
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Deletes the draft for a symbol+interval via `DELETE /api/workspace-drafts/{symbol}/{interval}` (#226). */
+export async function deleteWorkspaceDraft(
+  symbol: string,
+  interval: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(
+    `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(interval)}`,
+    { method: 'DELETE', signal }
+  )
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Lists the caller's watchlist via `GET /api/watchlist` (#226) — seeded with defaults on first read. */
+export async function getWatchlist(signal?: AbortSignal): Promise<WatchlistEntry[]> {
+  const response = await fetch('/api/watchlist', { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as WatchlistEntry[]
+}
+
+/** Adds a symbol to the caller's watchlist via `POST /api/watchlist` (#226). */
+export async function addWatchlistEntry(symbol: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol }),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Removes a symbol from the caller's watchlist via `DELETE /api/watchlist/{symbol}` (#226). */
+export async function removeWatchlistEntry(symbol: string, signal?: AbortSignal): Promise<void> {
+  const response = await fetch(`/api/watchlist/${encodeURIComponent(symbol)}`, {
+    method: 'DELETE',
+    signal,
+  })
+
+  if (!response.ok && response.status !== 404) {
     throw new Error(await extractErrorDetail(response))
   }
 }

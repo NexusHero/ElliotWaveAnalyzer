@@ -809,3 +809,37 @@ export interface AlternateHypothesesReport {
   proposalCapHit: boolean
   unavailable: string | null
 }
+
+/** Chart-layer + count settings saved with a workspace draft (mirrors backend `WorkspaceDraftSettings`, #226). */
+export interface WorkspaceDraftSettings {
+  countType: string
+  showInvalidationLayer: boolean
+  showSupportLayer: boolean
+  showTargetsLayer: boolean
+  showOscillator: boolean
+  logScale: boolean
+  subWaveDepth: number | null
+}
+
+/** A saved in-progress workspace for one symbol+interval (mirrors backend `WorkspaceDraft`, #226). */
+export interface WorkspaceDraft {
+  symbol: string
+  interval: string
+  annotations: WaveAnnotation[]
+  settings: WorkspaceDraftSettings
+  updatedAt: string
+}
+
+/** Request body for `PUT /api/workspace-drafts/{symbol}/{interval}` (mirrors backend `SaveWorkspaceDraftRequest`). */
+export interface SaveWorkspaceDraftRequest {
+  annotations: WaveAnnotation[]
+  settings: WorkspaceDraftSettings
+}
+
+/** One watchlist entry (mirrors backend `WatchlistEntry`, #226). */
+export interface WatchlistEntry {
+  symbol: string
+  sortOrder: number
+  lastPrice: number | null
+  hasDraft: boolean
+}

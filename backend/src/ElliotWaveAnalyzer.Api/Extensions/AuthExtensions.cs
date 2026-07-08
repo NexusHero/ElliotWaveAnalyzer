@@ -46,6 +46,13 @@ internal static class AuthExtensions
         services.AddScoped<IConsentService, ConsentService>();
         services.AddScoped<ITrackRecordService, TrackRecordService>();
 
+        // Per-symbol workspace drafts + watchlist (#226): auto-saved in-progress state, distinct
+        // from a deliberate track-record save. WatchlistService reads IQuoteProvider (registered by
+        // AddDepotImport) for each entry's last price — DI registration order doesn't matter since
+        // both land in the same container before it is built.
+        services.AddScoped<IWorkspaceDraftService, WorkspaceDraftService>();
+        services.AddScoped<IWatchlistService, WatchlistService>();
+
         // Persona-panel (#184) real track-record history: reuses the same candle-fetch-and-evaluate
         // approach TrackRecordService does, restricted to persona-tagged saves.
         services.AddScoped<IPersonaCalibrationProvider, PersonaCalibrationProvider>();
