@@ -62,6 +62,8 @@ try
     app.MapScanEndpoints();
     app.MapRiskEndpoints();
     app.MapTrackRecordEndpoints();
+    app.MapWorkspaceDraftEndpoints();
+    app.MapWatchlistEndpoints();
     app.MapBacktestEndpoints();
     app.MapKeyEndpoints();
     app.MapDepotEndpoints();

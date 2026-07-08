@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as client from '../api/client'
-import type { WaveAnalysisResponse } from '../api/types'
+import type { WaveAnalysisResponse, WorkspaceDraft } from '../api/types'
 import WaveWorkspace from './WaveWorkspace'
 
 vi.mock('../api/client')
@@ -266,12 +266,16 @@ describe('WaveWorkspace', () => {
     expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
 
     // A pure range change (same symbol + timeframe) preserves the analyst's work …
-    fireEvent.click(within(screen.getByRole('group', { name: 'Range' })).getByRole('button', { name: '3Y' }))
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Range' })).getByRole('button', { name: '3Y' })
+    )
     expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
 
     // … but a timeframe change resets it (labels placed on daily bars don't map onto weekly).
     fireEvent.click(
-      within(screen.getByRole('group', { name: 'Timeframe' })).getByRole('button', { name: 'Weekly' })
+      within(screen.getByRole('group', { name: 'Timeframe' })).getByRole('button', {
+        name: 'Weekly',
+      })
     )
     expect(screen.queryByLabelText('Label for annotation 1')).not.toBeInTheDocument()
   })
@@ -304,5 +308,114 @@ describe('WaveWorkspace', () => {
     // Clearing re-enables the full palette.
     fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
     expect(screen.getByRole('button', { name: 'Zigzag / Flat' })).toBeEnabled()
+  })
+
+  // ── Per-symbol workspace drafts + watchlist (#226) ─────────────────────────────────────────
+  describe('workspace drafts + watchlist (#226)', () => {
+    function draft(overrides: Partial<WorkspaceDraft> = {}): WorkspaceDraft {
+      return {
+        symbol: 'SP500',
+        interval: '1d',
+        annotations: [
+          { date: '2024-01-05T00:00:00Z', price: 38000, label: '1' },
+          { date: '2024-01-15T00:00:00Z', price: 35000, label: '2' },
+        ],
+        settings: {
+          countType: 'impulse',
+          showInvalidationLayer: true,
+          showSupportLayer: false,
+          showTargetsLayer: false,
+          showOscillator: false,
+          logScale: false,
+          subWaveDepth: null,
+        },
+        updatedAt: '2024-01-15T00:00:00Z',
+        ...overrides,
+      }
+    }
+
+    it('restores a saved draft on load (AC1)', async () => {
+      mockClient.getWorkspaceDraft.mockResolvedValue(draft())
+      renderWorkspace()
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+      )
+      expect(screen.getByLabelText('Label for annotation 2')).toBeInTheDocument()
+    })
+
+    it('auto-saves the placed count after a short debounce', async () => {
+      mockClient.getWorkspaceDraft.mockResolvedValue(null)
+      renderWorkspace()
+
+      fireEvent.click(screen.getByTestId('pt1'))
+      fireEvent.click(screen.getByTestId('pt2'))
+
+      await waitFor(() => expect(mockClient.saveWorkspaceDraft).toHaveBeenCalled(), {
+        timeout: 2000,
+      })
+      const [symbol, interval, request] = mockClient.saveWorkspaceDraft.mock.calls[0]!
+      expect(symbol).toBe('SP500')
+      expect(interval).toBe('1d')
+      expect(request.annotations).toHaveLength(2)
+    })
+
+    it('deletes rather than saves an empty draft when the count is cleared', async () => {
+      mockClient.getWorkspaceDraft.mockResolvedValue(null)
+      renderWorkspace()
+
+      fireEvent.click(screen.getByTestId('pt1'))
+      fireEvent.click(screen.getByTestId('pt2'))
+      await waitFor(() => expect(mockClient.saveWorkspaceDraft).toHaveBeenCalled(), {
+        timeout: 2000,
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+      await waitFor(
+        () => expect(mockClient.deleteWorkspaceDraft).toHaveBeenCalledWith('SP500', '1d'),
+        {
+          timeout: 2000,
+        }
+      )
+    })
+
+    it("switching to a watchlist symbol restores that symbol's own draft (AC1)", async () => {
+      mockClient.getWatchlist.mockResolvedValue([
+        { symbol: 'SP500', sortOrder: 0, lastPrice: 5000, hasDraft: false },
+        { symbol: 'NASDAQ', sortOrder: 1, lastPrice: 18000, hasDraft: true },
+      ])
+      mockClient.getWorkspaceDraft.mockImplementation((symbol) =>
+        Promise.resolve(symbol === 'NASDAQ' ? draft({ symbol: 'NASDAQ' }) : null)
+      )
+      renderWorkspace()
+
+      const nasdaqButton = await screen.findByRole('button', {
+        name: (name) => name.startsWith('NASDAQ'),
+      })
+      fireEvent.click(nasdaqButton)
+
+      await waitFor(() =>
+        expect(screen.getByLabelText('Label for annotation 1')).toBeInTheDocument()
+      )
+      expect(mockClient.getWorkspaceDraft).toHaveBeenCalledWith('NASDAQ', '1d', expect.anything())
+    })
+
+    it('renders the watchlist from the API and supports add/remove', async () => {
+      mockClient.getWatchlist.mockResolvedValue([
+        { symbol: 'SP500', sortOrder: 0, lastPrice: null, hasDraft: false },
+      ])
+      renderWorkspace()
+
+      await screen.findByRole('button', { name: (name) => name.startsWith('SP500') })
+
+      fireEvent.change(screen.getByLabelText('Add symbol to watchlist'), {
+        target: { value: 'aapl' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Add to watchlist' }))
+      await waitFor(() => expect(mockClient.addWatchlistEntry).toHaveBeenCalledWith('AAPL'))
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove SP500 from watchlist' }))
+      await waitFor(() => expect(mockClient.removeWatchlistEntry).toHaveBeenCalledWith('SP500'))
+    })
   })
 })
