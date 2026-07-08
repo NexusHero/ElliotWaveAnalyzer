@@ -13,18 +13,8 @@ namespace ElliotWaveAnalyzer.Api.Application.Charting;
 /// </summary>
 public static class AnnotatedChartComposer
 {
-    private static readonly ChartColor Background = new(0x10, 0x14, 0x1A);
-    private static readonly ChartColor Foreground = new(0xC8, 0xD0, 0xDA);
-    private static readonly ChartColor Muted = new(0x7A, 0x86, 0x94);
-    private static readonly ChartColor Grid = new(0x2A, 0x31, 0x3C);
-    private static readonly ChartColor Bull = new(0x26, 0xA6, 0x9A);
-    private static readonly ChartColor Bear = new(0xEF, 0x53, 0x50);
-    private static readonly ChartColor BaseChannel = new(0x42, 0xA5, 0xF5);
-    private static readonly ChartColor AccelChannel = new(0xAB, 0x47, 0xBC);
-    private static readonly ChartColor EntryFill = new(0x42, 0xA5, 0xF5, 0x33);
-    private static readonly ChartColor TargetFill = new(0x66, 0xBB, 0x6A, 0x33);
-    private static readonly ChartColor Invalidation = new(0xEF, 0x53, 0x50);
-    private static readonly ChartColor Label = new(0xFF, 0xCA, 0x28);
+    /// <summary>The original design width every layout constant below was tuned against (#227).</summary>
+    private const float DesignWidth = 1200f;
 
     private const float PlotLeft = 60f;
     private const float PlotTop = 64f;
@@ -37,9 +27,16 @@ public static class AnnotatedChartComposer
     {
         ArgumentNullException.ThrowIfNull(input);
 
+        var palette = ChartPalette.For(input.Theme);
+        // Every fixed-pixel margin/font/stroke below was designed against DesignWidth (#227) — scaling
+        // them by the caller's actual width keeps proportions identical at 1200px and grows cleanly
+        // for a larger publishing canvas, with zero theme/size-specific branching in the draw steps.
+        var layoutScale = input.Width / DesignWidth;
+
         var ops = new List<ChartDrawOp>();
         var plot = new PlotArea(
-            PlotLeft, PlotTop, input.Width - RightMargin, input.Height - BottomMargin,
+            PlotLeft * layoutScale, PlotTop * layoutScale,
+            input.Width - (RightMargin * layoutScale), input.Height - (BottomMargin * layoutScale),
             input.Scale, PriceRange(input));
         if (input.Candles.Count > 0)
         {
@@ -47,28 +44,38 @@ public static class AnnotatedChartComposer
             plot.EndDate = input.Candles[^1].OpenTime;
         }
 
-        DrawGrid(ops, plot);
-        DrawCandles(ops, plot, input.Candles);
-        DrawChannels(ops, plot, input.Channels);
-        DrawZone(ops, plot, input.EntryZone, EntryFill);
+        DrawGrid(ops, plot, palette);
+        DrawCandles(ops, plot, input.Candles, palette);
+        DrawChannels(ops, plot, input.Channels, palette);
+        DrawZone(ops, plot, input.EntryZone, palette.EntryFill, layoutScale);
         foreach (var target in input.TargetZones)
         {
-            DrawZone(ops, plot, target, TargetFill);
+            DrawZone(ops, plot, target, palette.TargetFill, layoutScale);
         }
 
-        DrawInvalidation(ops, plot, input.Invalidation);
-        DrawLabels(ops, plot, input.Labels);
-        DrawScenarios(ops, plot, input.Candles, input.Scenarios);
-        DrawTitle(ops, input);
+        foreach (var alt in input.AlternateZones)
+        {
+            // Subordinate to the primary's own zones — same hue family, visibly lower opacity, and the
+            // label already carries "(alt)" (set by the caller) so it reads distinctly in the legend.
+            DrawZone(ops, plot, alt, alt.Basis.Contains("target", StringComparison.OrdinalIgnoreCase)
+                ? palette.TargetFill.WithAlpha(0x18)
+                : palette.EntryFill.WithAlpha(0x18), layoutScale);
+        }
+
+        DrawInvalidation(ops, plot, input.Invalidation, palette, layoutScale);
+        DrawLabels(ops, plot, input.Labels, palette, layoutScale);
+        DrawScenarios(ops, plot, input.Candles, input.Scenarios, palette, layoutScale);
+        DrawTitle(ops, input, palette, layoutScale);
+        DrawWatermark(ops, input, palette, layoutScale);
 
         if (input.Candles.Count == 0)
         {
             ops.Add(new ChartTextOp(
                 (plot.Left + plot.Right) / 2f, (plot.Top + plot.Bottom) / 2f,
-                "no price data", Muted, 18f, ChartTextAlign.Center));
+                "no price data", palette.Muted, 18f * layoutScale, ChartTextAlign.Center));
         }
 
-        return new ChartScene(input.Width, input.Height, Background, ops);
+        return new ChartScene(input.Width, input.Height, palette.Background, ops);
     }
 
     /// <summary>The min/max price the axis must span so every drawn element is visible.</summary>
@@ -130,17 +137,18 @@ public static class AnnotatedChartComposer
         }
     }
 
-    private static void DrawGrid(List<ChartDrawOp> ops, PlotArea plot)
+    private static void DrawGrid(List<ChartDrawOp> ops, PlotArea plot, ChartPalette palette)
     {
-        ops.Add(new ChartRectOp(plot.Left, plot.Top, plot.Width, plot.Height, Fill: null, Grid));
+        ops.Add(new ChartRectOp(plot.Left, plot.Top, plot.Width, plot.Height, Fill: null, palette.Grid));
         for (var r = 1; r < GridRows; r++)
         {
             var y = plot.Top + (plot.Height * r / GridRows);
-            ops.Add(new ChartLineOp(plot.Left, y, plot.Right, y, Grid));
+            ops.Add(new ChartLineOp(plot.Left, y, plot.Right, y, palette.Grid));
         }
     }
 
-    private static void DrawCandles(List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<MarketCandle> candles)
+    private static void DrawCandles(
+        List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<MarketCandle> candles, ChartPalette palette)
     {
         if (candles.Count == 0)
         {
@@ -153,7 +161,7 @@ public static class AnnotatedChartComposer
         {
             var c = candles[i];
             var x = plot.Left + (step * i) + (step / 2.0);
-            var color = c.Close >= c.Open ? Bull : Bear;
+            var color = c.Close >= c.Open ? palette.Bull : palette.Bear;
 
             ops.Add(new ChartLineOp(x, plot.MapY(c.High), x, plot.MapY(c.Low), color));
 
@@ -165,11 +173,12 @@ public static class AnnotatedChartComposer
         }
     }
 
-    private static void DrawChannels(List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<Channel> channels)
+    private static void DrawChannels(
+        List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<Channel> channels, ChartPalette palette)
     {
         foreach (var channel in channels)
         {
-            var color = channel.Kind == ChannelKind.Base ? BaseChannel : AccelChannel;
+            var color = channel.Kind == ChannelKind.Base ? palette.BaseChannel : palette.AccelChannel;
             DrawChannelLine(ops, plot, channel.OriginDate, channel.Baseline, color);
             DrawChannelLine(ops, plot, channel.OriginDate, channel.Parallel, color);
         }
@@ -184,7 +193,8 @@ public static class AnnotatedChartComposer
         ops.Add(new ChartLineOp(plot.Left, y1, plot.Right, y2, color, StrokeWidth: 1.5f));
     }
 
-    private static void DrawZone(List<ChartDrawOp> ops, PlotArea plot, PriceZone? zone, ChartColor fill)
+    private static void DrawZone(
+        List<ChartDrawOp> ops, PlotArea plot, PriceZone? zone, ChartColor fill, float layoutScale)
     {
         if (zone is not { } z)
         {
@@ -198,12 +208,14 @@ public static class AnnotatedChartComposer
             fill, fill.WithAlpha(0xAA)));
 
         var color = fill.WithAlpha(0xFF);
-        ops.Add(new ChartTextOp(plot.Right + 6f, top + 12f, FormatPrice(z.High), color, 12f));
-        ops.Add(new ChartTextOp(plot.Right + 6f, bottom - 2f, FormatPrice(z.Low), color, 12f));
-        ops.Add(new ChartTextOp(plot.Left + 6f, top + 14f, z.Label, color, 12f));
+        var fontSize = 12f * layoutScale;
+        ops.Add(new ChartTextOp(plot.Right + 6f, top + 12f, FormatPrice(z.High), color, fontSize));
+        ops.Add(new ChartTextOp(plot.Right + 6f, bottom - 2f, FormatPrice(z.Low), color, fontSize));
+        ops.Add(new ChartTextOp(plot.Left + 6f, top + 14f, z.Label, color, fontSize));
     }
 
-    private static void DrawInvalidation(List<ChartDrawOp> ops, PlotArea plot, PriceLevel? level)
+    private static void DrawInvalidation(
+        List<ChartDrawOp> ops, PlotArea plot, PriceLevel? level, ChartPalette palette, float layoutScale)
     {
         if (level is not { } l)
         {
@@ -211,25 +223,27 @@ public static class AnnotatedChartComposer
         }
 
         var y = plot.MapY(l.Price);
-        ops.Add(new ChartLineOp(plot.Left, y, plot.Right, y, Invalidation, StrokeWidth: 2f, Dashed: true));
+        ops.Add(new ChartLineOp(plot.Left, y, plot.Right, y, palette.Invalidation, StrokeWidth: 2f, Dashed: true));
         ops.Add(new ChartTextOp(
-            plot.Right + 6f, y + 4f, $"✕ {FormatPrice(l.Price)}", Invalidation, 13f));
+            plot.Right + 6f, y + 4f, $"✕ {FormatPrice(l.Price)}", palette.Invalidation, 13f * layoutScale));
     }
 
-    private static void DrawLabels(List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<WaveAnnotation> labels)
+    private static void DrawLabels(
+        List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<WaveAnnotation> labels, ChartPalette palette,
+        float layoutScale)
     {
         foreach (var a in labels)
         {
             var x = plot.MapX(a.Date);
             var y = plot.MapY(a.Price);
-            ops.Add(new ChartRectOp(x - 2f, y - 2f, 4f, 4f, Label));
-            ops.Add(new ChartTextOp(x, y - 8f, $"[{a.Label}]", Label, 15f, ChartTextAlign.Center));
+            ops.Add(new ChartRectOp(x - 2f, y - 2f, 4f, 4f, palette.Label));
+            ops.Add(new ChartTextOp(x, y - 8f, $"[{a.Label}]", palette.Label, 15f * layoutScale, ChartTextAlign.Center));
         }
     }
 
     private static void DrawScenarios(
         List<ChartDrawOp> ops, PlotArea plot, IReadOnlyList<MarketCandle> candles,
-        IReadOnlyList<ChartScenarioArrow> scenarios)
+        IReadOnlyList<ChartScenarioArrow> scenarios, ChartPalette palette, float layoutScale)
     {
         if (candles.Count == 0 || scenarios.Count == 0)
         {
@@ -241,7 +255,7 @@ public static class AnnotatedChartComposer
         var lastClose = candles[^1].Close;
         foreach (var s in scenarios)
         {
-            var color = s.Bullish ? Bull : Bear;
+            var color = s.Bullish ? palette.Bull : palette.Bear;
             var y1 = plot.MapY(lastClose);
             var y2 = plot.MapY(s.TargetPrice);
             ops.Add(new ChartLineOp(startX, y1, tipX, y2, color, StrokeWidth: 2f, Dashed: !s.Primary));
@@ -250,18 +264,37 @@ public static class AnnotatedChartComposer
             var dir = Math.Sign(y2 - y1);
             ops.Add(new ChartLineOp(tipX, y2, tipX - 8f, y2 - (dir * 6f) - 4f, color, StrokeWidth: 2f));
             ops.Add(new ChartLineOp(tipX, y2, tipX - 8f, y2 - (dir * 6f) + 4f, color, StrokeWidth: 2f));
-            ops.Add(new ChartTextOp(tipX, y2 - 6f, s.Label, color, 12f, ChartTextAlign.Right));
+            ops.Add(new ChartTextOp(tipX, y2 - 6f, s.Label, color, 12f * layoutScale, ChartTextAlign.Right));
         }
     }
 
-    private static void DrawTitle(List<ChartDrawOp> ops, AnnotatedChartInput input)
+    /// <summary>Title block: symbol · timeframe · date · scale, plus a disclaimer line (#227 AC2).</summary>
+    private static void DrawTitle(List<ChartDrawOp> ops, AnnotatedChartInput input, ChartPalette palette, float layoutScale)
     {
         var scale = input.Scale == FibScale.Log ? "log" : "linear";
         var date = input.RenderDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         ops.Add(new ChartTextOp(
-            PlotLeft, 34f,
+            PlotLeft * layoutScale, 34f * layoutScale,
             $"{input.Symbol} · {input.Timeframe} · {date} · {scale} scale",
-            Foreground, 20f));
+            palette.Foreground, 20f * layoutScale));
+        ops.Add(new ChartTextOp(
+            PlotLeft * layoutScale, 52f * layoutScale,
+            "Not financial advice — for educational purposes only.",
+            palette.Muted, 12f * layoutScale));
+    }
+
+    /// <summary>Optional low-opacity watermark near the bottom of the canvas (#227 AC2).</summary>
+    private static void DrawWatermark(
+        List<ChartDrawOp> ops, AnnotatedChartInput input, ChartPalette palette, float layoutScale)
+    {
+        if (string.IsNullOrWhiteSpace(input.WatermarkText))
+        {
+            return;
+        }
+
+        ops.Add(new ChartTextOp(
+            input.Width / 2f, input.Height - (16f * layoutScale),
+            input.WatermarkText, palette.Muted.WithAlpha(0x60), 16f * layoutScale, ChartTextAlign.Center));
     }
 
     private static string FormatPrice(decimal price)

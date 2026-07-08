@@ -108,4 +108,60 @@ public sealed class AnalysisChartAcceptanceTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
+
+    // ── #227: export options — theme/axisScale/scale2x/watermark, backward compatible (AC4) ──────
+
+    [Test]
+    public async Task GetChart_WithNoQueryString_StillWorks_BackwardCompatible()
+    {
+        // AC4: an existing caller that never learns about the new #227 options keeps getting a
+        // valid export — no query string is required.
+        var id = await SaveAsync();
+
+        var response = await _client.GetAsync($"/api/analyses/{id}/chart.png");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetChart_WithExportOptions_ReturnsOk()
+    {
+        var id = await SaveAsync();
+
+        var response = await _client.GetAsync(
+            $"/api/analyses/{id}/chart.png?theme=light&axisScale=log&scale2x=true&watermark=demo");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetChart_InvalidTheme_ReturnsBadRequest()
+    {
+        var id = await SaveAsync();
+
+        var response = await _client.GetAsync($"/api/analyses/{id}/chart.png?theme=neon");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetChart_InvalidAxisScale_ReturnsBadRequest()
+    {
+        var id = await SaveAsync();
+
+        var response = await _client.GetAsync($"/api/analyses/{id}/chart.png?axisScale=exponential");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GetChart_WatermarkTooLong_ReturnsBadRequest()
+    {
+        var id = await SaveAsync();
+
+        var response = await _client.GetAsync(
+            $"/api/analyses/{id}/chart.png?watermark={new string('x', 65)}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
 }

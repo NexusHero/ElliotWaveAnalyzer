@@ -167,4 +167,107 @@ public sealed class AnnotatedChartComposerTests
     [Test]
     public void Compose_NullInput_Throws()
         => Assert.Throws<ArgumentNullException>(() => AnnotatedChartComposer.Compose(null!));
+
+    // ── #227: theme, watermark, alternate zones, disclaimer, publishing size ──────────────────────
+
+    [Test]
+    public void Compose_LightTheme_UsesTheLightPalettesBackground()
+    {
+        var dark = AnnotatedChartComposer.Compose(SampleInput());
+        var light = AnnotatedChartComposer.Compose(SampleInput() with { Theme = ChartTheme.Light });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dark.Background, Is.EqualTo(ChartPalette.Dark.Background));
+            Assert.That(light.Background, Is.EqualTo(ChartPalette.Light.Background));
+            Assert.That(light.Background, Is.Not.EqualTo(dark.Background));
+        });
+    }
+
+    [Test]
+    public void Compose_Watermark_EmitsLowOpacityCenteredText()
+    {
+        var input = SampleInput() with { WatermarkText = "@myhandle" };
+        var scene = AnnotatedChartComposer.Compose(input);
+
+        var watermark = scene.Ops.OfType<ChartTextOp>()
+            .FirstOrDefault(t => t.Text == "@myhandle" && t.Align == ChartTextAlign.Center);
+        Assert.That(watermark, Is.Not.Null);
+        Assert.That(watermark!.Color.A, Is.LessThan(0xFF), "the watermark must be translucent, not opaque");
+    }
+
+    [Test]
+    public void Compose_NoWatermarkText_EmitsNoWatermark()
+    {
+        var scene = AnnotatedChartComposer.Compose(SampleInput());
+
+        // A translucent, centered text run is the watermark's own distinguishing shape — wave labels
+        // are also centered but drawn fully opaque, so this doesn't false-positive on them.
+        Assert.That(
+            scene.Ops.OfType<ChartTextOp>().Any(t => t.Align == ChartTextAlign.Center && t.Color.A < 0xFF),
+            Is.False);
+    }
+
+    [Test]
+    public void Compose_AlternateZones_DrawnSubordinateToThePrimaryZones()
+    {
+        var input = SampleInput() with
+        {
+            AlternateZones =
+            [
+                new PriceZone(37000m, 37500m, "Alt 1 target (alt)", "target"),
+            ],
+        };
+        var scene = AnnotatedChartComposer.Compose(input);
+
+        var texts = scene.Ops.OfType<ChartTextOp>().Select(t => t.Text).ToList();
+        Assert.That(texts, Has.Some.Contains("(alt)"));
+
+        // The alternate zone's fill must be visibly more transparent than the primary target zone's.
+        var primaryZoneFillAlpha = scene.Ops.OfType<ChartRectOp>()
+            .Where(r => r.Fill is { A: < 0xFF })
+            .First(r => r.Width > 400).Fill!.A;
+        var altZoneFillAlpha = scene.Ops.OfType<ChartRectOp>()
+            .Where(r => r.Fill is { A: < 0xFF })
+            .Where(r => r.Width > 400)
+            .Min(r => r.Fill!.A);
+        Assert.That(altZoneFillAlpha, Is.LessThan(primaryZoneFillAlpha));
+    }
+
+    [Test]
+    public void Compose_Title_IncludesADisclaimerLine()
+    {
+        var scene = AnnotatedChartComposer.Compose(SampleInput());
+
+        Assert.That(
+            scene.Ops.OfType<ChartTextOp>().Any(t =>
+                t.Text.Contains("Not financial advice", StringComparison.Ordinal)),
+            Is.True);
+    }
+
+    [Test]
+    public void DefaultInput_MeetsThePublishingSizeMinimum()
+    {
+        var input = new AnnotatedChartInput("BTC", "1D", T0, FibScale.Linear, []);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(input.Width, Is.GreaterThanOrEqualTo(1920));
+            Assert.That(input.Height, Is.GreaterThanOrEqualTo(1080));
+        });
+    }
+
+    [Test]
+    public void Compose_LargerCanvas_ScalesLayoutProportionally_StillDeterministic()
+    {
+        // A bigger canvas must not change the *shape* of the scene (same op count), just its geometry.
+        var narrow = AnnotatedChartComposer.Compose(SampleInput() with { Width = 1200, Height = 700 });
+        var wide = AnnotatedChartComposer.Compose(SampleInput() with { Width = 3840, Height = 2160 });
+
+        Assert.That(wide.Ops, Has.Count.EqualTo(narrow.Ops.Count));
+        Assert.That(
+            AnnotatedChartComposer.Compose(SampleInput() with { Width = 3840, Height = 2160 }).Ops,
+            Is.EqualTo(wide.Ops),
+            "same wide input composed twice must still be byte-for-byte identical (#227 AC3)");
+    }
 }

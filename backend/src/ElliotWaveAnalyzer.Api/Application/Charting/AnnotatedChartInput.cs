@@ -22,11 +22,24 @@ public sealed record AnnotatedChartInput(
     FibScale Scale,
     IReadOnlyList<MarketCandle> Candles)
 {
-    /// <summary>Canvas width in pixels.</summary>
-    public int Width { get; init; } = 1200;
+    /// <summary>
+    /// Canvas width in pixels. Default (1920) meets #227 AC2's publishing-size minimum; layout margins
+    /// and font sizes scale proportionally to this against the original 1200px design width, so a
+    /// caller can size up (or down) without the composer needing any theme/size-specific logic.
+    /// </summary>
+    public int Width { get; init; } = 1920;
 
-    /// <summary>Canvas height in pixels.</summary>
-    public int Height { get; init; } = 700;
+    /// <summary>Canvas height in pixels. Default (1080) meets #227 AC2's publishing-size minimum.</summary>
+    public int Height { get; init; } = 1080;
+
+    /// <summary>Colour palette to compose with (#227 AC2).</summary>
+    public ChartTheme Theme { get; init; } = ChartTheme.Dark;
+
+    /// <summary>
+    /// Optional watermark text, drawn low-opacity near the bottom of the canvas (#227 AC2). Null or
+    /// empty draws nothing.
+    /// </summary>
+    public string? WatermarkText { get; init; }
 
     /// <summary>Wave labels to place at their pivots (e.g. 1–5, A–C). Empty when pivots are unknown.</summary>
     public IReadOnlyList<WaveAnnotation> Labels { get; init; } = [];
@@ -39,6 +52,15 @@ public sealed record AnnotatedChartInput(
 
     /// <summary>Forward target zone box(es).</summary>
     public IReadOnlyList<PriceZone> TargetZones { get; init; } = [];
+
+    /// <summary>
+    /// Alternate scenarios' own entry/target zones (#227), drawn subordinate (lower opacity, labelled
+    /// "(alt)") to the primary's <see cref="EntryZone"/>/<see cref="TargetZones"/> — the exported
+    /// analogue of the live chart's projection-branch bands, built from the alternates a saved
+    /// analysis actually persists (see ADR-072 for why a live count's forward-projection branches
+    /// themselves cannot be reconstructed for a saved analysis).
+    /// </summary>
+    public IReadOnlyList<PriceZone> AlternateZones { get; init; } = [];
 
     /// <summary>Projected Elliott channels drawn as rays across the plot.</summary>
     public IReadOnlyList<Channel> Channels { get; init; } = [];
