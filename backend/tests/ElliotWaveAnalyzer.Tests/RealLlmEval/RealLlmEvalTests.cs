@@ -2,6 +2,7 @@ using System.Text.Json;
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
@@ -107,7 +108,8 @@ public sealed class RealLlmEvalTests
         SkipWithoutAKey();
 
         var narrator = new LlmPositionNarrator(
-            [BuildRealGeminiClient()], Options.Create(new LlmProviderOptions { Active = "Gemini" }), NullLogger<LlmPositionNarrator>.Instance);
+            [BuildRealGeminiClient()], Options.Create(new LlmProviderOptions { Active = "Gemini" }),
+            new FakeNarrativeLanguageProvider(), NullLogger<LlmPositionNarrator>.Instance);
 
         PositionBrief[] briefs =
         [

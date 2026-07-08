@@ -49,17 +49,25 @@ internal static class AutoWaveRankRunner
         IReadOnlyList<WaveCandidate> candidates,
         ILogger logger,
         CancellationToken cancellationToken,
-        string? personaGuidance = null)
+        string? personaGuidance = null,
+        NarrativeLanguage language = NarrativeLanguage.English)
     {
         var prompt = AutoWaveAnalysisPromptBuilder.Build(symbol, candles, candidates);
 
         // Persona guidance (#184) only ever narrows HOW the same candidate set is read and
         // explained — it is appended to, never replaces, the base instruction, so a persona can
-        // no more introduce a non-deterministic count than the plain ranker can (ADR-009).
+        // no more introduce a non-deterministic count than the plain ranker can (ADR-009). The
+        // narrative-language directive (#228) is additive the same way — it only changes which
+        // language the free-text fields are written in, never the candidate geometry.
         var systemPrompt = "You are an expert Elliott Wave market analyst. Respond ONLY with valid JSON — no prose, no markdown.";
         if (!string.IsNullOrWhiteSpace(personaGuidance))
         {
             systemPrompt += " " + personaGuidance;
+        }
+
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
         }
 
         var messages = new List<ChatMessage>

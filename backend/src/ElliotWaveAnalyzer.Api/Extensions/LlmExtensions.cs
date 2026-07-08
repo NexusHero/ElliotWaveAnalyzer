@@ -48,6 +48,11 @@ internal static class LlmExtensions
 
         services.AddTransient<ILlmWaveAnalyzer, LlmWaveAnalyzer>();
 
+        // Narrative language (#228): resolves the calling user's preference from their session, for
+        // every narrator that doesn't already receive a userId parameter. Scoped (reads AppDbContext
+        // via INarrativeLanguageSettingsService, registered by AddAppAuth).
+        services.AddScoped<INarrativeLanguageProvider, HttpContextNarrativeLanguageProvider>();
+
         // Full-auto ranking: a consensus across all keyed providers when LlmProvider:Ensemble
         // is true, otherwise just the active provider. Chosen once at startup from config.
         var ensemble = configuration.GetValue<bool>($"{LlmProviderOptions.SectionName}:Ensemble");

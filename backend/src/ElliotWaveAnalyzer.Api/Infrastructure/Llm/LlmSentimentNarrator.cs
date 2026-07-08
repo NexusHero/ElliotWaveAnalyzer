@@ -20,6 +20,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmSentimentNarrator(
     IEnumerable<IChatClient> chatClients,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmSentimentNarrator> logger) : ISentimentNarrator
 {
     private const int MaxOutputTokens = 300;
@@ -47,12 +48,19 @@ internal sealed class LlmSentimentNarrator(
             };
         }
 
+        var systemPrompt =
+            "You are an Elliott Wave analyst writing a two-sentence note on social mood versus wave "
+            + "position (socionomics). Use ONLY the numbers in the fact sheet — never state a mood "
+            + "score that is not listed. Respond ONLY with JSON: {\"narrative\": \"...\"}.";
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an Elliott Wave analyst writing a two-sentence note on social mood versus wave "
-                + "position (socionomics). Use ONLY the numbers in the fact sheet — never state a mood "
-                + "score that is not listed. Respond ONLY with JSON: {\"narrative\": \"...\"}."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, BuildFactSheet(report)),
         };
 

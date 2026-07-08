@@ -20,6 +20,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmAnalogNarrator(
     IEnumerable<IChatClient> chatClients,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmAnalogNarrator> logger) : IAnalogNarrator
 {
     private const int MaxOutputTokens = 400;
@@ -46,12 +47,19 @@ internal sealed class LlmAnalogNarrator(
             };
         }
 
+        var systemPrompt =
+            "You are an Elliott Wave analyst writing a two-sentence note comparing a setup to its "
+            + "historical analogs. Use ONLY the numbers in the fact sheet — never state a rate, count "
+            + "or date that is not listed. Respond ONLY with JSON: {\"narrative\": \"...\"}.";
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an Elliott Wave analyst writing a two-sentence note comparing a setup to its "
-                + "historical analogs. Use ONLY the numbers in the fact sheet — never state a rate, count "
-                + "or date that is not listed. Respond ONLY with JSON: {\"narrative\": \"...\"}."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, BuildFactSheet(report)),
         };
 

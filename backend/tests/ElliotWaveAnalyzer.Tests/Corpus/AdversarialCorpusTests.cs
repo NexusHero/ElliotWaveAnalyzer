@@ -1,6 +1,7 @@
 using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -188,7 +189,8 @@ public sealed class AdversarialCorpusTests
     ];
 
     private static LlmPositionNarrator Narrator(IChatClient client) =>
-        new([client], Options.Create(new LlmProviderOptions()), NullLogger<LlmPositionNarrator>.Instance);
+        new([client], Options.Create(new LlmProviderOptions()), new FakeNarrativeLanguageProvider(),
+            NullLogger<LlmPositionNarrator>.Instance);
 
     [TestCaseSource(nameof(ExfiltrationCorpus))]
     public async Task Exfiltration_RawProseResponse_NeverLeaksModelTextOnlyTheFixedReason(string payload)

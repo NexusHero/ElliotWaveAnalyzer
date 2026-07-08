@@ -7,6 +7,7 @@ import {
   type SavedKey,
 } from '../hooks/useApiKeys'
 import { type ConsentCategories, useConsent } from '../hooks/useConsent'
+import { useNarrativeLanguage } from '../hooks/useNarrativeLanguage'
 import DepotImportPanel from './DepotImportPanel'
 import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
 
@@ -177,16 +178,38 @@ function ProviderRow({
 
 const STYLES = ['Report', 'Verdict', 'Chat'] as const
 const TONES = ['Gentle', 'Direct'] as const
+const LANGUAGES = ['English', 'German'] as const
 
 function CoachingPreferences() {
   const [style, setStyle] = useState<(typeof STYLES)[number]>('Report')
   const [tone, setTone] = useState<(typeof TONES)[number]>('Gentle')
   const [showFib, setShowFib] = useState(true)
+  const { language, setLanguage } = useNarrativeLanguage()
 
   return (
     <section className="set-section">
       <h2>Coaching preferences</h2>
       <div className="pref-rows">
+        <div className="pref-row">
+          <div className="pref-text">
+            <strong>Narrative language</strong>
+            <span>The language AI readings, reflections and summaries are written in.</span>
+          </div>
+          <div className="mini-seg" role="group" aria-label="Narrative language">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={language === l ? 'on' : ''}
+                aria-pressed={language === l}
+                onClick={() => setLanguage(l)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="pref-row">
           <div className="pref-text">
             <strong>Reflection layout</strong>

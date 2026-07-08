@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using ElliotWaveAnalyzer.Api.Application;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 using Microsoft.Extensions.AI;
@@ -18,6 +19,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmHypothesisProposer(
     IEnumerable<IChatClient> chatClients,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmHypothesisProposer> logger) : IHypothesisProposer
 {
     private const int MaxOutputTokens = 400;
@@ -35,14 +37,21 @@ internal sealed class LlmHypothesisProposer(
             return [];
         }
 
+        var systemPrompt =
+            "You are an Elliott Wave analyst suggesting which STRUCTURES are worth testing for a set of "
+            + "pivots. You do NOT decide validity — a deterministic engine will rule-check each. Choose only "
+            + "from this vocabulary: impulse, diagonal, zigzag, flat, triangle. Give at most " + max
+            + " suggestions, each with a one-line reason. Respond ONLY with JSON: "
+            + "{\"proposals\":[{\"structure\":\"...\",\"reason\":\"...\"}]}.";
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an Elliott Wave analyst suggesting which STRUCTURES are worth testing for a set of "
-                + "pivots. You do NOT decide validity — a deterministic engine will rule-check each. Choose only "
-                + "from this vocabulary: impulse, diagonal, zigzag, flat, triangle. Give at most " + max
-                + " suggestions, each with a one-line reason. Respond ONLY with JSON: "
-                + "{\"proposals\":[{\"structure\":\"...\",\"reason\":\"...\"}]}."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, Describe(symbol, pivots)),
         };
 

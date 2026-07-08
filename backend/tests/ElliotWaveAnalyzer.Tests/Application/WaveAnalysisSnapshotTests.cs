@@ -24,7 +24,8 @@ public sealed class WaveAnalysisSnapshotTests
     {
         var options = Options.Create(new LlmProviderOptions { Active = "Gemini" });
         var chatClient = new FakeChatClient();
-        var llm = new LlmWaveAnalyzer(chatClient, options, NullLogger<LlmWaveAnalyzer>.Instance);
+        var llm = new LlmWaveAnalyzer(
+            chatClient, options, new FakeNarrativeLanguageProvider(), NullLogger<LlmWaveAnalyzer>.Instance);
 
         var tokenTracker = Substitute.For<ITokenTracker>();
         tokenTracker.IsBudgetExceeded().Returns(false);

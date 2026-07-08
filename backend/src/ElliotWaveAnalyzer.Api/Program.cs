@@ -68,6 +68,7 @@ try
     app.MapKeyEndpoints();
     app.MapDepotEndpoints();
     app.MapSymbolEndpoints();
+    app.MapNarrativeLanguageEndpoints();
     app.MapAppHealthChecks();
 
     app.Run();

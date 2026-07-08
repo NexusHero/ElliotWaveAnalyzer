@@ -19,14 +19,21 @@ public sealed class FakeChatClient : IChatClient
         TotalTokenCount = 150,
     };
 
+    /// <summary>The messages sent on the most recent <see cref="GetResponseAsync"/> call (#228 — lets tests
+    /// assert on the sent system prompt, e.g. the narrative-language directive).</summary>
+    public IReadOnlyList<ChatMessage>? LastMessages { get; private set; }
+
     public Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages,
         ChatOptions? options = null,
         CancellationToken cancellationToken = default)
-        => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, ResponseJson))
+    {
+        LastMessages = messages.ToList();
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, ResponseJson))
         {
             Usage = Usage,
         });
+    }
 
     public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
         IEnumerable<ChatMessage> messages,

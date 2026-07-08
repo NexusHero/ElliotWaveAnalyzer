@@ -51,4 +51,23 @@ public sealed class PositionFactGuardTests
         // 150.10 is within 0.5% of the 150.00 current price — rounding in prose is fine.
         Assert.That(PositionFactGuard.Passes("Trading around 150.10 today.", Brief()), Is.True);
     }
+
+    // ── #228 AC3: the guard matches digits via a language-agnostic regex, not English words —
+    // German prose citing the brief's own prices still passes, and a hallucinated price in German
+    // prose is still rejected exactly like the English case above.
+
+    [Test]
+    public void Passes_GermanNarrativeCitingOnlyFactPrices_IsAllowed()
+    {
+        const string narrative =
+            "Der Kurs hält bei 150.00 über der Invalidierung von 120.00; ein Rücksetzer auf 130.00 favorisiert 180.00.";
+        Assert.That(PositionFactGuard.Passes(narrative, Brief()), Is.True);
+    }
+
+    [Test]
+    public void Passes_GermanNarrativeWithAFabricatedPrice_IsRejected()
+    {
+        const string narrative = "Das Ziel liegt bei 999.99.";
+        Assert.That(PositionFactGuard.Passes(narrative, Brief()), Is.False);
+    }
 }

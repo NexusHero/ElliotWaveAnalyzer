@@ -83,4 +83,21 @@ public sealed class AnalogFactGuardTests
     {
         Assert.That(AnalogFactGuard.Passes("The analogs skew bullish and constructive.", Report()), Is.True);
     }
+
+    // ── #228 AC3: the guard matches digits via a language-agnostic regex, not English words —
+    // German prose citing the report's own figures still passes, and a hallucinated figure in
+    // German prose is still rejected exactly like the English case above.
+
+    [Test]
+    public void Passes_GermanGroundedNarrative_IsAccepted()
+    {
+        const string narrative = "Etwa 68% der 25 Analoga erreichten das Ziel, bei einem Median von 12 Tagen.";
+        Assert.That(AnalogFactGuard.Passes(narrative, Report()), Is.True);
+    }
+
+    [Test]
+    public void Passes_GermanHallucinatedHitRate_IsRejected()
+    {
+        Assert.That(AnalogFactGuard.Passes("Starke 82% erreichten ihr Ziel.", Report()), Is.False);
+    }
 }

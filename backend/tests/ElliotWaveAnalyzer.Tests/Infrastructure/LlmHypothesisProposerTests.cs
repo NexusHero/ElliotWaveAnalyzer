@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -19,7 +20,8 @@ public sealed class LlmHypothesisProposerTests
         Enumerable.Range(0, n).Select(i => new SwingPivot(Start.AddDays(i * 5), 100 + i * 10, i % 2 == 1)).ToList();
 
     private static LlmHypothesisProposer Proposer(params IChatClient[] clients) =>
-        new(clients, Options.Create(new LlmProviderOptions()), NullLogger<LlmHypothesisProposer>.Instance);
+        new(clients, Options.Create(new LlmProviderOptions()), new FakeNarrativeLanguageProvider(),
+            NullLogger<LlmHypothesisProposer>.Instance);
 
     [Test]
     public void IsConfigured_ReflectsWhetherAChatClientIsPresent()
@@ -33,6 +35,21 @@ public sealed class LlmHypothesisProposerTests
     {
         var result = await Proposer().ProposeAsync("BTC", Pivots(6), 5);
         Assert.That(result, Is.Empty);
+    }
+
+    [Test]
+    public async Task ProposeAsync_GermanPreference_AppendsTheLanguageDirectiveToTheSystemPrompt()
+    {
+        var chat = new FakeChatClient { ResponseJson = """{ "proposals": [] }""" };
+        var proposer = new LlmHypothesisProposer(
+            [chat], Options.Create(new LlmProviderOptions()),
+            new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.German },
+            NullLogger<LlmHypothesisProposer>.Instance);
+
+        await proposer.ProposeAsync("BTC", Pivots(6), 5);
+
+        var systemMessage = chat.LastMessages!.First(m => m.Role == ChatRole.System);
+        Assert.That(systemMessage.Text, Does.Contain("German"));
     }
 
     [Test]

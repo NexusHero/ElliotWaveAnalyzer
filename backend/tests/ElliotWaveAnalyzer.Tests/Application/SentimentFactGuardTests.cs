@@ -60,4 +60,21 @@ public sealed class SentimentFactGuardTests
         const string narrative = "An unusually strong mood reading of 0.99 confirms the breakout.";
         Assert.That(SentimentFactGuard.Passes(narrative, Report()), Is.False);
     }
+
+    // ── #228 AC3: the guard matches digits via a language-agnostic regex, not English words —
+    // German prose citing the report's own figures still passes, and a hallucinated figure in
+    // German prose is still rejected exactly like the English case above.
+
+    [Test]
+    public void Passes_GermanGroundedNarrative_IsAccepted()
+    {
+        const string narrative = "Die Stimmung erreichte 0.80 bei Welle 3, fiel aber bis Welle 5 auf 0.50.";
+        Assert.That(SentimentFactGuard.Passes(narrative, Report()), Is.True);
+    }
+
+    [Test]
+    public void Passes_GermanHallucinatedMoodScore_IsRejected()
+    {
+        Assert.That(SentimentFactGuard.Passes("Die Stimmung erreichte ein Extrem von 0.95 bei Welle 5.", Report()), Is.False);
+    }
 }

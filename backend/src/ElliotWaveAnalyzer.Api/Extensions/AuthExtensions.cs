@@ -53,6 +53,11 @@ internal static class AuthExtensions
         services.AddScoped<IWorkspaceDraftService, WorkspaceDraftService>();
         services.AddScoped<IWatchlistService, WatchlistService>();
 
+        // Narrative-language preference (#228): a single scalar per user, so it lives on AppUser
+        // rather than a new table. INarrativeLanguageProvider (registered by AddLlmServices, since
+        // it's an LLM-narrative concern) reads through this to resolve the current caller's setting.
+        services.AddScoped<INarrativeLanguageSettingsService, NarrativeLanguageSettingsService>();
+
         // Persona-panel (#184) real track-record history: reuses the same candle-fetch-and-evaluate
         // approach TrackRecordService does, restricted to persona-tagged saves.
         services.AddScoped<IPersonaCalibrationProvider, PersonaCalibrationProvider>();

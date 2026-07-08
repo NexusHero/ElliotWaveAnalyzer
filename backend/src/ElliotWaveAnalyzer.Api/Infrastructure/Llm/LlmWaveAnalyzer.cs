@@ -21,6 +21,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmWaveAnalyzer(
     IChatClient chatClient,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmWaveAnalyzer> logger) : ILlmWaveAnalyzer
 {
     // Gemini 2.5 models spend "thinking" tokens against this budget, so a small cap can
@@ -49,10 +50,16 @@ internal sealed class LlmWaveAnalyzer(
             "Sending wave validation to {Provider} ({Model}) for {Symbol} with {Count} annotations",
             ProviderName, options.Value.GetActiveEndpoint().Model, symbol, annotations.Count);
 
+        var systemPrompt = "You are an expert Elliott Wave analyst. Respond ONLY with valid JSON — no prose, no markdown.";
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an expert Elliott Wave analyst. Respond ONLY with valid JSON — no prose, no markdown."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, prompt),
         };
 
