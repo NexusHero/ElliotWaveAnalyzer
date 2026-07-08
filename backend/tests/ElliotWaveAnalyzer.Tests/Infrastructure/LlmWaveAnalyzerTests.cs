@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using ElliotWaveAnalyzer.Tests.TestData;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,6 +39,7 @@ public sealed class LlmWaveAnalyzerTests
         _sut = new LlmWaveAnalyzer(
             _chat,
             Options.Create(new LlmProviderOptions { Active = "Gemini" }),
+            new FakeNarrativeLanguageProvider(),
             NullLogger<LlmWaveAnalyzer>.Instance);
     }
 
@@ -135,6 +137,28 @@ public sealed class LlmWaveAnalyzerTests
             () => _sut.ValidateAsync("BTC", Candles, Annotations, Report));
     }
 
+    // ─── Narrative language (#228) ─────────────────────────────────────────────
+
+    [Test]
+    public async Task ValidateAsync_GermanPreference_AppendsTheLanguageDirectiveToTheSystemPrompt()
+    {
+        GivenResponse(
+            """{ "isValid": true, "violations": [], "warnings": [], "analysis": "x", "confidence": "high" }""");
+        var sut = new LlmWaveAnalyzer(
+            _chat,
+            Options.Create(new LlmProviderOptions { Active = "Gemini" }),
+            new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.German },
+            NullLogger<LlmWaveAnalyzer>.Instance);
+
+        await sut.ValidateAsync("BTC", Candles, Annotations, Report);
+
+        await _chat.Received().GetResponseAsync(
+            Arg.Is<IEnumerable<ChatMessage>>(msgs =>
+                msgs.Any(m => m.Role == ChatRole.System && m.Text!.Contains("German"))),
+            Arg.Any<ChatOptions?>(),
+            Arg.Any<CancellationToken>());
+    }
+
     // ─── Provider name ───────────────────────────────────────────────────────────
 
     [Test]
@@ -143,6 +167,7 @@ public sealed class LlmWaveAnalyzerTests
         var sut = new LlmWaveAnalyzer(
             _chat,
             Options.Create(new LlmProviderOptions { Active = "Claude" }),
+            new FakeNarrativeLanguageProvider(),
             NullLogger<LlmWaveAnalyzer>.Instance);
 
         Assert.That(sut.ProviderName, Is.EqualTo("Claude"));

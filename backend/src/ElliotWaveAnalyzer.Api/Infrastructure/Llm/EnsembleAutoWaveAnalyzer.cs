@@ -20,6 +20,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class EnsembleAutoWaveAnalyzer(
     IChatClientResolver chatClientResolver,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<EnsembleAutoWaveAnalyzer> logger) : IAutoWaveAnalyzer
 {
     /// <summary>The keyed-DI name, endpoint options, and display name for each provider.</summary>
@@ -55,6 +56,9 @@ internal sealed class EnsembleAutoWaveAnalyzer(
             "Ensemble ranking {Count} candidates for {Symbol} across: {Providers}",
             candidates.Count, symbol, string.Join(", ", enabled.Select(p => p.Display)));
 
+        // Resolved once — the same caller's preference applies to every provider in the ensemble.
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+
         // Query all providers concurrently; tolerate individual failures.
         var tasks = enabled.Select(async p =>
         {
@@ -62,7 +66,8 @@ internal sealed class EnsembleAutoWaveAnalyzer(
             {
                 var client = chatClientResolver.Resolve(p.Key);
                 var result = await AutoWaveRankRunner.RunAsync(
-                    client, p.Endpoint(opts).Model, p.Display, symbol, candles, candidates, logger, cancellationToken);
+                    client, p.Endpoint(opts).Model, p.Display, symbol, candles, candidates, logger, cancellationToken,
+                    language: language);
                 return (p.Display, Result: result, Ok: true);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

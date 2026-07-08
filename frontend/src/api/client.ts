@@ -7,6 +7,8 @@ import type {
   CandleIntervalCode,
   DepotSnapshot,
   ImageVerificationReport,
+  NarrativeLanguage,
+  NarrativeLanguageResponse,
   PersonaPanelResponse,
   PortfolioReview,
   ResolvedSymbol,
@@ -658,6 +660,36 @@ export async function removeWatchlistEntry(symbol: string, signal?: AbortSignal)
   })
 
   if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorDetail(response))
+  }
+}
+
+/** Fetches the caller's narrative-language preference via `GET /api/settings/narrative-language` (#228). */
+export async function getNarrativeLanguage(
+  signal?: AbortSignal
+): Promise<NarrativeLanguageResponse> {
+  const response = await fetch('/api/settings/narrative-language', { signal })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as NarrativeLanguageResponse
+}
+
+/** Sets the caller's narrative-language preference via `PUT /api/settings/narrative-language` (#228). */
+export async function setNarrativeLanguage(
+  language: NarrativeLanguage,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch('/api/settings/narrative-language', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ language }),
+    signal,
+  })
+
+  if (!response.ok) {
     throw new Error(await extractErrorDetail(response))
   }
 }

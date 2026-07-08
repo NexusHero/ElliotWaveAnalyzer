@@ -1,6 +1,7 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Tests.Acceptance;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -53,12 +54,53 @@ public sealed class LlmAutoWaveAnalyzerTests
         return new LlmAutoWaveAnalyzer(
             new FakeChatClient { ResponseJson = responseJson },
             Options.Create(options),
+            new FakeNarrativeLanguageProvider(),
             NullLogger<LlmAutoWaveAnalyzer>.Instance);
     }
 
     [Test]
     public void ProviderName_IsTheActiveProvider()
         => Assert.That(Build(RankingJson).ProviderName, Is.EqualTo("Gemini"));
+
+    [Test]
+    public async Task RankAsync_GermanPreference_AppendsTheLanguageDirectiveToTheSystemPrompt()
+    {
+        var chat = new FakeChatClient { ResponseJson = RankingJson };
+        var analyzer = new LlmAutoWaveAnalyzer(
+            chat,
+            Options.Create(new LlmProviderOptions
+            {
+                Active = "Gemini",
+                Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
+            }),
+            new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.German },
+            NullLogger<LlmAutoWaveAnalyzer>.Instance);
+
+        await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
+
+        var systemMessage = chat.LastMessages!.First(m => m.Role == ChatRole.System);
+        Assert.That(systemMessage.Text, Does.Contain("German"));
+    }
+
+    [Test]
+    public async Task RankAsync_EnglishPreference_NoLanguageDirectiveAppended()
+    {
+        var chat = new FakeChatClient { ResponseJson = RankingJson };
+        var analyzer = new LlmAutoWaveAnalyzer(
+            chat,
+            Options.Create(new LlmProviderOptions
+            {
+                Active = "Gemini",
+                Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
+            }),
+            new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.English },
+            NullLogger<LlmAutoWaveAnalyzer>.Instance);
+
+        await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
+
+        var systemMessage = chat.LastMessages!.First(m => m.Role == ChatRole.System);
+        Assert.That(systemMessage.Text, Does.Not.Contain("German"));
+    }
 
     [Test]
     public async Task RankAsync_ReturnsTheClientRankingAndUsage()
@@ -88,6 +130,7 @@ public sealed class LlmAutoWaveAnalyzerTests
                 Active = "Gemini",
                 Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
             }),
+            new FakeNarrativeLanguageProvider(),
             NullLogger<LlmAutoWaveAnalyzer>.Instance);
 
         var result = await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
@@ -114,6 +157,7 @@ public sealed class LlmAutoWaveAnalyzerTests
                 Active = "Gemini",
                 Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gemini-model" },
             }),
+            new FakeNarrativeLanguageProvider(),
             NullLogger<LlmAutoWaveAnalyzer>.Instance);
 
         Assert.ThrowsAsync<InvalidOperationException>(

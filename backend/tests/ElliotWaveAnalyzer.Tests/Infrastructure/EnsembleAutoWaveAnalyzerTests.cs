@@ -88,7 +88,35 @@ public sealed class EnsembleAutoWaveAnalyzerTests
         };
 
         return new EnsembleAutoWaveAnalyzer(
-            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), new FakeNarrativeLanguageProvider(),
+            NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+    }
+
+    [Test]
+    public async Task RankAsync_GermanPreference_ReachesEveryProviderInTheEnsemble()
+    {
+        var geminiClient = new FakeChatClient { ResponseJson = Ranking(0, "Gemini") };
+        var claudeClient = new FakeChatClient { ResponseJson = Ranking(0, "Claude") };
+        var resolver = new FakeChatClientResolver().Add("gemini", geminiClient).Add("claude", claudeClient);
+        var opts = new LlmProviderOptions
+        {
+            Active = "Gemini",
+            Gemini = new LlmEndpointOptions { ApiKey = "g-key", Model = "gm" },
+            Claude = new LlmEndpointOptions { ApiKey = "c-key", Model = "cm" },
+        };
+        var analyzer = new EnsembleAutoWaveAnalyzer(
+            resolver, Options.Create(opts), new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.German },
+            NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+
+        await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                geminiClient.LastMessages!.First(m => m.Role == ChatRole.System).Text, Does.Contain("German"));
+            Assert.That(
+                claudeClient.LastMessages!.First(m => m.Role == ChatRole.System).Text, Does.Contain("German"));
+        });
     }
 
     [Test]
@@ -143,7 +171,8 @@ public sealed class EnsembleAutoWaveAnalyzerTests
             Claude = new LlmEndpointOptions { ApiKey = "c-key", Model = "cm" },
         };
         var analyzer = new EnsembleAutoWaveAnalyzer(
-            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), new FakeNarrativeLanguageProvider(),
+            NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
 
         var result = await analyzer.RankAsync("BTC", [], [Candidate(0), Candidate(1)]);
 
@@ -166,7 +195,8 @@ public sealed class EnsembleAutoWaveAnalyzerTests
             Claude = new LlmEndpointOptions { ApiKey = "c-key", Model = "cm" },
         };
         var analyzer = new EnsembleAutoWaveAnalyzer(
-            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), new FakeNarrativeLanguageProvider(),
+            NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
 
         Assert.ThrowsAsync<InvalidOperationException>(
             () => analyzer.RankAsync("BTC", [], [Candidate(0)]));
@@ -178,7 +208,8 @@ public sealed class EnsembleAutoWaveAnalyzerTests
         var resolver = new FakeChatClientResolver(); // no clients registered
         var opts = new LlmProviderOptions { Active = "Gemini" }; // all keys empty
         var analyzer = new EnsembleAutoWaveAnalyzer(
-            resolver, Options.Create(opts), NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
+            resolver, Options.Create(opts), new FakeNarrativeLanguageProvider(),
+            NullLogger<EnsembleAutoWaveAnalyzer>.Instance);
 
         Assert.ThrowsAsync<InvalidOperationException>(
             () => analyzer.RankAsync("BTC", [], [Candidate(0)]));

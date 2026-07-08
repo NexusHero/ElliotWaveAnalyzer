@@ -14,13 +14,14 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmAutoWaveAnalyzer(
     IChatClient chatClient,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmAutoWaveAnalyzer> logger) : IAutoWaveAnalyzer
 {
     /// <inheritdoc/>
     public string ProviderName => options.Value.Active;
 
     /// <inheritdoc/>
-    public Task<AutoWaveAnalysis> RankAsync(
+    public async Task<AutoWaveAnalysis> RankAsync(
         string symbol,
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveCandidate> candidates,
@@ -30,7 +31,8 @@ internal sealed class LlmAutoWaveAnalyzer(
             "Ranking {Count} wave candidates for {Symbol} via {Provider} ({Model})",
             candidates.Count, symbol, ProviderName, options.Value.GetActiveEndpoint().Model);
 
-        return AutoWaveRankRunner.RunAsync(
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        return await AutoWaveRankRunner.RunAsync(
             chatClient,
             options.Value.GetActiveEndpoint().Model,
             ProviderName,
@@ -38,6 +40,7 @@ internal sealed class LlmAutoWaveAnalyzer(
             candles,
             candidates,
             logger,
-            cancellationToken);
+            cancellationToken,
+            language: language);
     }
 }

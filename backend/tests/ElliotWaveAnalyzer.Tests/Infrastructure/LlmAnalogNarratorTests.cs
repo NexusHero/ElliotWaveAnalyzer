@@ -1,5 +1,6 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -30,7 +31,8 @@ public sealed class LlmAnalogNarratorTests
     }
 
     private static LlmAnalogNarrator Narrator(params IChatClient[] clients) =>
-        new(clients, Options.Create(new LlmProviderOptions()), NullLogger<LlmAnalogNarrator>.Instance);
+        new(clients, Options.Create(new LlmProviderOptions()), new FakeNarrativeLanguageProvider(),
+            NullLogger<LlmAnalogNarrator>.Instance);
 
     [Test]
     public async Task NarrateAsync_NoChatClient_DegradesWithReason()
@@ -53,6 +55,21 @@ public sealed class LlmAnalogNarratorTests
         var result = await Narrator(new StubChatClient("""{ "narrative": "x" }""")).NarrateAsync(thin);
 
         Assert.That(result.NarrativeUnavailableReason, Does.Contain("Not enough historical analogs"));
+    }
+
+    [Test]
+    public async Task NarrateAsync_GermanPreference_AppendsTheLanguageDirectiveToTheSystemPrompt()
+    {
+        var chat = new FakeChatClient { ResponseJson = """{ "narrative": "x" }""" };
+        var narrator = new LlmAnalogNarrator(
+            [chat], Options.Create(new LlmProviderOptions()),
+            new FakeNarrativeLanguageProvider { Language = NarrativeLanguage.German },
+            NullLogger<LlmAnalogNarrator>.Instance);
+
+        await narrator.NarrateAsync(SufficientReport());
+
+        var systemMessage = chat.LastMessages!.First(m => m.Role == ChatRole.System);
+        Assert.That(systemMessage.Text, Does.Contain("German"));
     }
 
     [Test]

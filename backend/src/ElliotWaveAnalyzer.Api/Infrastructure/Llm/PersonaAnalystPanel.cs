@@ -23,6 +23,7 @@ internal sealed class PersonaAnalystPanel(
     IChatClient chatClient,
     IOptions<LlmProviderOptions> options,
     IPersonaCalibrationProvider calibrationProvider,
+    INarrativeLanguageSettingsService languageSettings,
     ILogger<PersonaAnalystPanel> logger) : IPersonaAnalystPanel
 {
     public async Task<PersonaPanelRankResult> RankAsync(
@@ -35,6 +36,9 @@ internal sealed class PersonaAnalystPanel(
         var personaKeys = PersonaCatalog.Personas.Select(p => p.Key).ToList();
         var history = await calibrationProvider.GetHistoryAsync(userId, personaKeys, cancellationToken);
         var weights = PersonaWeightCalculator.Calculate(history);
+        // userId is already known here — read the setting directly rather than via the
+        // HttpContext-resolving INarrativeLanguageProvider every other narrator uses (#228).
+        var language = await languageSettings.GetAsync(userId, cancellationToken) ?? NarrativeLanguage.English;
 
         var opts = options.Value;
         var provider = opts.Active;
@@ -50,7 +54,7 @@ internal sealed class PersonaAnalystPanel(
             {
                 var analysis = await AutoWaveRankRunner.RunAsync(
                     chatClient, model, $"{provider} ({persona.DisplayName})", symbol, candles, candidates,
-                    logger, cancellationToken, persona.Guidance);
+                    logger, cancellationToken, persona.Guidance, language);
 
                 rankings.Add(new PersonaRanking(persona.Key, analysis.Ranking));
                 totalPromptTokens += analysis.Usage.PromptTokens;

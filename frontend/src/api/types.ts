@@ -843,3 +843,12 @@ export interface WatchlistEntry {
   lastPrice: number | null
   hasDraft: boolean
 }
+
+/** The language LLM narrative prose is written in (mirrors backend `NarrativeLanguage`, #228). */
+export type NarrativeLanguage = 'English' | 'German'
+
+/** Response for `GET /api/settings/narrative-language` (mirrors backend `NarrativeLanguageResponse`). */
+export interface NarrativeLanguageResponse {
+  /** Null when the user has never explicitly chosen a language. */
+  language: NarrativeLanguage | null
+}

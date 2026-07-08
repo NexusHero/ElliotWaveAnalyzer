@@ -1,6 +1,7 @@
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 using ElliotWaveAnalyzer.Api.Interfaces;
+using ElliotWaveAnalyzer.Tests.Acceptance;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -20,6 +21,7 @@ public sealed class PersonaAnalystPanelTests
     {
         private readonly Queue<Func<ChatResponse>> _responses = new();
         public int CallCount { get; private set; }
+        public List<IReadOnlyList<ChatMessage>> AllSentMessages { get; } = [];
 
         public SequencedChatClient Enqueue(string json)
         {
@@ -40,6 +42,7 @@ public sealed class PersonaAnalystPanelTests
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             CallCount++;
+            AllSentMessages.Add(messages.ToList());
             return Task.FromResult(_responses.Dequeue()());
         }
 
@@ -73,9 +76,26 @@ public sealed class PersonaAnalystPanelTests
           "rankings": [ { "candidateId": {{best}}, "confidence": "high", "rationale": "r", "outlook": "o" } ] }
         """;
 
-    private static PersonaAnalystPanel Build(SequencedChatClient client) =>
+    private static PersonaAnalystPanel Build(SequencedChatClient client, INarrativeLanguageSettingsService? languageSettings = null) =>
         new(client, Options.Create(new LlmProviderOptions { Active = "Gemini" }),
-            new NeutralCalibrationProvider(), NullLogger<PersonaAnalystPanel>.Instance);
+            new NeutralCalibrationProvider(), languageSettings ?? new FakeNarrativeLanguageSettingsService(),
+            NullLogger<PersonaAnalystPanel>.Instance);
+
+    [Test]
+    public async Task RankAsync_GermanPreference_AppendsTheLanguageDirectiveForEveryPersona()
+    {
+        var client = new SequencedChatClient().Enqueue(Ranking(0)).Enqueue(Ranking(0)).Enqueue(Ranking(0));
+        var languageSettings = new FakeNarrativeLanguageSettingsService();
+        var userId = Guid.NewGuid();
+        await languageSettings.SetAsync(userId, NarrativeLanguage.German);
+        var panel = Build(client, languageSettings);
+
+        await panel.RankAsync(userId, "BTC", [], [Candidate(0)]);
+
+        Assert.That(
+            client.AllSentMessages.Select(m => m.First(x => x.Role == ChatRole.System).Text),
+            Has.All.Contain("German"));
+    }
 
     [Test]
     public async Task AllPersonasSucceed_EveryCatalogPersonaRanks_AndUsageIsSummed()

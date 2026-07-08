@@ -19,6 +19,7 @@ namespace ElliotWaveAnalyzer.Api.Infrastructure.Llm;
 internal sealed class LlmPositionNarrator(
     IEnumerable<IChatClient> chatClients,
     IOptions<LlmProviderOptions> options,
+    INarrativeLanguageProvider languageProvider,
     ILogger<LlmPositionNarrator> logger) : IPositionNarrator
 {
     private const int MaxOutputTokens = 512;
@@ -35,12 +36,19 @@ internal sealed class LlmPositionNarrator(
             return PositionNarration.Unavailable("No LLM provider is configured — add an API key to enable narratives.");
         }
 
+        var systemPrompt =
+            "You are an Elliott Wave analyst writing a one-paragraph position note. Use ONLY the numbers "
+            + "in the fact sheet — never state a price that is not listed. Respond ONLY with JSON: "
+            + "{\"narrative\": \"...\"}.";
+        var language = await languageProvider.GetCurrentAsync(cancellationToken);
+        if (NarrativeLanguageDirective.For(language) is { } languageDirective)
+        {
+            systemPrompt += " " + languageDirective;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an Elliott Wave analyst writing a one-paragraph position note. Use ONLY the numbers "
-                + "in the fact sheet — never state a price that is not listed. Respond ONLY with JSON: "
-                + "{\"narrative\": \"...\"}."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, BuildFactSheet(brief)),
         };
 
