@@ -48,7 +48,8 @@ public sealed class WaveVerificationServiceTests
     [Test]
     public async Task VerifyAsync_WeeklyInterval_SnapsPivotsPlacedOnWeeklyBars()
     {
-        var service = new WaveVerificationService([new StubDaily(ThreeWeeksDaily())], []);
+        var service = new WaveVerificationService(
+            [new StubDaily(ThreeWeeksDaily())], [], NSubstitute.Substitute.For<IIndicatorCalculator>());
         // Pivots as the weekly chart shows them: week-start date, weekly extreme price.
         var annotations = new List<WaveAnnotation>
         {
@@ -68,7 +69,8 @@ public sealed class WaveVerificationServiceTests
     [Test]
     public async Task VerifyAsync_DailyInterval_RejectsWeeklyPlacedPivots_TheBugThisGuards()
     {
-        var service = new WaveVerificationService([new StubDaily(ThreeWeeksDaily())], []);
+        var service = new WaveVerificationService(
+            [new StubDaily(ThreeWeeksDaily())], [], NSubstitute.Substitute.For<IIndicatorCalculator>());
         var annotations = new List<WaveAnnotation>
         {
             new(Mon1, 110m, "1"),

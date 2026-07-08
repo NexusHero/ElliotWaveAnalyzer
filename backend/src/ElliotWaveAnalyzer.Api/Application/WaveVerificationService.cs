@@ -10,7 +10,8 @@ namespace ElliotWaveAnalyzer.Api.Application;
 /// </summary>
 public sealed class WaveVerificationService(
     IEnumerable<IMarketDataProvider> marketDataProviders,
-    IEnumerable<IIntradayMarketDataProvider> intradayProviders) : IWaveVerificationService
+    IEnumerable<IIntradayMarketDataProvider> intradayProviders,
+    IIndicatorCalculator indicatorCalculator) : IWaveVerificationService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
     private readonly IReadOnlyList<IIntradayMarketDataProvider> _intradayProviders = [.. intradayProviders];
@@ -33,7 +34,7 @@ public sealed class WaveVerificationService(
             : await GetDailyAsync(symbol, lookbackDays, cancellationToken);
         var candles = CandleResampler.Resample(raw, interval);
 
-        return WaveVerifier.Verify(annotations, candles);
+        return WaveVerifier.Verify(annotations, candles, indicatorCalculator);
     }
 
     private async Task<IReadOnlyList<MarketCandle>> GetDailyAsync(

@@ -19,6 +19,7 @@ public sealed class AutoWaveAnalysisService(
     IEnumerable<IMarketDataProvider> marketDataProviders,
     IAutoWaveAnalyzer llm,
     ITokenTracker tokenTracker,
+    IIndicatorCalculator indicatorCalculator,
     ILogger<AutoWaveAnalysisService> logger) : IAutoWaveAnalysisService
 {
     private readonly IReadOnlyList<IMarketDataProvider> _marketDataProviders = [.. marketDataProviders];
@@ -47,7 +48,7 @@ public sealed class AutoWaveAnalysisService(
 
         var pivots = SwingPivotDetector.Detect(candles, thresholdPercent);
         var (candidates, searchTruncated) = WaveCandidateGenerator.GenerateParsed(
-            pivots, cancellationToken: cancellationToken);
+            pivots, candles: candles, indicatorCalculator: indicatorCalculator, cancellationToken: cancellationToken);
 
         logger.LogInformation(
             "Auto analysis for {Symbol}: {Pivots} pivots → {Candidates} parsed candidates (truncated: {Truncated})",
