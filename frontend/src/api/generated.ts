@@ -389,6 +389,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/wave-analysis/persona-panel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calibrated, self-weighting LLM analyst panel
+         * @description Three fixed personas (Conservative / Aggressive / Contrarian) each rank the same
+         *     rule-valid candidate counts the deterministic engine generated — they can only
+         *     re-order and explain, never introduce a count. Each persona's vote is weighted by
+         *     its own measured hit-rate from your track record (a persona with no concluded
+         *     history yet uses a documented neutral prior). The response reports the weighted
+         *     consensus, a disagreement score (1.0 = unanimous, lower when personas split), and
+         *     which personas ran — fewer than three means the panel degraded under quota
+         *     pressure rather than failing outright.
+         */
+        post: operations["PersonaAnalystPanel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/wave-analysis/topdown": {
         parameters: {
             query?: never;
@@ -590,9 +617,14 @@ export interface paths {
         };
         /**
          * Render a saved analysis as a publication-grade annotated PNG
-         * @description Returns an annotated chart (candles, shaded entry/target zones, invalidation line with
-         *     price tag, scenario arrows and a title block) for one of your saved analyses as
-         *     image/png. Scoped to the caller — another user's id returns 404.
+         * @description Returns an annotated chart (candles, shaded entry/target/alternate zones, invalidation
+         *     line with price tag, scenario arrows and a title block with disclaimer) for one of your
+         *     saved analyses as image/png, sized for publishing (1920×1080, or 3840×2160 with
+         *     scale2x=true). Scoped to the caller — another user's id returns 404. Optional query
+         *     params (#227): theme ('dark' default, or 'light'), axisScale ('linear' default, or
+         *     'log'), scale2x (false default), watermark (free text, max 64 chars, omitted by
+         *     default) — every one is optional, so an existing caller with no query string is
+         *     unaffected (#227 AC4).
          */
         get: operations["GetAnalysisChart"];
         put?: never;
@@ -621,6 +653,70 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspace-drafts/{symbol}/{interval}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns the saved in-progress draft for a symbol+interval, if any */
+        get: operations["GetWorkspaceDraft"];
+        /**
+         * Upserts the in-progress draft for a symbol+interval
+         * @description Intended for a debounced auto-save as the analyst places/edits annotations — not a
+         *     deliberate save. Overwrites the prior draft for this symbol+interval silently. A user
+         *     is capped at 50 drafts; the least-recently-updated one is evicted past the cap.
+         */
+        put: operations["SaveWorkspaceDraft"];
+        post?: never;
+        /** Deletes the draft for a symbol+interval */
+        delete: operations["DeleteWorkspaceDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the caller's watchlist, with each entry's last price and draft indicator
+         * @description A user with no entries yet is seeded with the four legacy quick symbols (SP500,
+         *     NASDAQ, BTC, ETH) on first read. hasDraft is true when a workspace draft (#226)
+         *     exists for that symbol on any interval.
+         */
+        get: operations["ListWatchlist"];
+        put?: never;
+        /** Adds a symbol to the caller's watchlist */
+        post: operations["AddWatchlistEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Removes a symbol from the caller's watchlist */
+        delete: operations["RemoveWatchlistEntry"];
         options?: never;
         head?: never;
         patch?: never;
@@ -867,10 +963,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/narrative-language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Returns the caller's narrative-language preference
+         * @description Language is null when the user has never explicitly chosen one — the frontend uses
+         *     that to suggest (and persist) a default from the browser's locale; every narrative
+         *     narrator otherwise treats an unset preference as English.
+         */
+        get: operations["GetNarrativeLanguage"];
+        /** Sets the caller's narrative-language preference */
+        put: operations["SetNarrativeLanguage"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AddWatchlistEntryRequest: {
+            symbol: string;
+        };
         AlternateHypothesesReport: {
             symbol: string;
             validated: components["schemas"]["HypothesisResult"][];
@@ -1174,6 +1296,43 @@ export interface components {
         };
         /** @enum {unknown} */
         MoodDivergenceKind: "Bearish" | "Bullish";
+        /** @enum {unknown} */
+        NarrativeLanguage: "English" | "German" | null;
+        NarrativeLanguageResponse: {
+            language: null | components["schemas"]["NarrativeLanguage"];
+        };
+        PersonaPanelResponse: {
+            rankings: components["schemas"]["PersonaRankedCount"][];
+            weights: components["schemas"]["PersonaWeight"][];
+            /** Format: double */
+            consensusScore: number | string;
+            marketSummary: string;
+            usage: components["schemas"]["TokenUsage"];
+            searchTruncated?: boolean;
+            /** Format: int32 */
+            personasAttempted?: number | string;
+        };
+        PersonaRankedCount: {
+            structure: string;
+            origin: components["schemas"]["WaveAnnotation"];
+            waves: components["schemas"]["WaveAnnotation"][];
+            ruleReport: components["schemas"]["WaveRuleReport"];
+            levels: null | components["schemas"]["WaveLevels"];
+            confidence: string;
+            rationale: string;
+            outlook: string;
+            isBest: boolean;
+            endorsingPersonas: string[];
+            tree?: null | components["schemas"]["WaveNode"];
+            /** Format: double */
+            score?: null | number | string;
+        };
+        PersonaWeight: {
+            persona: string;
+            /** Format: double */
+            weight: number | string;
+            isNeutralPrior: boolean;
+        };
         PortfolioReview: {
             briefs: components["schemas"]["PositionBrief"][];
             unresolved: components["schemas"]["UnresolvedPosition"][];
@@ -1353,6 +1512,10 @@ export interface components {
             last4: string;
             isDefault: boolean;
         };
+        SaveWorkspaceDraftRequest: {
+            annotations: components["schemas"]["WaveAnnotation"][];
+            settings: components["schemas"]["WorkspaceDraftSettings"];
+        };
         ScanHit: {
             symbol: string;
             structure: string;
@@ -1449,6 +1612,9 @@ export interface components {
             narrative?: null | string;
             narrativeUnavailableReason?: null | string;
         };
+        SetNarrativeLanguageRequest: {
+            language: components["schemas"]["NarrativeLanguage"];
+        };
         SnappedPivot: {
             label: string;
             /** Format: date-time */
@@ -1536,6 +1702,7 @@ export interface components {
             /** Format: double */
             entryHigh?: null | number | string;
             alternates?: components["schemas"]["ScenarioInput"][];
+            persona?: null | string;
         };
         TrackedAnalysis: {
             /** Format: uuid */
@@ -1569,6 +1736,14 @@ export interface components {
             isin: string;
             name: string;
             reason: string;
+        };
+        WatchlistEntry: {
+            symbol: string;
+            /** Format: int32 */
+            sortOrder: number | string;
+            /** Format: double */
+            lastPrice: null | number | string;
+            hasDraft: boolean;
         };
         WaveAnalysisResponse: {
             result: components["schemas"]["WaveValidationResult"];
@@ -1657,6 +1832,24 @@ export interface components {
             /** Format: double */
             score: null | number | string;
             branches?: null | components["schemas"]["ProjectionBranches"];
+        };
+        WorkspaceDraft: {
+            symbol: string;
+            interval: string;
+            annotations: components["schemas"]["WaveAnnotation"][];
+            settings: components["schemas"]["WorkspaceDraftSettings"];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        WorkspaceDraftSettings: {
+            countType: string;
+            showInvalidationLayer: boolean;
+            showSupportLayer: boolean;
+            showTargetsLayer: boolean;
+            showOscillator: boolean;
+            logScale: boolean;
+            /** Format: int32 */
+            subWaveDepth: null | number | string;
         };
         /** @enum {unknown} */
         ZoneKind: "Entry" | "Target";
@@ -2121,6 +2314,48 @@ export interface operations {
             };
         };
     };
+    PersonaAnalystPanel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoWaveAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaPanelResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
     TopDownWaveAnalysis: {
         parameters: {
             query: {
@@ -2432,7 +2667,12 @@ export interface operations {
     };
     GetAnalysisChart: {
         parameters: {
-            query?: never;
+            query?: {
+                theme?: string;
+                axisScale?: string;
+                scale2x?: boolean;
+                watermark?: string;
+            };
             header?: never;
             path: {
                 id: string;
@@ -2447,6 +2687,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Not Found */
             404: {
@@ -2474,6 +2723,203 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ConfidenceCalibration"];
                 };
+            };
+        };
+    };
+    GetWorkspaceDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+                interval: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDraft"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    SaveWorkspaceDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+                interval: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveWorkspaceDraftRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    DeleteWorkspaceDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+                interval: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ListWatchlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistEntry"][];
+                };
+            };
+        };
+    };
+    AddWatchlistEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddWatchlistEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RemoveWatchlistEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2810,6 +3256,48 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
+            };
+        };
+    };
+    GetNarrativeLanguage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NarrativeLanguageResponse"];
+                };
+            };
+        };
+    };
+    SetNarrativeLanguage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetNarrativeLanguageRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
