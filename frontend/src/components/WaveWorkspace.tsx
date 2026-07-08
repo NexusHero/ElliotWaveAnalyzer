@@ -477,13 +477,17 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     const sorted = [...annotations].sort((a, b) => a.date.localeCompare(b.date))
     const last = sorted[sorted.length - 1]
     const window = deriveProjectionTimeWindow(annotations)
+    // "Now" for the window's own anchor (#166 follow-up) — the most recent candle we actually
+    // have, not the pivot's own (possibly long-stale) date; see branchesToProjectionPaths.
+    const now = candles.length > 0 ? candles[candles.length - 1]?.openTime : null
     return branchesToProjectionPaths(
       liveVerify.data?.branches ?? null,
       last ?? null,
       window,
-      promoted
+      promoted,
+      now
     )
-  }, [pro, annotations, liveVerify.data?.branches, promoted])
+  }, [pro, annotations, liveVerify.data?.branches, promoted, candles])
 
   const toggleLayer = useCallback((key: keyof LevelLayers) => {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
