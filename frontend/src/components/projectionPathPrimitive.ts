@@ -35,7 +35,8 @@ export interface ProjectionPathColors {
  * computed by the pure `branchesToProjectionPaths`. Confined to this file, mirroring `ZoneBandsPrimitive`.
  */
 export class ProjectionPathPrimitive implements ISeriesPrimitive<Time> {
-  private series: ISeriesApi<keyof import('lightweight-charts').SeriesOptionsMap, Time> | null = null
+  private series: ISeriesApi<keyof import('lightweight-charts').SeriesOptionsMap, Time> | null =
+    null
   private timeScale: ITimeScaleApi<Time> | null = null
   private requestUpdate: (() => void) | null = null
   private paths: ProjectionPath[] = []
@@ -78,6 +79,10 @@ export class ProjectionPathPrimitive implements ISeriesPrimitive<Time> {
                 const yTo = (yLow + yHigh) / 2
 
                 ctx.save()
+                // A second-order path (#166 follow-up — "one more step" beyond the first box) is
+                // always fainter, however the first step resolves — it never competes visually with
+                // the projection it was chained from.
+                if (path.order === 2) ctx.globalAlpha *= 0.55
                 if (!path.promoted) ctx.setLineDash([5 * hsr, 4 * hsr])
                 ctx.strokeStyle = style.line
                 ctx.lineWidth = 1.5 * vsr

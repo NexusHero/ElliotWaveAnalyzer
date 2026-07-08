@@ -130,6 +130,7 @@ describe('PriceChart', () => {
               toHigh: 160,
               variant: 'speculative',
               promoted: false,
+              order: 1,
             },
             {
               fromTime: '2024-01-10',
@@ -140,6 +141,7 @@ describe('PriceChart', () => {
               toHigh: 100,
               variant: 'alternate',
               promoted: true,
+              order: 1,
             },
           ]}
         />

@@ -94,11 +94,60 @@ public static class ProjectionService
         }
 
         var sorted = annotations.OrderBy(a => a.Date).ToList();
-        var alternate = baseLevels.Alternative?.Reinterpretation is { } r ? Resolve(r) : null;
+
+        // One step ahead: the current wave completes at its own zone edge, and the next wave is
+        // projected from there (motive chain — always Project, the base count's own kind).
+        var firstStep = AdvanceOneWave(sorted, baseLevels, Project);
+        var speculative = firstStep.Levels;
+        // A second step beyond that (#166 follow-up): bounded to exactly one further advance, never
+        // a true recursion — see AdvanceOneWave's own doc comment.
+        var speculativeNext = speculative is null
+            ? null
+            : AdvanceOneWave(firstStep.Annotations, speculative, Project).Levels;
+
+        var reinterpretation = baseLevels.Alternative?.Reinterpretation;
+        var alternate = reinterpretation is { } r ? Resolve(r) : null;
+        // Same motive-vs-corrective dispatch Resolve() itself uses, so a second step down the
+        // alternate chain is projected exactly the way the alternate itself was.
+        var alternateNext = reinterpretation is { } r2 && alternate is { } a
+            ? AdvanceOneWave(
+                r2.Annotations,
+                a,
+                r2.Motive ? Project : next => ProjectCorrective(next, r2.Structure)).Levels
+            : null;
+
         return new ProjectionBranches(
             InvalidationRetracePercent(sorted, baseLevels),
-            Speculative(sorted, baseLevels),
-            alternate);
+            speculative,
+            speculativeNext,
+            alternate,
+            alternateNext);
+    }
+
+    /// <summary>
+    /// Advances a projected count by exactly one wave: the given (already-projected) wave
+    /// hypothetically completes at the far edge of its own zone, and a synthetic pivot is appended
+    /// there so <paramref name="project"/> can compute what the next wave looks like. Returns the
+    /// annotations used (so a caller can advance a further step from the same starting point) and
+    /// the resulting levels (null when the given levels have no zone edge to complete at). Used by
+    /// <see cref="Branches"/> to build both the one-step "speculative"/"alternate" branches and — by
+    /// calling this a second time on the first step's own output — the second-order branches one
+    /// step beyond those. Never called more than twice in a row by any caller, so this is bounded,
+    /// not a true recursion.
+    /// </summary>
+    private static (IReadOnlyList<WaveAnnotation> Annotations, WaveLevels? Levels) AdvanceOneWave(
+        IReadOnlyList<WaveAnnotation> sorted,
+        WaveLevels levels,
+        Func<IReadOnlyList<WaveAnnotation>, WaveLevels?> project)
+    {
+        var completion = CompletionPrice(levels);
+        if (completion is null)
+        {
+            return (sorted, null);
+        }
+
+        var next = new List<WaveAnnotation>(sorted) { new(sorted[^1].Date.AddDays(1), completion.Value, "x") };
+        return (next, project(next));
     }
 
     /// <summary>
@@ -120,25 +169,6 @@ public static class ProjectionService
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// The one-step-ahead projection: append a synthetic pivot where the current wave completes (the
-    /// far edge of its zone) and re-project the next wave. Null when there's no zone edge to complete at.
-    /// </summary>
-    private static WaveLevels? Speculative(IReadOnlyList<WaveAnnotation> sorted, WaveLevels levels)
-    {
-        var completion = CompletionPrice(levels);
-        if (completion is null)
-        {
-            return null;
-        }
-
-        var next = new List<WaveAnnotation>(sorted)
-        {
-            new(sorted[^1].Date.AddDays(1), completion.Value, "x"),
-        };
-        return Project(next);
     }
 
     /// <summary>

@@ -1398,7 +1398,9 @@ export interface components {
             /** Format: double */
             invalidationRetracePercent: null | number | string;
             speculative: null | components["schemas"]["WaveLevels"];
+            speculativeNext: null | components["schemas"]["WaveLevels"];
             alternate: null | components["schemas"]["WaveLevels"];
+            alternateNext: null | components["schemas"]["WaveLevels"];
         };
         RankedWaveCount: {
             structure: string;
