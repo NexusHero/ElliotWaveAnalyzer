@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ElliotWaveAnalyzer.Api.Application;
+using ElliotWaveAnalyzer.Api.Application.Charting;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -41,12 +42,18 @@ public static class TrackRecordEndpoints
             .WithName("GetAnalysisChart")
             .WithSummary("Render a saved analysis as a publication-grade annotated PNG")
             .WithDescription("""
-                Returns an annotated chart (candles, shaded entry/target zones, invalidation line with
-                price tag, scenario arrows and a title block) for one of your saved analyses as
-                image/png. Scoped to the caller — another user's id returns 404.
+                Returns an annotated chart (candles, shaded entry/target/alternate zones, invalidation
+                line with price tag, scenario arrows and a title block with disclaimer) for one of your
+                saved analyses as image/png, sized for publishing (1920×1080, or 3840×2160 with
+                scale2x=true). Scoped to the caller — another user's id returns 404. Optional query
+                params (#227): theme ('dark' default, or 'light'), axisScale ('linear' default, or
+                'log'), scale2x (false default), watermark (free text, max 64 chars, omitted by
+                default) — every one is optional, so an existing caller with no query string is
+                unaffected (#227 AC4).
                 """)
             .Produces(StatusCodes.Status200OK, contentType: "image/png")
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapGet("/calibration", GetCalibration)
             .WithName("GetCalibration")
@@ -104,10 +111,71 @@ public static class TrackRecordEndpoints
         Guid id,
         ClaimsPrincipal user,
         IAnalysisChartService chartService,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string theme = "dark",
+        string axisScale = "linear",
+        bool scale2x = false,
+        string? watermark = null)
     {
-        var png = await chartService.RenderChartAsync(GetUserId(user), id, cancellationToken);
+        if (!TryParseTheme(theme, out var chartTheme))
+        {
+            return Results.Problem(
+                title: "Invalid theme",
+                detail: "theme must be 'dark' or 'light'.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!TryParseAxisScale(axisScale, out var fibScale))
+        {
+            return Results.Problem(
+                title: "Invalid axisScale",
+                detail: "axisScale must be 'linear' or 'log'.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (watermark is { Length: > 64 })
+        {
+            return Results.Problem(
+                title: "Invalid watermark",
+                detail: "watermark must be at most 64 characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var png = await chartService.RenderChartAsync(
+            GetUserId(user), id, chartTheme, fibScale, scale2x, watermark, cancellationToken);
         return png is null ? Results.NotFound() : Results.File(png, "image/png");
+    }
+
+    private static bool TryParseTheme(string theme, out ChartTheme parsed)
+    {
+        switch (theme.ToLowerInvariant())
+        {
+            case "dark":
+                parsed = ChartTheme.Dark;
+                return true;
+            case "light":
+                parsed = ChartTheme.Light;
+                return true;
+            default:
+                parsed = ChartTheme.Dark;
+                return false;
+        }
+    }
+
+    private static bool TryParseAxisScale(string axisScale, out FibScale parsed)
+    {
+        switch (axisScale.ToLowerInvariant())
+        {
+            case "linear":
+                parsed = FibScale.Linear;
+                return true;
+            case "log":
+                parsed = FibScale.Log;
+                return true;
+            default:
+                parsed = FibScale.Linear;
+                return false;
+        }
     }
 
     private static async Task<IResult> GetCalibration(

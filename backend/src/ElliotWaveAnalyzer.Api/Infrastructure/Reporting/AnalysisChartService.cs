@@ -24,7 +24,13 @@ internal sealed class AnalysisChartService(
 
     /// <inheritdoc/>
     public async Task<byte[]?> RenderChartAsync(
-        Guid userId, Guid analysisId, CancellationToken cancellationToken = default)
+        Guid userId,
+        Guid analysisId,
+        ChartTheme theme = ChartTheme.Dark,
+        FibScale scale = FibScale.Linear,
+        bool scale2x = false,
+        string? watermarkText = null,
+        CancellationToken cancellationToken = default)
     {
         var analysis = await trackRecord.GetAsync(userId, analysisId, cancellationToken);
         if (analysis is null)
@@ -33,7 +39,15 @@ internal sealed class AnalysisChartService(
         }
 
         var candles = await GetCandlesAsync(analysis.Symbol, cancellationToken);
-        var input = BuildInput(analysis, candles, timeProvider.GetUtcNow().UtcDateTime);
+        var input = BuildInput(analysis, candles, timeProvider.GetUtcNow().UtcDateTime)
+            with
+        {
+            Theme = theme,
+            Scale = scale,
+            WatermarkText = watermarkText,
+            Width = scale2x ? 3840 : 1920,
+            Height = scale2x ? 2160 : 1080,
+        };
         var scene = AnnotatedChartComposer.Compose(input);
         return renderer.Render(scene);
     }
@@ -76,6 +90,19 @@ internal sealed class AnalysisChartService(
             TargetZones = ToZone(analysis.TargetLow, analysis.TargetHigh, "Target", "Projected target") is { } t
                 ? [t]
                 : [],
+            // The exported analogue of the live chart's projection-branch bands (#227): a saved
+            // analysis has no stored pivots to recompute a live forward projection from, but it DOES
+            // persist each alternate's own entry/target zone — draw those, subordinate to the
+            // primary's own zones (see AnnotatedChartComposer's AlternateZones handling and ADR-072).
+            AlternateZones = [.. analysis.Scenarios
+                .Where(s => s.Role == ScenarioRole.Alternate && !s.Retired)
+                .SelectMany(s => new[]
+                {
+                    ToZone(s.EntryLow, s.EntryHigh, $"{s.Label} entry (alt)", "entry"),
+                    ToZone(s.TargetLow, s.TargetHigh, $"{s.Label} target (alt)", "target"),
+                })
+                .Where(z => z is not null)
+                .Select(z => z!)],
             Scenarios = [.. analysis.Scenarios
                 .Where(s => !s.Retired && (s.TargetLow ?? s.TargetHigh) is not null)
                 .Select(s => new ChartScenarioArrow(
