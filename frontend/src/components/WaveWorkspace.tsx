@@ -526,6 +526,38 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
     [annotations.length, candles, resetCoach, countType]
   )
 
+  // Drag-to-move (#225): a live, uncommitted preview of the pivot being dragged. Kept separate
+  // from `annotations` so the debounced live-verify (keyed on `annotations`) only fires once, on
+  // drop — not on every pointermove — while still letting the leg readout/wave line update live.
+  const [dragPreview, setDragPreview] = useState<{
+    index: number
+    date: string
+    price: number
+  } | null>(null)
+  const handlePivotDragPreview = useCallback((index: number, time: string, price: number) => {
+    setDragPreview({ index, date: `${time}T00:00:00Z`, price })
+  }, [])
+  const handlePivotDragEnd = useCallback(
+    (index: number, time: string, price: number) => {
+      setDragPreview(null)
+      setAnnotations((prev) =>
+        prev
+          .map((a, i) => (i === index ? { ...a, date: `${time}T00:00:00Z`, price } : a))
+          .sort((a, b) => a.date.localeCompare(b.date))
+      )
+      resetCoach()
+    },
+    [resetCoach]
+  )
+  // What the chart actually draws: `annotations` with the in-flight drag substituted in. Nothing
+  // else (live-verify, save, nudge) ever reads this — only rendering.
+  const displayAnnotations = useMemo<WaveAnnotation[]>(() => {
+    if (!dragPreview) return annotations
+    return annotations.map((a, i) =>
+      i === dragPreview.index ? { ...a, date: dragPreview.date, price: dragPreview.price } : a
+    )
+  }, [annotations, dragPreview])
+
   const handleNudge = useCallback(
     (index: number, direction: -1 | 1) => {
       setAnnotations((prev) => {
@@ -650,8 +682,12 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   )
 
   // Live per-leg proportions for the analyst's own count (#165) — Δprice/Δ%/Δtime/ratio, updating
-  // as pivots are placed, nudged or dragged. The authoritative Fibonacci ratios still come from verify.
-  const legs = useMemo<LegMeasurement[]>(() => legMeasurements(annotations), [annotations])
+  // as pivots are placed, nudged or dragged (reading `displayAnnotations` so an in-flight drag
+  // updates this live, per #225 AC3). The authoritative Fibonacci ratios still come from verify.
+  const legs = useMemo<LegMeasurement[]>(
+    () => legMeasurements(displayAnnotations),
+    [displayAnnotations]
+  )
 
   const markers = useMemo<ChartMarker[]>(() => {
     const toMarker =
@@ -669,17 +705,19 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
         ? treeToDegreeMarkers(activeRanked.tree, subWaveDepth)
         : aiLineAnnotations.map(toMarker('ai'))
     return [
-      ...annotations.map(toMarker('user')),
+      ...displayAnnotations.map(toMarker('user')),
       ...aiMarkers,
       ...overlayAnnotations.map(toMarker('alt')),
     ]
-  }, [annotations, aiLineAnnotations, overlayAnnotations, subWaveDepth, activeRanked])
+  }, [displayAnnotations, aiLineAnnotations, overlayAnnotations, subWaveDepth, activeRanked])
 
   // Connected wave-line polylines through the pivots (a count needs ≥2 pivots to draw a line).
+  // The `user` line is also the hit-test target for drag-to-move (#225), so it must reflect the
+  // in-flight drag position (`displayAnnotations`), not the last-committed `annotations`.
   const waveLines = useMemo<WaveLine[]>(() => {
     const lines: WaveLine[] = []
-    if (annotations.length >= 2) {
-      lines.push({ kind: 'user', points: toWaveLinePoints(annotations) })
+    if (displayAnnotations.length >= 2) {
+      lines.push({ kind: 'user', points: toWaveLinePoints(displayAnnotations) })
     }
     if (aiLineAnnotations.length >= 2) {
       lines.push({ kind: 'ai', points: toWaveLinePoints(aiLineAnnotations) })
@@ -688,7 +726,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
       lines.push({ kind: 'alt', points: toWaveLinePoints(overlayAnnotations) })
     }
     return lines
-  }, [annotations, aiLineAnnotations, overlayAnnotations])
+  }, [displayAnnotations, aiLineAnnotations, overlayAnnotations])
 
   const liveVerifyState: LiveVerifyState =
     annotations.length < 2
@@ -895,6 +933,8 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 rsi={marketQuery.data?.rsi}
                 showOscillator={showOscillator}
                 onPointClick={handlePointClick}
+                onPivotDragPreview={handlePivotDragPreview}
+                onPivotDragEnd={handlePivotDragEnd}
                 theme={theme}
               />
             </div>

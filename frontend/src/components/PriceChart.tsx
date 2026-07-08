@@ -19,6 +19,7 @@ import {
 import { useEffect, useRef } from 'react'
 import type { MarketCandle, RsiResult } from '../api/types'
 import type { Theme } from '../hooks/useTheme'
+import { snapToCandle } from './pivotSnap'
 import type { ProjectionPath } from './projectionPath'
 import { type ProjectionPathColors, ProjectionPathPrimitive } from './projectionPathPrimitive'
 import type { WaveLinePoint } from './waveLine'
@@ -78,6 +79,13 @@ interface PriceChartProps {
   showOscillator?: boolean
   /** Called when the user clicks a point on the chart (date + price at the click). */
   onPointClick?: (time: string, price: number) => void
+  /**
+   * Fires continuously while a `user`-kind pivot marker is being dragged (#225) — a live,
+   * uncommitted preview (snapped time/price). Omit to leave drag-to-move off (nudge-only).
+   */
+  onPivotDragPreview?: (index: number, time: string, price: number) => void
+  /** Fires once when a pivot drag ends (#225) — the caller commits this to its own state. */
+  onPivotDragEnd?: (index: number, time: string, price: number) => void
   /** Current theme — drives the chart colours, which are read from the CSS variables. */
   theme?: Theme
 }
@@ -98,6 +106,8 @@ export default function PriceChart({
   rsi = [],
   showOscillator = false,
   onPointClick,
+  onPivotDragPreview,
+  onPivotDragEnd,
   theme = 'dark',
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -122,6 +132,22 @@ export default function PriceChart({
   // Keep the latest callback in a ref so the click subscription never needs re-binding.
   const onPointClickRef = useRef(onPointClick)
   onPointClickRef.current = onPointClick
+  // Drag-to-move (#225): latest callbacks/data kept in refs so the pointer listeners (attached
+  // once, on mount) always see the current values without needing to re-bind.
+  const onPivotDragPreviewRef = useRef(onPivotDragPreview)
+  onPivotDragPreviewRef.current = onPivotDragPreview
+  const onPivotDragEndRef = useRef(onPivotDragEnd)
+  onPivotDragEndRef.current = onPivotDragEnd
+  const waveLinesRef = useRef(waveLines)
+  waveLinesRef.current = waveLines
+  const candlesRef = useRef(candles)
+  candlesRef.current = candles
+  // Which pivot (index into the `user` wave line) is currently being dragged, if any, and the
+  // pointer that owns the gesture (captured so a fast drag off-canvas still tracks).
+  const dragStateRef = useRef<{ index: number; pointerId: number } | null>(null)
+  // Set the instant a drag ends so the very next `subscribeClick` firing (the same gesture's
+  // mouseup) is suppressed — a drag must never also spawn a new placed pivot (AC2).
+  const justDraggedRef = useRef(false)
 
   // ── Create chart on mount ─────────────────────────────────────────────────
   useEffect(() => {
@@ -174,6 +200,12 @@ export default function PriceChart({
     projectionPathRef.current = projectionPrimitive
 
     const handleClick = (param: MouseEventParams) => {
+      // A drag gesture's mouseup fires a click right after it — suppress exactly that one so a
+      // drag never also spawns a new placed pivot (#225 AC2). Nudge / plain clicks are unaffected.
+      if (justDraggedRef.current) {
+        justDraggedRef.current = false
+        return
+      }
       const callback = onPointClickRef.current
       if (!callback || !param.point || param.time === undefined) return
       const price = series.coordinateToPrice(param.point.y)
@@ -181,6 +213,83 @@ export default function PriceChart({
       callback(timeToIsoDate(param.time), price)
     }
     chart.subscribeClick(handleClick)
+
+    // ── Drag-to-move a placed pivot (#225) ──────────────────────────────────
+    // lightweight-charts exposes no marker-drag API, so pivots are hit-tested by hand against
+    // the `user` wave-line's own points (the only series that carries both time AND price per
+    // pivot — the marker layer only carries a date). Chart panning/scaling is disabled for the
+    // gesture's duration so a drag never fights the chart's own click-to-pan.
+    const DRAG_HIT_RADIUS_PX = 14
+
+    const findNearestUserPivot = (clientX: number, clientY: number): number | null => {
+      const userLine = waveLinesRef.current.find((w) => w.kind === 'user')
+      if (!userLine) return null
+      const rect = container.getBoundingClientRect()
+      const x = clientX - rect.left
+      const y = clientY - rect.top
+      let best: { index: number; dist: number } | null = null
+      userLine.points.forEach((p, i) => {
+        const px = chart.timeScale().timeToCoordinate(datePart(p.time) as Time)
+        const py = series.priceToCoordinate(p.value)
+        if (px === null || py === null) return
+        const dist = Math.hypot(px - x, py - y)
+        if (dist <= DRAG_HIT_RADIUS_PX && (!best || dist < best.dist)) {
+          best = { index: i, dist }
+        }
+      })
+      return best ? (best as { index: number; dist: number }).index : null
+    }
+
+    /** Resolves a pointer's client (x, y) to a snapped (time, price), or null off the chart/data. */
+    const resolveSnapped = (clientX: number, clientY: number) => {
+      const rect = container.getBoundingClientRect()
+      const x = clientX - rect.left
+      const y = clientY - rect.top
+      const time = chart.timeScale().coordinateToTime(x)
+      const price = series.coordinateToPrice(y)
+      if (time === null || price === null) return null
+      return snapToCandle(candlesRef.current, timeToIsoDate(time as Time), price)
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      // Only engage when the caller actually wants drag (onPivotDragEnd wired) — otherwise the
+      // chart behaves exactly as it did before #225 (nudge-only).
+      if (!onPivotDragEndRef.current) return
+      const index = findNearestUserPivot(event.clientX, event.clientY)
+      if (index === null) return
+      dragStateRef.current = { index, pointerId: event.pointerId }
+      // Not implemented in every environment (notably jsdom in tests) — best-effort only; the
+      // drag still works via the window-level listeners below without capture.
+      container.setPointerCapture?.(event.pointerId)
+      chart.applyOptions({ handleScroll: false, handleScale: false })
+      event.preventDefault()
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const drag = dragStateRef.current
+      if (!drag || drag.pointerId !== event.pointerId) return
+      const snapped = resolveSnapped(event.clientX, event.clientY)
+      if (!snapped) return
+      onPivotDragPreviewRef.current?.(drag.index, snapped.time, snapped.price)
+    }
+
+    const endDrag = (event: PointerEvent) => {
+      const drag = dragStateRef.current
+      if (!drag || drag.pointerId !== event.pointerId) return
+      dragStateRef.current = null
+      container.releasePointerCapture?.(event.pointerId)
+      chart.applyOptions({ handleScroll: true, handleScale: true })
+      const snapped = resolveSnapped(event.clientX, event.clientY)
+      if (snapped) {
+        justDraggedRef.current = true
+        onPivotDragEndRef.current?.(drag.index, snapped.time, snapped.price)
+      }
+    }
+
+    container.addEventListener('pointerdown', handlePointerDown)
+    container.addEventListener('pointermove', handlePointerMove)
+    container.addEventListener('pointerup', endDrag)
+    container.addEventListener('pointercancel', endDrag)
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
@@ -193,6 +302,10 @@ export default function PriceChart({
     return () => {
       observer.disconnect()
       chart.unsubscribeClick(handleClick)
+      container.removeEventListener('pointerdown', handlePointerDown)
+      container.removeEventListener('pointermove', handlePointerMove)
+      container.removeEventListener('pointerup', endDrag)
+      container.removeEventListener('pointercancel', endDrag)
       chart.remove()
       chartRef.current = null
       seriesRef.current = null
