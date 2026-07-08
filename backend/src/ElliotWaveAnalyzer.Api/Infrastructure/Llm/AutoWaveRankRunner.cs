@@ -35,6 +35,10 @@ internal static class AutoWaveRankRunner
     /// <summary>
     /// Sends the candidates to <paramref name="chatClient"/> and returns the parsed ranking with
     /// token usage. Throws <see cref="InvalidOperationException"/> on transport or JSON failure.
+    /// <see cref="LlmQuotaExceededException"/> propagates unwrapped (never dressed up as a generic
+    /// transport failure) so <see cref="ElliotWaveAnalyzer.Api.Infrastructure.GlobalExceptionHandler"/>'s
+    /// dedicated 429 response reaches every caller of this method (#184's cost-bounded degradation
+    /// depends on being able to distinguish the two).
     /// </summary>
     public static async Task<AutoWaveAnalysis> RunAsync(
         IChatClient chatClient,
@@ -44,14 +48,23 @@ internal static class AutoWaveRankRunner
         IReadOnlyList<MarketCandle> candles,
         IReadOnlyList<WaveCandidate> candidates,
         ILogger logger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? personaGuidance = null)
     {
         var prompt = AutoWaveAnalysisPromptBuilder.Build(symbol, candles, candidates);
 
+        // Persona guidance (#184) only ever narrows HOW the same candidate set is read and
+        // explained — it is appended to, never replaces, the base instruction, so a persona can
+        // no more introduce a non-deterministic count than the plain ranker can (ADR-009).
+        var systemPrompt = "You are an expert Elliott Wave market analyst. Respond ONLY with valid JSON — no prose, no markdown.";
+        if (!string.IsNullOrWhiteSpace(personaGuidance))
+        {
+            systemPrompt += " " + personaGuidance;
+        }
+
         var messages = new List<ChatMessage>
         {
-            new(ChatRole.System,
-                "You are an expert Elliott Wave market analyst. Respond ONLY with valid JSON — no prose, no markdown."),
+            new(ChatRole.System, systemPrompt),
             new(ChatRole.User, prompt),
         };
 
@@ -74,7 +87,7 @@ internal static class AutoWaveRankRunner
             {
                 response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException and not LlmQuotaExceededException)
             {
                 logger.LogError(ex, "{Provider} chat request failed", provider);
                 throw new InvalidOperationException(

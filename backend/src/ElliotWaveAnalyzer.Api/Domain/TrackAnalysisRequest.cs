@@ -23,4 +23,11 @@ public sealed record TrackAnalysisRequest(
 
     /// <summary>Backup counts (up to two) the auto-switch promotes from if the primary is invalidated.</summary>
     public IReadOnlyList<ScenarioInput> Alternates { get; init; } = [];
+
+    /// <summary>
+    /// The persona-panel (#184) persona key whose own top pick this count was, when saving from
+    /// the panel and exactly one persona endorsed it. Null for every other save — an untagged
+    /// analysis simply contributes no signal to that persona's measured weight.
+    /// </summary>
+    public string? Persona { get; init; }
 }

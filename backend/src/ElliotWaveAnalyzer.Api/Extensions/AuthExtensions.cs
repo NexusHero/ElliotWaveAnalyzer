@@ -46,6 +46,10 @@ internal static class AuthExtensions
         services.AddScoped<IConsentService, ConsentService>();
         services.AddScoped<ITrackRecordService, TrackRecordService>();
 
+        // Persona-panel (#184) real track-record history: reuses the same candle-fetch-and-evaluate
+        // approach TrackRecordService does, restricted to persona-tagged saves.
+        services.AddScoped<IPersonaCalibrationProvider, PersonaCalibrationProvider>();
+
         // Backtest harness (REQ-026): runs the pipeline over history and feeds priors into scenario
         // probabilities. Both read/write the shared AppDbContext, so scoped.
         services.AddScoped<IBacktestService, BacktestService>();

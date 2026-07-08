@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ElliotWaveAnalyzer.Api.Domain;
 using ElliotWaveAnalyzer.Api.Interfaces;
 
@@ -68,6 +69,29 @@ public static class WaveAnalysisEndpoints
                 and token usage. Rankings is empty when no valid structure is found.
                 """)
             .Produces<AutoWaveAnalysisResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
+            .RequireRateLimiting("gemini-analysis");
+
+        // ── POST /api/wave-analysis/persona-panel ─────────────────────────────
+        // Calibrated, self-weighting analyst panel (#184): three fixed personas each rank the
+        // same deterministic candidates; the engine combines their votes weighted by each
+        // persona's own measured track record. Multiple LLM calls (fewer under quota pressure —
+        // AC5) → strict throttle.
+        group.MapPost("/wave-analysis/persona-panel", PersonaPanel)
+            .WithName("PersonaAnalystPanel")
+            .WithSummary("Calibrated, self-weighting LLM analyst panel")
+            .WithDescription("""
+                Three fixed personas (Conservative / Aggressive / Contrarian) each rank the same
+                rule-valid candidate counts the deterministic engine generated — they can only
+                re-order and explain, never introduce a count. Each persona's vote is weighted by
+                its own measured hit-rate from your track record (a persona with no concluded
+                history yet uses a documented neutral prior). The response reports the weighted
+                consensus, a disagreement score (1.0 = unanimous, lower when personas split), and
+                which personas ran — fewer than three means the panel degraded under quota
+                pressure rather than failing outright.
+                """)
+            .Produces<PersonaPanelResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .RequireRateLimiting("gemini-analysis");
@@ -362,6 +386,42 @@ public static class WaveAnalysisEndpoints
             // return a generic 502 so nothing internal leaks.
             loggerFactory.CreateLogger("WaveAnalysisEndpoints")
                 .LogError(ex, "Auto wave analysis failed for {Symbol}", request.Symbol);
+            return Results.Problem(
+                title: "Analysis unavailable",
+                detail: "The analysis service is currently unavailable. Please try again later.",
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    }
+
+    private static async Task<IResult> PersonaPanel(
+        AutoWaveAnalysisRequest request,
+        ClaimsPrincipal user,
+        IPersonaPanelAnalysisService personaPanelService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var lookbackDays = Math.Clamp(request.LookbackDays ?? 365, 30, 1825);
+        var threshold = Math.Clamp(request.ThresholdPercent ?? 2.5m, 0.5m, 25m);
+        var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        try
+        {
+            var result = await personaPanelService.AnalyzeAsync(
+                userId, request.Symbol.ToUpperInvariant(), lookbackDays, threshold, cancellationToken);
+
+            return Results.Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(
+                title: "Invalid request",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+        {
+            loggerFactory.CreateLogger("WaveAnalysisEndpoints")
+                .LogError(ex, "Persona panel failed for {Symbol}", request.Symbol);
             return Results.Problem(
                 title: "Analysis unavailable",
                 detail: "The analysis service is currently unavailable. Please try again later.",

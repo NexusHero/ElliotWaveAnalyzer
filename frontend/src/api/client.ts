@@ -7,6 +7,7 @@ import type {
   CandleIntervalCode,
   DepotSnapshot,
   ImageVerificationReport,
+  PersonaPanelResponse,
   PortfolioReview,
   ResolvedSymbol,
   RiskAssessment,
@@ -71,6 +72,29 @@ export async function autoAnalyzeWaves(
   }
 
   return (await response.json()) as AutoWaveAnalysisResponse
+}
+
+/**
+ * Calibrated, self-weighting analyst panel via `POST /api/wave-analysis/persona-panel` (#184):
+ * three fixed personas rank the same deterministic candidates the "magic button" would; the
+ * response reports the weighted consensus and how many personas actually ran.
+ */
+export async function personaAnalystPanel(
+  request: AutoWaveAnalysisRequest,
+  signal?: AbortSignal
+): Promise<PersonaPanelResponse> {
+  const response = await fetch('/api/wave-analysis/persona-panel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorDetail(response))
+  }
+
+  return (await response.json()) as PersonaPanelResponse
 }
 
 /**

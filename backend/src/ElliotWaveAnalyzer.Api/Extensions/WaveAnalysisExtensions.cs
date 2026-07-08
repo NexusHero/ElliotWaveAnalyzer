@@ -16,6 +16,11 @@ internal static class WaveAnalysisExtensions
         services.AddTransient<ITechnicalAnalysisService, TechnicalAnalysisService>();
         services.AddTransient<IWaveAnalysisService, WaveAnalysisService>();
         services.AddTransient<IAutoWaveAnalysisService, AutoWaveAnalysisService>();
+
+        // Calibrated, self-weighting analyst panel (#184) — same orchestration shape as
+        // IAutoWaveAnalysisService, ranked by IPersonaAnalystPanel (registered in the LLM
+        // extensions) instead of a single/ensemble ranker. Scoped, mirroring that dependency.
+        services.AddScoped<IPersonaPanelAnalysisService, PersonaPanelAnalysisService>();
         services.AddTransient<ITopDownAnalysisService, TopDownAnalysisService>();
 
         // Analyst-in-the-loop re-verification (REQ-031): deterministic, no LLM.
