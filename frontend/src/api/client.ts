@@ -200,7 +200,8 @@ export async function getAlternateHypotheses(
 
 /**
  * Fetches live OHLCV candles (+ indicators) for a symbol via `GET /api/market-data/{symbol}`.
- * `days` selects the lookback window (1–365); `interval` the timeframe ('1d' daily, '1w' weekly).
+ * `days` selects the lookback window (1–1825, i.e. up to 5 years); `interval` the timeframe ('1d'
+ * daily, '1w' weekly).
  */
 export async function getMarketData(
   symbol: string,

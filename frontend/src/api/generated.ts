@@ -300,12 +300,12 @@ export interface paths {
         };
         /**
          * Returns OHLCV candles + MACD + RSI for the requested symbol
-         * @description Symbol is any data-source ticker (resolve one via /api/symbols/search): BTC, ETH
-         *     (CoinGecko); any equity/ETF/index/metal ticker (Yahoo, e.g. RKLB, ^IXIC, SI=F).
-         *     Optional 'interval' selects the timeframe: '1d' (daily, default), '1w' (weekly,
-         *     resampled from daily), '4h' or '1h' (from hourly candles — intraday-capable
-         *     instruments only; a request past the source's hourly lookback returns 400 with the
-         *     supported range). Indicators are computed on the selected timeframe.
+         * @description Symbol is any data-source ticker (resolve one via /api/symbols/search): BTC, ETH or
+         *     any equity/ETF/index ticker, all served by Twelve Data. 'days' selects the lookback
+         *     window (1-1825, i.e. up to 5 years). Optional 'interval' selects the timeframe: '1d'
+         *     (daily, default), '1w' (weekly, resampled from daily), '4h' or '1h' (from hourly
+         *     candles — intraday-capable instruments only). Indicators are computed on the
+         *     selected timeframe.
          */
         get: operations["GetMarketData"];
         put?: never;

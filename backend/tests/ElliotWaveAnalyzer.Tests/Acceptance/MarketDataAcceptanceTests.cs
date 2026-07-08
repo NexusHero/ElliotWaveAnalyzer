@@ -67,6 +67,25 @@ public sealed class MarketDataAcceptanceTests
     }
 
     [Test]
+    public async Task GetMarketData_FiveYearRange_Returns200()
+    {
+        // The frontend's "5Y" range button (#164) requests 1825 days — this must not be rejected
+        // by the endpoint's own validation, only ever by the upstream source actually having less
+        // history (handled client-side by the "coverage note", not a 400).
+        var response = await _client.GetAsync("/api/market-data/BTC?days=1825");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GetMarketData_BeyondFiveYears_Returns400()
+    {
+        var response = await _client.GetAsync("/api/market-data/BTC?days=1826");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
     public async Task GetMarketData_WeeklyInterval_ReturnsFewerCandlesThanDaily()
     {
         var daily = await _client.GetFromJsonAsync<JsonElement>("/api/market-data/BTC?days=90&interval=1d");
