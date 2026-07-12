@@ -35,11 +35,11 @@
          read-only, which the Microsoft.AspNetCore.OpenApi 10.0.x XML-comment source
          generator still assigns to (CS0200). Do not let Dependabot bump this to 3.x
          until Microsoft.AspNetCore.OpenApi references a 3.x-compatible generator. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.10.0" />
     <!-- Writes the OpenAPI document to disk at build time (no server/DB needed) — the
          frontend↔backend contract check (#197) generates from this file, never from a live
          server, so it's deterministic in CI with no manual step (AC5). -->
-    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.0">
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.9">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
