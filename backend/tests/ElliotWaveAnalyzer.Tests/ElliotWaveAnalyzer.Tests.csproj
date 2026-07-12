@@ -49,7 +49,7 @@
     <!-- Property-based testing: encode the safety invariants (I1-I9) and let CsCheck attack them with
          thousands of generated + shrunk variants over the pure deterministic core. Pure managed, no
          native deps. Seeded for reproducibility (ADR-034). -->
-    <PackageReference Include="CsCheck" Version="4.6.0" />
+    <PackageReference Include="CsCheck" Version="4.7.0" />
   </ItemGroup>
 
   <ItemGroup>
