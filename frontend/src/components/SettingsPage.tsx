@@ -8,6 +8,9 @@ import {
 } from '../hooks/useApiKeys'
 import { type ConsentCategories, useConsent } from '../hooks/useConsent'
 import { useNarrativeLanguage } from '../hooks/useNarrativeLanguage'
+import { Button } from './core/Button'
+import { Segmented } from './core/Segmented'
+import { Switch } from './core/Switch'
 import DepotImportPanel from './DepotImportPanel'
 import { ChevronLeft, Eye, EyeOff, Lock, Shield } from './Icons'
 
@@ -153,14 +156,14 @@ function ProviderRow({
               />
               Default
             </label>
-            <button type="button" className="btn-text danger" onClick={() => onRemove(provider.id)}>
+            <Button variant="text" danger onClick={() => onRemove(provider.id)}>
               Remove
-            </button>
+            </Button>
           </>
         ) : (
-          <button
-            type="button"
-            className="btn-primary sm"
+          <Button
+            variant="primary"
+            size="sm"
             disabled={draft.trim().length === 0}
             onClick={() => {
               onSave(provider.id, draft)
@@ -169,7 +172,7 @@ function ProviderRow({
             }}
           >
             Save key
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -195,19 +198,13 @@ function CoachingPreferences() {
             <strong>Narrative language</strong>
             <span>The language AI readings, reflections and summaries are written in.</span>
           </div>
-          <div className="mini-seg" role="group" aria-label="Narrative language">
-            {LANGUAGES.map((l) => (
-              <button
-                key={l}
-                type="button"
-                className={language === l ? 'on' : ''}
-                aria-pressed={language === l}
-                onClick={() => setLanguage(l)}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            size="sm"
+            aria-label="Narrative language"
+            options={[...LANGUAGES]}
+            value={language}
+            onChange={(v) => setLanguage(v as (typeof LANGUAGES)[number])}
+          />
         </div>
 
         <div className="pref-row">
@@ -215,18 +212,12 @@ function CoachingPreferences() {
             <strong>Reflection layout</strong>
             <span>How the coach’s result is laid out.</span>
           </div>
-          <div className="mini-seg">
-            {STYLES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={style === s ? 'on' : ''}
-                onClick={() => setStyle(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            size="sm"
+            options={[...STYLES]}
+            value={style}
+            onChange={(v) => setStyle(v as (typeof STYLES)[number])}
+          />
         </div>
 
         <div className="pref-row">
@@ -234,18 +225,12 @@ function CoachingPreferences() {
             <strong>Coach tone</strong>
             <span>Gentle nudges or direct critique.</span>
           </div>
-          <div className="mini-seg">
-            {TONES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className={tone === t ? 'on' : ''}
-                onClick={() => setTone(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            size="sm"
+            options={[...TONES]}
+            value={tone}
+            onChange={(v) => setTone(v as (typeof TONES)[number])}
+          />
         </div>
 
         <div className="pref-row">
@@ -253,16 +238,11 @@ function CoachingPreferences() {
             <strong>Show Fibonacci relationships</strong>
             <span>Include the ratio strip in results.</span>
           </div>
-          <button
-            type="button"
-            className={`switch${showFib ? ' on' : ''}`}
-            role="switch"
-            aria-checked={showFib}
+          <Switch
+            checked={showFib}
+            onChange={setShowFib}
             aria-label="Show Fibonacci relationships"
-            onClick={() => setShowFib((v) => !v)}
-          >
-            <span />
-          </button>
+          />
         </div>
       </div>
     </section>
@@ -290,53 +270,39 @@ function ConsentPreferences() {
             <strong>Essential</strong>
             <span>Session, security, and core functionality. Always on.</span>
           </div>
-          <button
-            type="button"
-            className="switch on"
-            role="switch"
-            aria-checked={true}
+          <Switch
+            checked={true}
+            onChange={() => {}}
             aria-label="Essential cookies (always on)"
             disabled
-          >
-            <span />
-          </button>
+          />
         </div>
         <div className="pref-row">
           <div className="pref-text">
             <strong>Analytics</strong>
             <span>Helps us understand how the app is used.</span>
           </div>
-          <button
-            type="button"
-            className={`switch${draft.analytics ? ' on' : ''}`}
-            role="switch"
-            aria-checked={draft.analytics}
+          <Switch
+            checked={draft.analytics}
+            onChange={(v) => setDraft((d) => ({ ...d, analytics: v }))}
             aria-label="Analytics cookies"
-            onClick={() => setDraft((d) => ({ ...d, analytics: !d.analytics }))}
-          >
-            <span />
-          </button>
+          />
         </div>
         <div className="pref-row">
           <div className="pref-text">
             <strong>Marketing</strong>
             <span>Used to measure the effectiveness of campaigns.</span>
           </div>
-          <button
-            type="button"
-            className={`switch${draft.marketing ? ' on' : ''}`}
-            role="switch"
-            aria-checked={draft.marketing}
+          <Switch
+            checked={draft.marketing}
+            onChange={(v) => setDraft((d) => ({ ...d, marketing: v }))}
             aria-label="Marketing cookies"
-            onClick={() => setDraft((d) => ({ ...d, marketing: !d.marketing }))}
-          >
-            <span />
-          </button>
+          />
         </div>
       </div>
-      <button type="button" className="btn-primary" onClick={() => saveConsent(draft)}>
+      <Button variant="primary" onClick={() => saveConsent(draft)}>
         Save cookie preferences
-      </button>
+      </Button>
     </section>
   )
 }

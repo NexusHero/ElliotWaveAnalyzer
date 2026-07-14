@@ -40,6 +40,7 @@ import type { Theme } from '../hooks/useTheme'
 import AutoAnalysisPanel, { type AutoState } from './AutoAnalysisPanel'
 import BacktestSummaryPanel from './BacktestSummaryPanel'
 import CoachPanel, { type CoachMode, type CoachState } from './CoachPanel'
+import { Segmented } from './core/Segmented'
 import { treeToDegreeMarkers } from './degreeMarkers'
 import HistoricalAnalogsPanel, { type AnalogsState } from './HistoricalAnalogsPanel'
 import HypothesesPanel, { type HypothesesState } from './HypothesesPanel'
@@ -874,35 +875,27 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
               <div className="tf-cluster">
                 <div className="tf-group">
                   <span className="tf-eyebrow">Resolution</span>
-                  <div className="tf-select" role="group" aria-label="Timeframe">
-                    {TIMEFRAMES.map((t) => (
-                      <button
-                        key={t.code}
-                        type="button"
-                        className={timeframe.code === t.code ? 'on' : ''}
-                        aria-pressed={timeframe.code === t.code}
-                        onClick={() => handleTimeframe(t)}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
+                  <Segmented
+                    aria-label="Timeframe"
+                    options={TIMEFRAMES.map((t) => ({ value: t.code, label: t.label }))}
+                    value={timeframe.code}
+                    onChange={(code) => {
+                      const next = TIMEFRAMES.find((t) => t.code === code)
+                      if (next) handleTimeframe(next)
+                    }}
+                  />
                 </div>
                 <div className="tf-group">
                   <span className="tf-eyebrow">Window</span>
-                  <div className="tf-select" role="group" aria-label="Range">
-                    {RANGES.map((r) => (
-                      <button
-                        key={r.label}
-                        type="button"
-                        className={range.label === r.label ? 'on' : ''}
-                        aria-pressed={range.label === r.label}
-                        onClick={() => handleRange(r)}
-                      >
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
+                  <Segmented
+                    aria-label="Range"
+                    options={RANGES.map((r) => r.label)}
+                    value={range.label}
+                    onChange={(label) => {
+                      const next = RANGES.find((r) => r.label === label)
+                      if (next) handleRange(next)
+                    }}
+                  />
                 </div>
               </div>
               {/* Log/Pro are view settings, not navigation — set them apart as compact toggle chips

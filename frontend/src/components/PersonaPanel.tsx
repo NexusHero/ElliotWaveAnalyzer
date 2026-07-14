@@ -1,5 +1,6 @@
 import type { PersonaPanelResponse, PersonaRankedCount } from '../api/types'
 import { NOT_INVESTMENT_ADVICE_DISCLAIMER } from '../constants/legal'
+import { Button } from './core/Button'
 import { Lock, Seal } from './Icons'
 
 /** Fetch lifecycle of the persona-panel request, mirrored from the parent's mutation state. */
@@ -64,9 +65,9 @@ export default function PersonaPanel({
           </span>
           <h4>No API key configured</h4>
           <p>Add an LLM API key in Settings to run the analyst panel.</p>
-          <button type="button" className="btn-primary" onClick={onOpenSettings}>
+          <Button variant="primary" onClick={onOpenSettings}>
             Go to Settings
-          </button>
+          </Button>
         </div>
       )}
 

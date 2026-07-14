@@ -1,4 +1,5 @@
 import type { WaveVerification } from '../api/types'
+import { Button } from './core/Button'
 import { Alert, Seal } from './Icons'
 import LevelsSummary from './LevelsSummary'
 
@@ -43,7 +44,8 @@ export default function LiveVerifyPanel({
   // "Valid" (no hard-rule Fail) is vacuously true when the checker had nothing to evaluate — e.g.
   // no pivot snapped to a candle, so every rule is Indeterminate. Distinguish that from a genuinely
   // valid count so a rejected/empty count never wears a green "Valid" badge.
-  const anyDeterminate = verification?.rules.rules.some((r) => r.status !== 'Indeterminate') ?? false
+  const anyDeterminate =
+    verification?.rules.rules.some((r) => r.status !== 'Indeterminate') ?? false
   const verdict: { cls: string; label: string } = !anyDeterminate
     ? { cls: 'neutral', label: 'Nothing to validate yet' }
     : verification!.isValid
@@ -109,14 +111,9 @@ export default function LiveVerifyPanel({
 
           {onSave && (
             <div className="lv-save">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={onSave}
-                disabled={savePending || savedId != null}
-              >
+              <Button variant="primary" onClick={onSave} disabled={savePending || savedId != null}>
                 {savePending ? 'Saving…' : savedId != null ? 'Saved ✓' : 'Save to track record'}
-              </button>
+              </Button>
               {savedId != null && (
                 <a
                   className="lv-export"
