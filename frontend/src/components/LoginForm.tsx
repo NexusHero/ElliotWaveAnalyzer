@@ -1,4 +1,8 @@
 import { type FormEvent, useState } from 'react'
+import { Button } from './core/Button'
+import { Checkbox } from './core/Checkbox'
+import { Field } from './core/Field'
+import { Segmented } from './core/Segmented'
 import { Check, GoogleG, WaveLogo } from './Icons'
 
 export type AuthMode = 'login' | 'register'
@@ -97,27 +101,15 @@ export default function LoginForm({
           onSubmit={handleSubmit}
           aria-label={isRegister ? 'Create account' : 'Log in'}
         >
-          <div className="seg" role="tablist">
-            <span className={`seg-thumb${isRegister ? ' right' : ''}`} aria-hidden />
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!isRegister}
-              className={`seg-btn${!isRegister ? ' on' : ''}`}
-              onClick={() => setMode('login')}
-            >
-              Log in
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={isRegister}
-              className={`seg-btn${isRegister ? ' on' : ''}`}
-              onClick={() => setMode('register')}
-            >
-              Create account
-            </button>
-          </div>
+          <Segmented
+            thumb
+            options={[
+              { value: 'login', label: 'Log in' },
+              { value: 'register', label: 'Create account' },
+            ]}
+            value={mode}
+            onChange={(v) => setMode(v as AuthMode)}
+          />
 
           <div className="auth-head">
             <h2>{isRegister ? 'Create your account' : 'Welcome back'}</h2>
@@ -131,91 +123,80 @@ export default function LoginForm({
           {googleEnabled && (
             <>
               {/* Full-page navigation (not fetch): the OAuth flow needs real browser redirects. */}
-              <a className="btn-google" href="/api/auth/google/login">
+              <Button as="a" variant="google" href="/api/auth/google/login">
                 <GoogleG size={18} />
                 Continue with Google
-              </a>
+              </Button>
               <div className="auth-divider" aria-hidden>
                 <span>or</span>
               </div>
             </>
           )}
 
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-          </label>
+          <Field
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="you@example.com"
+          />
 
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              placeholder="••••••••"
-            />
-          </label>
+          <Field
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
+            placeholder="••••••••"
+          />
 
           {isRegister && (
             <div className="fade-up">
-              <label className="field">
-                <span>
-                  Confirm password {mismatch && <span className="hint err">— doesn’t match</span>}
-                </span>
-                <input
-                  type="password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                />
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={agreed}
-                  onChange={(e) => setAgreed(e.target.checked)}
-                />
-                I understand this is a market-analysis tool and not financial advice.
-              </label>
-              <label className="check" style={{ marginBottom: 22 }}>
-                <input
-                  type="checkbox"
+              <Field
+                label="Confirm password"
+                hint={mismatch ? 'doesn’t match' : undefined}
+                hintError={mismatch}
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                autoComplete="new-password"
+                placeholder="••••••••"
+              />
+              <Checkbox
+                label="I understand this is a market-analysis tool and not financial advice."
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <div style={{ marginBottom: 22 }}>
+                <Checkbox
+                  label={
+                    <>
+                      I accept the{' '}
+                      <a href="/legal/terms" target="_blank" rel="noopener noreferrer">
+                        Terms of Service
+                      </a>{' '}
+                      and{' '}
+                      <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">
+                        Privacy Policy
+                      </a>
+                      .
+                    </>
+                  }
                   checked={acceptTerms}
                   onChange={(e) => setAcceptTerms(e.target.checked)}
                 />
-                I accept the{' '}
-                <a href="/legal/terms" target="_blank" rel="noopener noreferrer">
-                  Terms of Service
-                </a>{' '}
-                and{' '}
-                <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">
-                  Privacy Policy
-                </a>
-                .
-              </label>
+              </div>
             </div>
           )}
 
           {!isRegister && (
             <div className="auth-row">
-              <label className="check">
-                <input type="checkbox" defaultChecked />
-                Keep me signed in
-              </label>
-              <button type="button" className="link">
-                Forgot password?
-              </button>
+              <Checkbox label="Keep me signed in" defaultChecked />
+              <Button variant="link">Forgot password?</Button>
             </div>
           )}
 
@@ -225,19 +206,15 @@ export default function LoginForm({
             </p>
           )}
 
-          <button className="btn-primary lg" type="submit" disabled={!canSubmit}>
+          <Button variant="primary" size="lg" type="submit" disabled={!canSubmit}>
             {loading ? 'Please wait…' : isRegister ? 'Create account' : 'Log in'}
-          </button>
+          </Button>
 
           <p className="auth-switch">
             {isRegister ? 'Already have an account? ' : 'New to Elliott Wave Analyzer? '}
-            <button
-              type="button"
-              className="link"
-              onClick={() => setMode(isRegister ? 'login' : 'register')}
-            >
+            <Button variant="link" onClick={() => setMode(isRegister ? 'login' : 'register')}>
               {isRegister ? 'Log in' : 'Create one'}
-            </button>
+            </Button>
           </p>
         </form>
       </main>

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useConsent } from '../hooks/useConsent'
+import { Button } from './core/Button'
+import { Switch } from './core/Switch'
 
 /**
  * First-visit cookie-consent banner (#169): granular opt-in, essential always on, analytics and
@@ -38,48 +40,26 @@ export default function ConsentBanner() {
                 <strong>Essential</strong>
                 <span>Session, security, and core functionality. Always on.</span>
               </div>
-              <button
-                type="button"
-                className="switch on"
-                role="switch"
-                aria-checked={true}
+              <Switch
+                checked={true}
+                onChange={() => {}}
                 aria-label="Essential cookies (always on)"
                 disabled
-              >
-                <span />
-              </button>
+              />
             </div>
             <div className="pref-row">
               <div className="pref-text">
                 <strong>Analytics</strong>
                 <span>Helps us understand how the app is used.</span>
               </div>
-              <button
-                type="button"
-                className={`switch${analytics ? ' on' : ''}`}
-                role="switch"
-                aria-checked={analytics}
-                aria-label="Analytics cookies"
-                onClick={() => setAnalytics((v) => !v)}
-              >
-                <span />
-              </button>
+              <Switch checked={analytics} onChange={setAnalytics} aria-label="Analytics cookies" />
             </div>
             <div className="pref-row">
               <div className="pref-text">
                 <strong>Marketing</strong>
                 <span>Used to measure the effectiveness of campaigns.</span>
               </div>
-              <button
-                type="button"
-                className={`switch${marketing ? ' on' : ''}`}
-                role="switch"
-                aria-checked={marketing}
-                aria-label="Marketing cookies"
-                onClick={() => setMarketing((v) => !v)}
-              >
-                <span />
-              </button>
+              <Switch checked={marketing} onChange={setMarketing} aria-label="Marketing cookies" />
             </div>
           </div>
         )}
@@ -87,22 +67,17 @@ export default function ConsentBanner() {
 
       <div className="consent-banner-actions">
         {expanded ? (
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={() => saveConsent({ analytics, marketing })}
-          >
+          <Button variant="primary" onClick={() => saveConsent({ analytics, marketing })}>
             Save preferences
-          </button>
+          </Button>
         ) : (
           <>
-            <button
-              type="button"
-              className="btn-primary"
+            <Button
+              variant="primary"
               onClick={() => saveConsent({ analytics: true, marketing: true })}
             >
               Accept all
-            </button>
+            </Button>
             <button
               type="button"
               className="tb-btn"

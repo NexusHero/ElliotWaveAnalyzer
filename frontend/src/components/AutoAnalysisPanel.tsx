@@ -8,6 +8,7 @@ import type {
   WaveNode,
 } from '../api/types'
 import { NOT_INVESTMENT_ADVICE_DISCLAIMER } from '../constants/legal'
+import { Button } from './core/Button'
 import { Alert, CheckCircle, Lock, Seal, Spark, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
 import TopDownBreadcrumb from './TopDownBreadcrumb'
@@ -122,14 +123,9 @@ export default function AutoAnalysisPanel({
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={state === 'loading'}
-            onClick={onRun}
-          >
+          <Button variant="primary" disabled={state === 'loading'} onClick={onRun}>
             <Spark size={16} /> {state === 'loading' ? 'Analyzing…' : 'Auto-analyze'}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -150,9 +146,9 @@ export default function AutoAnalysisPanel({
           </span>
           <h4>No API key configured</h4>
           <p>Add an LLM API key in Settings to run the full-auto analysis.</p>
-          <button type="button" className="btn-primary" onClick={onOpenSettings}>
+          <Button variant="primary" onClick={onOpenSettings}>
             Go to Settings
-          </button>
+          </Button>
         </div>
       )}
 

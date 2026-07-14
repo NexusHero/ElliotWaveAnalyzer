@@ -122,14 +122,6 @@
 .skeleton-rows span:nth-child(3) {
   width: 64%;
 }
-@keyframes ewa-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
 
 /* ---------- section titles ---------- */
 .sec-title {
@@ -752,7 +744,7 @@
   gap: 8px;
   align-items: center;
 }
-.sc-form input[type='text'] {
+.sc-form input[type="text"] {
   flex: 1;
   min-width: 140px;
   padding: 6px 8px;
@@ -813,7 +805,7 @@
   gap: 8px;
   align-items: center;
 }
-.vi-form input[type='text'] {
+.vi-form input[type="text"] {
   flex: 1;
   min-width: 120px;
   padding: 6px 8px;

@@ -1,4 +1,5 @@
 import type { RuleResult, RuleStatus, WaveAnalysisResponse } from '../api/types'
+import { Button } from './core/Button'
 import { Alert, CheckCircle, Lock, Seal, Spark, Target, XMark } from './Icons'
 import LevelsSummary from './LevelsSummary'
 
@@ -38,17 +39,12 @@ export default function CoachPanel({
   return (
     <section className="coach" aria-label="Coach">
       <div className="coach-actions">
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={labelCount < 2}
-          onClick={onValidate}
-        >
+        <Button variant="primary" disabled={labelCount < 2} onClick={onValidate}>
           <Seal size={17} /> Validate my count
-        </button>
-        <button type="button" className="btn-ghost-acc" onClick={onAnalyze}>
+        </Button>
+        <Button variant="ghost" onClick={onAnalyze}>
           <Spark size={17} /> Analyze for me
-        </button>
+        </Button>
       </div>
 
       <div className="coach-body">
@@ -101,9 +97,9 @@ function NeedKeyState({ onOpenSettings }: { onOpenSettings: () => void }) {
         Add an LLM API key in Settings to unlock the coach’s reflection. Rule checks stay available
         without one.
       </p>
-      <button type="button" className="btn-primary" onClick={onOpenSettings}>
+      <Button variant="primary" onClick={onOpenSettings}>
         Go to Settings
-      </button>
+      </Button>
     </div>
   )
 }

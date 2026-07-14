@@ -207,6 +207,14 @@ textarea {
     opacity: 0.45;
   }
 }
+@keyframes ewa-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
 .fade-up {
   animation: ewa-fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
