@@ -38,6 +38,7 @@
          provider and the generated migration SQL are exercised exactly as in production.
          Replaces the EF Core in-memory provider. Tests skip when no Docker daemon is
          reachable (see TestDocker), keeping local runs green; CI provides Docker. -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="4.13.0" />
 
     <!-- Architecture rule enforcement (layering + encapsulation) at test time. -->
