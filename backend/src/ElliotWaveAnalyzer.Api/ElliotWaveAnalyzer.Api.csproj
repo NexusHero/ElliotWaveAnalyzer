@@ -102,11 +102,11 @@
     <!-- OpenTelemetry: traces + metrics for ASP.NET Core, outbound HTTP and the runtime.
          Exported via OTLP when OpenTelemetry:Endpoint is configured (no exporter otherwise).
          Microsoft.Extensions.AI auto-instruments IChatClient calls when tracing is active. -->
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.18.0" />
   </ItemGroup>
 
   <ItemGroup>
