@@ -14,7 +14,7 @@
          NSubstitute over Moq: no telemetry controversy, cleaner argument matcher syntax. -->
     <PackageReference Include="NUnit" Version="4.6.1" />
     <PackageReference Include="NUnit3TestAdapter" Version="6.2.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
 
     <!-- Cross-platform code-coverage collector for the "XPlat Code Coverage" data collector.
          Without it the named collector emits no coverage.cobertura.xml at all. -->
@@ -31,7 +31,7 @@
 
     <!-- End-to-end acceptance tests: boots the API in-memory via WebApplicationFactory
          and drives it over HTTP. External boundaries (LLM, market data) are faked. -->
-    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
 
     <!-- In-memory EF Core provider so auth/DB-backed tests need no live PostgreSQL. -->
     <!-- Real PostgreSQL in a throwaway container for DB-backed tests, so the Npgsql
