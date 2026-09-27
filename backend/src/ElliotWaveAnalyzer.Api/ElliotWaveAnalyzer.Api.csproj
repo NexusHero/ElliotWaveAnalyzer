@@ -27,7 +27,7 @@
     <!-- Built-in ASP.NET Core 10 OpenAPI support.
          Replaces Swashbuckle (not .NET 10 compatible).
          Serves OpenAPI JSON at /openapi/v1.json. -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
     <!-- Direct pin: the transitive Microsoft.OpenApi 2.0.0 pulled in by
          Microsoft.AspNetCore.OpenApi has a known high-severity advisory
          (GHSA-v5pm-xwqc-g5wc), which fails restore under TreatWarningsAsErrors.
@@ -35,11 +35,11 @@
          read-only, which the Microsoft.AspNetCore.OpenApi 10.0.x XML-comment source
          generator still assigns to (CS0200). Do not let Dependabot bump this to 3.x
          until Microsoft.AspNetCore.OpenApi references a 3.x-compatible generator. -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
+    <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
     <!-- Writes the OpenAPI document to disk at build time (no server/DB needed) — the
          frontend↔backend contract check (#197) generates from this file, never from a live
          server, so it's deterministic in CI with no manual step (AC5). -->
-    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.0">
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -57,24 +57,24 @@
            Gemini  → OpenAIClient pointed at Google's OpenAI-compatible endpoint
            Claude  → Anthropic.SDK's IChatClient
          Token usage comes from the standardized ChatResponse.Usage (UsageDetails). -->
-    <PackageReference Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
     <PackageReference Include="Anthropic.SDK" Version="5.10.0" />
 
     <!-- Standard resilience pipeline (retry, timeout, circuit-breaker, rate-limiter)
          for outbound HttpClient calls to upstream market-data APIs. -->
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
 
     <!-- Authentication: ASP.NET Core Identity (user store + password hashing) on EF Core
          with PostgreSQL. Sessions are opaque tokens stored hashed in the DB. -->
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.9" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
 
     <!-- Data Protection key ring persisted to the same PostgreSQL database (#171) — so encrypted
          per-user API keys stay decryptable across restarts and across multiple instances, instead
          of the framework's default local-only key ring. -->
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.12" />
 
     <!-- Depot import: PdfPig extracts text with word bounding boxes from broker PDF
          statements (Smartbroker+). MIT, pure managed code, no native deps. Isolated in
@@ -90,7 +90,7 @@
 
     <!-- Security hardening (see security-plan.md) -->
     <!-- Google OAuth 2.0 external login -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.12" />
     <!-- Declarative input validation with symbol allow-lists. Base package (not the heavier
          .AspNetCore one, which registers MVC model-binding filters a Minimal API never uses)
          plus the DI-extensions for AddValidatorsFromAssemblyContaining. -->
