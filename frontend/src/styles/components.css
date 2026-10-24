@@ -552,6 +552,12 @@
   display: flex;
   flex-direction: column;
 }
+.ws-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .ws-grid {
   flex: 1;
   display: grid;
@@ -562,6 +568,22 @@
   width: 100%;
   margin: 0 auto;
   align-items: start;
+}
+@media (min-width: 1081px) {
+  .ws:has(.ws-shell) {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .ws-shell {
+    overflow: hidden;
+  }
+  .ws-grid {
+    min-height: 0;
+    height: 100%;
+    align-items: stretch;
+    overflow: hidden;
+    padding: 12px 18px;
+  }
 }
 @media (max-width: 1080px) {
   .ws-grid {
@@ -686,6 +708,19 @@
   min-width: 0;
   position: sticky;
   top: 78px;
+}
+@media (min-width: 1081px) {
+  .chart-col {
+    position: static;
+    height: 100%;
+    min-height: 0;
+  }
+  .chart-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
 }
 @media (max-width: 1080px) {
   .chart-col {
@@ -828,16 +863,48 @@
   background: var(--inset);
   border: 1px solid var(--line-soft);
 }
+@media (min-width: 1081px) {
+  .chart-stage {
+    flex: 1;
+    height: auto;
+    min-height: 360px;
+  }
+}
 
-/* ---------- annotations card ---------- */
+/* ---------- annotations card & bounded right column ---------- */
 .coach-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
+@media (min-width: 1081px) {
+  .coach-col {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .coach-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 4px;
+  }
+}
+@media (max-width: 1080px) {
+  .coach-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
 /* Workspace section tabs (#163): a sticky, scannable strip so only one tool area shows at a time. */
 .ws-tabs {
+  flex: none;
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
@@ -848,6 +915,11 @@
   position: sticky;
   top: 78px;
   z-index: 2;
+}
+@media (min-width: 1081px) {
+  .ws-tabs {
+    position: static;
+  }
 }
 .ws-tab {
   flex: 1 1 auto;
@@ -871,20 +943,56 @@
   color: var(--text);
   box-shadow: var(--shadow-sm);
 }
+
+/* Sub-navigation pills inside Count / Auto / History so sub-panels switch instead of stacking. */
+.ws-subtabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 3px;
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+}
+.ws-subtab {
+  flex: 1 1 auto;
+  min-width: 56px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.ws-subtab:hover {
+  color: var(--text);
+}
+.ws-subtab.on {
+  background: var(--acc-soft);
+  color: var(--acc-strong, var(--text));
+  box-shadow: inset 0 0 0 1px var(--acc-line);
+}
+
 .anno-card {
+  flex: none;
   background: var(--panel);
   border: 1px solid var(--line-soft);
   border-radius: var(--r-lg);
-  padding: 16px;
+  padding: 12px 14px;
 }
 .anno-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .anno-head h3 {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.01em;
@@ -895,9 +1003,9 @@
 }
 .anno-empty {
   color: var(--faint);
-  font-size: 13px;
+  font-size: 12.5px;
   margin: 0;
-  padding: 8px 0;
+  padding: 4px 0;
 }
 .anno-list {
   list-style: none;
@@ -906,33 +1014,42 @@
   display: grid;
   gap: 7px;
 }
-/* Live per-leg measurements readout (#165). */
+.anno-list.anno-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+/* Live per-leg measurements readout (#165) — compact horizontal chip strip. */
 .leg-readout {
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--line-soft);
 }
 .leg-readout-head {
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.04em;
   color: var(--faint);
   text-transform: uppercase;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .leg-readout ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 .leg-readout li {
-  display: grid;
-  grid-template-columns: 3.2em 1fr 1fr 2.6em 3.4em;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--muted);
+  display: inline-flex;
   align-items: baseline;
+  gap: 5px;
+  padding: 2px 7px;
+  background: var(--inset);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--muted);
 }
 .leg-readout .leg-name {
   color: var(--text);
@@ -947,47 +1064,65 @@
 .leg-readout .leg-days,
 .leg-readout .leg-ratio {
   color: var(--faint);
-  text-align: right;
 }
 .anno-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 8px 7px 7px;
+  gap: 6px;
+  padding: 4px 6px;
   background: var(--card);
   border: 1px solid var(--line-soft);
   border-radius: var(--r-sm);
 }
+.anno-item.anno-chip {
+  flex: 0 1 auto;
+}
 .anno-sel {
-  width: 50px;
-  height: 30px;
+  width: 42px;
+  height: 24px;
   background: var(--inset);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 5px;
   color: var(--text);
   font-weight: 700;
   text-align: center;
-  padding: 0 4px;
-  font-size: 13px;
+  padding: 0 2px;
+  font-size: 12px;
 }
 .anno-sel:focus {
   outline: none;
   border-color: var(--acc-line);
 }
 .anno-info {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--muted);
-  flex: 1;
+  white-space: nowrap;
+}
+.anno-nudge {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  background: var(--inset);
+  color: var(--muted);
+  border-radius: 4px;
+  font-size: 9px;
+}
+.anno-nudge:hover {
+  color: var(--text);
+  border-color: var(--line);
 }
 .anno-del {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: none;
   background: none;
   color: var(--faint);
-  border-radius: 6px;
+  border-radius: 5px;
 }
 .anno-del:hover {
   color: var(--fail);

@@ -17,6 +17,8 @@ interface CoachPanelProps {
   onValidate: () => void
   onAnalyze: () => void
   onOpenSettings: () => void
+  /** When true, only the top action bar renders (body is hidden while the Live Check view is active). */
+  hideBody?: boolean
 }
 
 /**
@@ -35,6 +37,7 @@ export default function CoachPanel({
   onValidate,
   onAnalyze,
   onOpenSettings,
+  hideBody = false,
 }: CoachPanelProps) {
   return (
     <section className="coach" aria-label="Coach">
@@ -47,15 +50,17 @@ export default function CoachPanel({
         </Button>
       </div>
 
-      <div className="coach-body">
-        {state === 'empty' && <EmptyState labelCount={labelCount} />}
-        {state === 'needkey' && <NeedKeyState onOpenSettings={onOpenSettings} />}
-        {state === 'loading' && <LoadingState mode={mode} />}
-        {state === 'result' && result && (
-          <Report result={result} mode={mode} error={error} currentPrice={currentPrice} />
-        )}
-        {state === 'result' && !result && error && <ErrorState error={error} />}
-      </div>
+      {!hideBody && (
+        <div className="coach-body">
+          {state === 'empty' && <EmptyState labelCount={labelCount} />}
+          {state === 'needkey' && <NeedKeyState onOpenSettings={onOpenSettings} />}
+          {state === 'loading' && <LoadingState mode={mode} />}
+          {state === 'result' && result && (
+            <Report result={result} mode={mode} error={error} currentPrice={currentPrice} />
+          )}
+          {state === 'result' && !result && error && <ErrorState error={error} />}
+        </div>
+      )}
     </section>
   )
 }

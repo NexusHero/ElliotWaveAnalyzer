@@ -197,17 +197,71 @@ describe('WaveWorkspace', () => {
     expect(within(group).getByRole('button', { name: '+ Sub-waves' })).toBeInTheDocument()
   })
 
-  it('gives the AI workbench its own Auto tab so the Count tab stays lean', () => {
+  it('gives the AI workbench its own Auto tab with sub-pills so panels never stack', () => {
     renderWorkspace()
     // The manual counting loop no longer stacks the auto-analysis beneath it …
     expect(screen.getByText('Your wave count')).toBeInTheDocument()
     expect(screen.queryByText('Full-auto analysis')).not.toBeInTheDocument()
-    // … the AI workbench lives in its own section.
+    // … the AI workbench lives in its own section with sub-pills (Counts, Personas, Analogs, Hypotheses, Mood).
     fireEvent.click(screen.getByRole('tab', { name: 'Auto' }))
     expect(screen.getByText('Full-auto analysis')).toBeInTheDocument()
-    expect(screen.getByText('Historical analogs')).toBeInTheDocument()
-    expect(screen.getByText('Mood vs. wave position')).toBeInTheDocument()
+    expect(screen.queryByText('Historical analogs')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mood vs. wave position')).not.toBeInTheDocument()
     expect(screen.queryByText('Your wave count')).not.toBeInTheDocument()
+
+    // Switching sub-pills shows only the selected sub-panel at a time.
+    const autoSubTabs = screen.getByRole('tablist', { name: 'Auto analysis view' })
+    fireEvent.click(within(autoSubTabs).getByRole('tab', { name: 'Analogs' }))
+    expect(screen.getByText('Historical analogs')).toBeInTheDocument()
+    expect(screen.queryByText('Full-auto analysis')).not.toBeInTheDocument()
+
+    fireEvent.click(within(autoSubTabs).getByRole('tab', { name: 'Mood' }))
+    expect(screen.getByText('Mood vs. wave position')).toBeInTheDocument()
+    expect(screen.queryByText('Historical analogs')).not.toBeInTheDocument()
+  })
+
+  it('switches between Live check and AI coach sub-views in the Count tab without stacking', async () => {
+    mockClient.validateWaveCount.mockResolvedValue(sampleResponse)
+    mockClient.verifyEditedCount.mockResolvedValue({
+      structure: 'Impulse',
+      bullish: true,
+      isValid: true,
+      snapped: [],
+      rejected: [],
+      rules: {
+        bullishAssumed: true,
+        rules: [{ name: 'Rule 1', status: 'Pass', detail: 'ok' }],
+        ratios: [],
+      },
+      levels: null,
+      score: 0.85,
+    })
+    renderWorkspace()
+
+    fireEvent.click(screen.getByTestId('pt1'))
+    fireEvent.click(screen.getByTestId('pt2'))
+
+    // Live check is active by default once two pivots are placed.
+    const countSubTabs = screen.getByRole('tablist', { name: 'Count view' })
+    expect(within(countSubTabs).getByRole('tab', { name: 'Live check' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    expect(await screen.findByLabelText('Live verification')).toBeInTheDocument()
+
+    // Clicking "Validate my count" switches to AI coach and hides Live verification so they don't stack.
+    fireEvent.click(screen.getByRole('button', { name: /validate my count/i }))
+    expect(await screen.findByText('A clean five-wave impulse.')).toBeInTheDocument()
+    expect(within(countSubTabs).getByRole('tab', { name: 'AI coach' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    expect(screen.queryByLabelText('Live verification')).not.toBeInTheDocument()
+
+    // Clicking back on "Live check" restores the live verification view.
+    fireEvent.click(within(countSubTabs).getByRole('tab', { name: 'Live check' }))
+    expect(screen.getByLabelText('Live verification')).toBeInTheDocument()
+    expect(screen.queryByText('A clean five-wave impulse.')).not.toBeInTheDocument()
   })
 
   it('groups tools into tabs; switching shows one section and hides the others (#163)', () => {

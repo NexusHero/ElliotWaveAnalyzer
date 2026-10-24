@@ -123,6 +123,30 @@ const WORKSPACE_TABS = [
 ] as const
 type WorkspaceTab = (typeof WORKSPACE_TABS)[number]['key']
 
+/** Sub-views inside the Count tab so Live Check and AI Coach never stack underneath each other. */
+const COUNT_SUBTABS = [
+  { key: 'live', label: 'Live check' },
+  { key: 'coach', label: 'AI coach' },
+] as const
+type CountSubTab = (typeof COUNT_SUBTABS)[number]['key']
+
+/** Sub-views inside the Auto tab so only one AI/engine panel is visible at a time (no doom scrolling). */
+const AUTO_SUBTABS = [
+  { key: 'counts', label: 'Counts' },
+  { key: 'personas', label: 'Personas' },
+  { key: 'analogs', label: 'Analogs' },
+  { key: 'hypotheses', label: 'Hypotheses' },
+  { key: 'mood', label: 'Mood' },
+] as const
+type AutoSubTab = (typeof AUTO_SUBTABS)[number]['key']
+
+/** Sub-views inside the History tab. */
+const HISTORY_SUBTABS = [
+  { key: 'tracks', label: 'Saved counts' },
+  { key: 'backtest', label: 'Backtest' },
+] as const
+type HistorySubTab = (typeof HISTORY_SUBTABS)[number]['key']
+
 /**
  * Candle timeframe options. 1H/4H come from the intraday (hourly) source and work for
  * intraday-capable instruments; when a source can't serve them the chart shows an error state.
@@ -167,6 +191,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const [coachState, setCoachState] = useState<CoachState>('empty')
   const [mode, setMode] = useState<CoachMode>('user')
   const [tab, setTab] = useState<WorkspaceTab>('count')
+  const [countSubTab, setCountSubTab] = useState<CountSubTab>('live')
+  const [autoSubTab, setAutoSubTab] = useState<AutoSubTab>('counts')
+  const [historySubTab, setHistorySubTab] = useState<HistorySubTab>('tracks')
 
   const validation = useMutation({
     mutationFn: (payload: WaveAnnotation[]) => validateWaveCount({ symbol, annotations: payload }),
@@ -510,6 +537,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const resetCoach = useCallback(() => {
     setCoachState('empty')
     setMode('user')
+    setCountSubTab('live')
     validation.reset()
   }, [validation])
 
@@ -732,6 +760,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const runAnalysis = useCallback(
     (which: CoachMode, payload: WaveAnnotation[]) => {
       setMode(which)
+      setCountSubTab('coach')
       if (!hasApiKey) {
         setCoachState('needkey')
         return
@@ -758,6 +787,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   // renders in the Auto section, so the click also navigates there.
   const handleAnalyze = useCallback(() => {
     setTab('auto')
+    setAutoSubTab('counts')
     handleAutoAnalyze()
   }, [handleAutoAnalyze])
 
@@ -845,7 +875,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
   const liveVerifyError = liveVerify.error instanceof Error ? liveVerify.error.message : null
 
   return (
-    <div className="ws">
+    <div className="ws ws-shell">
       <OnboardingIntro />
       <div className="ws-grid">
         {/* ---- chart column ---- */}
@@ -1058,9 +1088,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 {annotations.length === 0 ? (
                   <p className="anno-empty">No labels yet — click the chart to begin.</p>
                 ) : (
-                  <ul className="anno-list">
+                  <ul className="anno-list anno-chips">
                     {annotations.map((a, i) => (
-                      <li key={`${a.date}-${i}`} className="anno-item">
+                      <li key={`${a.date}-${i}`} className="anno-item anno-chip">
                         <select
                           className="anno-sel mono"
                           aria-label={`Label for annotation ${i + 1}`}
@@ -1098,7 +1128,7 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                           aria-label={`Remove annotation ${i + 1}`}
                           onClick={() => handleRemove(i)}
                         >
-                          <Trash size={16} />
+                          <Trash size={14} />
                         </button>
                       </li>
                     ))}
@@ -1107,9 +1137,9 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 {legs.length > 0 && (
                   <div className="leg-readout" data-testid="leg-readout">
                     <div className="leg-readout-head mono">Δ price · % · days · ratio</div>
-                    <ul>
+                    <ul className="leg-chip-list">
                       {legs.map((leg, i) => (
-                        <li key={i} className="mono">
+                        <li key={i} className="leg-chip mono">
                           <span className="leg-name">{leg.label}</span>
                           <span className={leg.deltaPrice >= 0 ? 'up' : 'down'}>
                             {leg.deltaPrice >= 0 ? '+' : ''}
@@ -1130,133 +1160,206 @@ export default function WaveWorkspace({ theme, hasApiKey, onOpenSettings }: Wave
                 )}
               </div>
 
-              <CoachPanel
-                labelCount={annotations.length}
-                state={coachState}
-                mode={mode}
-                result={validation.data ?? null}
-                currentPrice={lastPrice}
-                error={analysisError}
-                onValidate={handleValidate}
-                onAnalyze={handleAnalyze}
-                onOpenSettings={onOpenSettings}
-              />
+              <div className="ws-subtabs" role="tablist" aria-label="Count view">
+                {COUNT_SUBTABS.map((st) => (
+                  <button
+                    key={st.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={countSubTab === st.key}
+                    className={`ws-subtab${countSubTab === st.key ? ' on' : ''}`}
+                    onClick={() => setCountSubTab(st.key)}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
 
-              <LiveVerifyPanel
-                state={liveVerifyState}
-                verification={liveVerify.data ?? null}
-                error={liveVerifyError}
-                currentPrice={lastPrice}
-                onSave={handleSaveManualCount}
-                savePending={manualSave.isPending}
-                saveError={manualSave.error instanceof Error ? manualSave.error.message : null}
-                savedId={manualSave.data?.id ?? null}
-              />
+              <div className="coach-scroll" data-testid="coach-scroll">
+                <CoachPanel
+                  labelCount={annotations.length}
+                  state={coachState}
+                  mode={mode}
+                  result={validation.data ?? null}
+                  currentPrice={lastPrice}
+                  error={analysisError}
+                  onValidate={handleValidate}
+                  onAnalyze={handleAnalyze}
+                  onOpenSettings={onOpenSettings}
+                  hideBody={countSubTab === 'live' && annotations.length >= 2}
+                />
+
+                {countSubTab === 'live' && (
+                  <LiveVerifyPanel
+                    state={liveVerifyState}
+                    verification={liveVerify.data ?? null}
+                    error={liveVerifyError}
+                    currentPrice={lastPrice}
+                    onSave={handleSaveManualCount}
+                    savePending={manualSave.isPending}
+                    saveError={manualSave.error instanceof Error ? manualSave.error.message : null}
+                    savedId={manualSave.data?.id ?? null}
+                  />
+                )}
+              </div>
             </>
           )}
 
-          {/* The AI workbench gets its own section — the auto-analysis result (market read, ranked
-              counts, levels) is by far the tallest content and buried the manual loop when stacked
-              beneath it. Chart overlays still follow the active auto count regardless of tab. */}
+          {/* The AI workbench gets its own section — sub-pills switch between Counts, Personas,
+              Analogs, Hypotheses, and Mood so only one tool panel shows at a time (no doom scrolling). */}
           {tab === 'auto' && (
             <>
-              <AutoAnalysisPanel
-                state={autoState}
-                data={auto.data ?? null}
-                topDown={topDown.data ?? null}
-                error={autoError}
-                sensitivity={sensitivity}
-                sensitivities={SENSITIVITIES}
-                onSensitivityChange={handleSensitivity}
-                pro={pro}
-                activeCount={activeCount}
-                onSelectCount={handleSelectCount}
-                overlayCount={overlayCount}
-                onToggleOverlay={toggleOverlay}
-                currentPrice={lastPrice}
-                onRun={handleAutoAnalyze}
-                onOpenSettings={onOpenSettings}
-                onSaveCount={handleSaveCount}
-                savePending={saveMutation.isPending}
-              />
+              <div className="ws-subtabs" role="tablist" aria-label="Auto analysis view">
+                {AUTO_SUBTABS.map((st) => (
+                  <button
+                    key={st.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={autoSubTab === st.key}
+                    className={`ws-subtab${autoSubTab === st.key ? ' on' : ''}`}
+                    onClick={() => setAutoSubTab(st.key)}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
 
-              <PersonaPanel
-                symbol={symbol}
-                state={personaPanelState}
-                data={personaPanel.data ?? null}
-                error={personaPanel.error instanceof Error ? personaPanel.error.message : null}
-                onRun={handleRunPersonaPanel}
-                onOpenSettings={onOpenSettings}
-                onSaveCount={handleSavePersonaCount}
-                savePending={saveMutation.isPending}
-              />
+              <div className="coach-scroll" data-testid="coach-scroll">
+                {autoSubTab === 'counts' && (
+                  <AutoAnalysisPanel
+                    state={autoState}
+                    data={auto.data ?? null}
+                    topDown={topDown.data ?? null}
+                    error={autoError}
+                    sensitivity={sensitivity}
+                    sensitivities={SENSITIVITIES}
+                    onSensitivityChange={handleSensitivity}
+                    pro={pro}
+                    activeCount={activeCount}
+                    onSelectCount={handleSelectCount}
+                    overlayCount={overlayCount}
+                    onToggleOverlay={toggleOverlay}
+                    currentPrice={lastPrice}
+                    onRun={handleAutoAnalyze}
+                    onOpenSettings={onOpenSettings}
+                    onSaveCount={handleSaveCount}
+                    savePending={saveMutation.isPending}
+                  />
+                )}
 
-              <HistoricalAnalogsPanel
-                symbol={symbol}
-                state={analogsState}
-                data={analogs.data ?? null}
-                error={analogs.error instanceof Error ? analogs.error.message : null}
-                onLoad={() => analogs.mutate()}
-              />
+                {autoSubTab === 'personas' && (
+                  <PersonaPanel
+                    symbol={symbol}
+                    state={personaPanelState}
+                    data={personaPanel.data ?? null}
+                    error={personaPanel.error instanceof Error ? personaPanel.error.message : null}
+                    onRun={handleRunPersonaPanel}
+                    onOpenSettings={onOpenSettings}
+                    onSaveCount={handleSavePersonaCount}
+                    savePending={saveMutation.isPending}
+                  />
+                )}
 
-              <HypothesesPanel
-                symbol={symbol}
-                state={hypothesesState}
-                data={hypotheses.data ?? null}
-                error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
-                onLoad={() => hypotheses.mutate()}
-              />
+                {autoSubTab === 'analogs' && (
+                  <HistoricalAnalogsPanel
+                    symbol={symbol}
+                    state={analogsState}
+                    data={analogs.data ?? null}
+                    error={analogs.error instanceof Error ? analogs.error.message : null}
+                    onLoad={() => analogs.mutate()}
+                  />
+                )}
 
-              <SentimentPanel
-                symbol={symbol}
-                state={sentimentState}
-                data={sentiment.data ?? null}
-                error={sentiment.error instanceof Error ? sentiment.error.message : null}
-                onLoad={() => sentiment.mutate()}
-              />
+                {autoSubTab === 'hypotheses' && (
+                  <HypothesesPanel
+                    symbol={symbol}
+                    state={hypothesesState}
+                    data={hypotheses.data ?? null}
+                    error={hypotheses.error instanceof Error ? hypotheses.error.message : null}
+                    onLoad={() => hypotheses.mutate()}
+                  />
+                )}
+
+                {autoSubTab === 'mood' && (
+                  <SentimentPanel
+                    symbol={symbol}
+                    state={sentimentState}
+                    data={sentiment.data ?? null}
+                    error={sentiment.error instanceof Error ? sentiment.error.message : null}
+                    onLoad={() => sentiment.mutate()}
+                  />
+                )}
+              </div>
             </>
           )}
 
           {tab === 'scan' && (
-            <ScannerPanel
-              state={scannerState}
-              result={scanMutation.data ?? null}
-              error={scanMutation.error instanceof Error ? scanMutation.error.message : null}
-              onScan={(filters) => scanMutation.mutate(filters)}
-            />
+            <div className="coach-scroll" data-testid="coach-scroll">
+              <ScannerPanel
+                state={scannerState}
+                result={scanMutation.data ?? null}
+                error={scanMutation.error instanceof Error ? scanMutation.error.message : null}
+                onScan={(filters) => scanMutation.mutate(filters)}
+              />
+            </div>
           )}
 
           {tab === 'verify' && (
-            <VerifyImagePanel
-              state={verifyImageState}
-              report={verifyImageMutation.data ?? null}
-              error={
-                verifyImageMutation.error instanceof Error
-                  ? verifyImageMutation.error.message
-                  : null
-              }
-              onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
-            />
+            <div className="coach-scroll" data-testid="coach-scroll">
+              <VerifyImagePanel
+                state={verifyImageState}
+                report={verifyImageMutation.data ?? null}
+                error={
+                  verifyImageMutation.error instanceof Error
+                    ? verifyImageMutation.error.message
+                    : null
+                }
+                onVerify={(file, symbol) => verifyImageMutation.mutate({ file, symbol })}
+              />
+            </div>
           )}
 
           {tab === 'portfolio' && (
-            <PortfolioReviewPanel
-              state={portfolioState}
-              review={portfolioQuery.data ?? null}
-              error={portfolioQuery.error instanceof Error ? portfolioQuery.error.message : null}
-            />
+            <div className="coach-scroll" data-testid="coach-scroll">
+              <PortfolioReviewPanel
+                state={portfolioState}
+                review={portfolioQuery.data ?? null}
+                error={portfolioQuery.error instanceof Error ? portfolioQuery.error.message : null}
+              />
+            </div>
           )}
 
           {tab === 'history' && (
             <>
-              <TrackRecordPanel
-                state={trackRecordState}
-                analyses={trackRecordQuery.data ?? []}
-                error={trackRecordError}
-                deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
-                onDelete={handleDeleteAnalysis}
-              />
-              <BacktestSummaryPanel summary={backtestQuery.data ?? null} />
+              <div className="ws-subtabs" role="tablist" aria-label="History view">
+                {HISTORY_SUBTABS.map((st) => (
+                  <button
+                    key={st.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={historySubTab === st.key}
+                    className={`ws-subtab${historySubTab === st.key ? ' on' : ''}`}
+                    onClick={() => setHistorySubTab(st.key)}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+              <div className="coach-scroll" data-testid="coach-scroll">
+                {historySubTab === 'tracks' ? (
+                  <TrackRecordPanel
+                    state={trackRecordState}
+                    analyses={trackRecordQuery.data ?? []}
+                    error={trackRecordError}
+                    deletingId={
+                      deleteMutation.isPending ? (deleteMutation.variables ?? null) : null
+                    }
+                    onDelete={handleDeleteAnalysis}
+                  />
+                ) : (
+                  <BacktestSummaryPanel summary={backtestQuery.data ?? null} />
+                )}
+              </div>
             </>
           )}
         </div>
