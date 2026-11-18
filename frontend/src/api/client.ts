@@ -587,6 +587,27 @@ export async function getWorkspaceDraft(
 }
 
 /**
+ * Mirrors the backend's route guard for `/api/workspace-drafts/{symbol}/{interval}`
+ * (`SymbolInput.IsValidSymbol` + `WorkspaceDraftEndpoints.ValidIntervals`): the symbol is a short
+ * ticker of letters, digits and `. - ^ = /`, and the interval one of the fixed draft intervals.
+ * Validating before building the URL means only allow-listed values ever reach the request path,
+ * rather than relying on encoding alone (Sonar S8476, client-side request forgery).
+ */
+const WORKSPACE_DRAFT_SYMBOL = /^[\p{L}\p{N}.\-^=/]{1,32}$/u
+const WORKSPACE_DRAFT_INTERVALS: ReadonlySet<string> = new Set(['1h', '4h', '1d', '1w'])
+
+function workspaceDraftUrl(symbol: string, interval: string): string {
+  if (!WORKSPACE_DRAFT_SYMBOL.test(symbol)) {
+    throw new Error(`Invalid symbol for workspace draft: ${JSON.stringify(symbol)}`)
+  }
+  const normalizedInterval = interval.toLowerCase()
+  if (!WORKSPACE_DRAFT_INTERVALS.has(normalizedInterval)) {
+    throw new Error(`Invalid interval for workspace draft: ${JSON.stringify(interval)}`)
+  }
+  return `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(normalizedInterval)}`
+}
+
+/**
  * Upserts the in-progress draft for a symbol+interval via
  * `PUT /api/workspace-drafts/{symbol}/{interval}` (#226). Meant for a debounced auto-save, not a
  * deliberate save — overwrites the prior draft silently.
@@ -597,15 +618,12 @@ export async function saveWorkspaceDraft(
   request: SaveWorkspaceDraftRequest,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch(
-    `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(interval)}`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request),
-      signal,
-    }
-  )
+  const response = await fetch(workspaceDraftUrl(symbol, interval), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+    signal,
+  })
 
   if (!response.ok) {
     throw new Error(await extractErrorDetail(response))
@@ -618,10 +636,7 @@ export async function deleteWorkspaceDraft(
   interval: string,
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch(
-    `/api/workspace-drafts/${encodeURIComponent(symbol)}/${encodeURIComponent(interval)}`,
-    { method: 'DELETE', signal }
-  )
+  const response = await fetch(workspaceDraftUrl(symbol, interval), { method: 'DELETE', signal })
 
   if (!response.ok && response.status !== 404) {
     throw new Error(await extractErrorDetail(response))

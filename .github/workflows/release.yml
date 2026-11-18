@@ -5,9 +5,9 @@ on:
     tags:
       - 'v*'
 
+# Least privilege: read-only by default; each job that writes asks for exactly what it needs.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
   # ── Backend: self-contained binaries for all platforms ───────────────────
@@ -80,11 +80,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
         working-directory: frontend
 
       - name: Build production bundle
@@ -110,6 +110,9 @@ jobs:
   publish-nuget:
     name: Publish NuGet Package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push the NuGet package to GitHub Packages
 
     steps:
       - uses: actions/checkout@v5
@@ -154,6 +157,8 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release and upload its assets
     needs: [publish-backend, publish-frontend, publish-nuget]
 
     steps:
@@ -175,7 +180,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: "Elliott Wave Analyzer ${{ github.ref_name }}"
           body: |

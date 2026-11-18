@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -14,7 +15,8 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "generate:api": "openapi-typescript ../backend/src/ElliotWaveAnalyzer.Api/openapi/ElliotWaveAnalyzer.Api.json -o src/api/generated.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:install-browser": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.2",

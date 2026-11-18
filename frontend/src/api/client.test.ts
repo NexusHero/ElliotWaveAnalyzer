@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  deleteWorkspaceDraft,
   getAuthProviders,
   getCurrentUser,
   getSavedDepot,
   importDepot,
   login,
+  saveWorkspaceDraft,
   searchSymbols,
   topDownAnalysis,
   validateWaveCount,
@@ -251,5 +253,32 @@ describe('getCurrentUser', () => {
     )
 
     expect(await getCurrentUser()).toEqual(user)
+  })
+})
+
+describe('workspace draft URLs', () => {
+  it('builds the PUT/DELETE path from an allow-listed symbol and interval', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await saveWorkspaceDraft('BTC/USD', '1d', { annotations: [], settings: null } as never)
+    await deleteWorkspaceDraft('^GSPC', '4h')
+
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/workspace-drafts/BTC%2FUSD/1d')
+    expect(fetchMock.mock.calls[1]![0]).toBe('/api/workspace-drafts/%5EGSPC/4h')
+  })
+
+  it.each([
+    ['BTC USD', '1d'],
+    ['BTC?x=1', '1d'],
+    ['', '1d'],
+    ['BTC', '5m'],
+    ['BTC', '1d/../x'],
+  ])('rejects %j / %j before any request is sent', async (symbol, interval) => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(deleteWorkspaceDraft(symbol, interval)).rejects.toThrow(/Invalid/)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -75,7 +75,7 @@ jobs:
         continue-on-error: true
 
       - name: Post coverage summary
-        uses: irongut/CodeCoverageSummary@v1.3.0
+        uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
         with:
           filename: backend/TestResults/**/coverage.cobertura.xml
           badge: true
@@ -128,11 +128,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
         working-directory: frontend
 
       - name: Run tests
@@ -175,7 +175,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Regenerate frontend/src/api/generated.ts from the fresh OpenAPI document
@@ -204,7 +204,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       # GHCR image names must be lowercase; the owner/repo slug may not be.
       - name: Resolve image name
@@ -214,14 +214,14 @@ jobs:
       # Only authenticate when we intend to push (pushes to main); never on PRs (incl. forks).
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: Dockerfile
