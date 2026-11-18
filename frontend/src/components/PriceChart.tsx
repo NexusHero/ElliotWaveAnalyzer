@@ -405,7 +405,9 @@ export default function PriceChart({
         futureTimes.add(path.toTimeMin)
         futureTimes.add(path.toTimeMax)
       }
-      timeSeries.setData([...futureTimes].sort().map((time) => ({ time: time as Time })))
+      timeSeries.setData(
+        [...futureTimes].sort((a, b) => a.localeCompare(b)).map((time) => ({ time: time as Time }))
+      )
     }
     projectionPathRef.current?.update(projectionPaths, projectionColors(chartColors(theme)))
   }, [projectionPaths, theme])

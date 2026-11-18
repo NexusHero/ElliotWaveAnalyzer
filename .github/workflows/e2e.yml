@@ -94,13 +94,13 @@ jobs:
           ConnectionStrings__Postgres: "Host=localhost;Port=5432;Database=ewa_e2e;Username=postgres;Password=postgres"
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Install Playwright's Chromium
         # GitHub-hosted runners have no browser pre-installed (unlike this repo's own authoring
         # environment, which does — see playwright.config.ts's comment).
-        run: npx playwright install --with-deps chromium
+        run: npm run test:e2e:install-browser
         working-directory: frontend
 
       - name: Start the frontend dev server

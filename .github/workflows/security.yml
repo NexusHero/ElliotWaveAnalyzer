@@ -57,7 +57,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Run npm audit
@@ -78,13 +78,17 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: frontend
 
       - name: Check licenses (no GPL / AGPL)
         working-directory: frontend
         run: |
-          npx license-checker-rseidelsohn --summary \
+          # Installed pinned + without lifecycle scripts into a scratch prefix (not a devDependency,
+          # which would pull its large npm-internals tree into the app's lockfile).
+          npm install --ignore-scripts --no-save --no-audit --no-fund \
+            --prefix "$RUNNER_TEMP/license-checker" license-checker-rseidelsohn@5.0.1
+          "$RUNNER_TEMP/license-checker/node_modules/.bin/license-checker-rseidelsohn" --summary \
             --failOn "GPL;AGPL" \
             --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;CC0-1.0;Unlicense;0BSD;BlueOak-1.0.0" \
             || echo "Warning: Unlisted or restrictive licenses found"
